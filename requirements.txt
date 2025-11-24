@@ -1,0 +1,4 @@
+ollama>=0.1.0
+pywin32>=306
+streamlit>=1.28.0
+
