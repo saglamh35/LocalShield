@@ -1947,7 +1947,6 @@
     "category": "Account Management",
     "subCategory": "Audit User Account Management",
     "eventID": "4798",
-    "advice": "Bunu senin için RAG sistemi ile buldum Patron! LocalShield çalışıyor. Şifreni hemen değiştir.",
     "level": "Information",
     "channel": "Security",
     "provider": "Microsoft-Windows-Security-Auditing",
@@ -3857,7 +3856,6 @@
     "eventID": "4672",
     "level": "Information",
     "channel": "Security",
-    "advice": "Bunu senin için RAG sistemi ile buldum Patron! LocalShield çalışıyor. Şifreni hemen değiştir.",
     "provider": "Microsoft-Windows-Security-Auditing",
     "description": "Special privileges assigned to new logon.",
     "availableSettings": [

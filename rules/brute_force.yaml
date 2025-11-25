@@ -1,0 +1,28 @@
+name: "Brute Force Attack Detection"
+description: "EventID 4625 (Failed Logon) için brute force saldırısı tespiti"
+enabled: true
+priority: "high"
+
+# Kural koşulları
+conditions:
+  event_id: "4625"
+  time_window: 60  # saniye cinsinden (1 dakika)
+  threshold: 5     # Bu süre içinde kaç tekrar olursa tetiklenir
+
+# Risk seviyesi (Kural Motoru bu değeri override eder)
+risk_level: "Yüksek"
+
+# MITRE ATT&CK Tekniği
+mitre_technique: "T1110"
+
+# Kural eşleştiğinde döndürülecek mesaj
+match_message: "Detection Rule Match: Brute Force Attack - EventID 4625 tekrar sayısı eşiği aşıldı"
+
+# Ek filtreleme (opsiyonel)
+filters:
+  # Belirli kullanıcı adlarını hariç tut (opsiyonel)
+  exclude_users: []
+  
+  # Sadece belirli kullanıcıları kontrol et (opsiyonel, boşsa tüm kullanıcılar)
+  include_users: []
+
