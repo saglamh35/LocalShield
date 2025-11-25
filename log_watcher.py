@@ -84,25 +84,56 @@ class LogWatcher:
     
     def parse_risk_level(self, analysis: str) -> str:
         """
-        AI analizinden risk seviyesini çıkarır
+        AI analizinden risk seviyesini çıkarır (Yeni Eğitici Markdown formatı için)
+        
+        Yeni format:
+        🕵️‍♂️ Olay Analizi
+        Kullanıcı: ...
+        Durum: ...
+        Risk: [Düşük/Orta/Yüksek]
         
         Args:
-            analysis: AI analiz metni
-            
+            analysis: AI analiz metni (Markdown formatında)
+        
         Returns:
             str: Risk seviyesi (Düşük/Orta/Yüksek)
         """
-        # "Risk Seviyesi: Yüksek | Özet: ..." formatından risk seviyesini çıkar
-        match = re.search(r'Risk Seviyesi:\s*([Düşük|Orta|Yüksek]+)', analysis, re.IGNORECASE)
+        # Yeni format: "Risk: [Düşük/Orta/Yüksek]" satırını ara
+        # Bu satır genellikle "🕵️‍♂️ Olay Analizi" bölümünde bulunur
+        # Regex: "Risk:" kelimesinden sonra gelen risk seviyesini yakala
+        match = re.search(r'Risk:\s*([Düşük|Orta|Yüksek]+)', analysis, re.IGNORECASE | re.MULTILINE)
+        
         if match:
             risk = match.group(1).strip()
-            # Türkçe karakterleri kontrol et
-            if "Yüksek" in risk or "yüksek" in risk.lower():
+            # Türkçe karakterleri ve büyük/küçük harf kontrolü
+            risk_lower = risk.lower()
+            if "yüksek" in risk_lower or "high" in risk_lower:
                 return "Yüksek"
-            elif "Orta" in risk or "orta" in risk.lower():
+            elif "orta" in risk_lower or "medium" in risk_lower:
                 return "Orta"
-            elif "Düşük" in risk or "düşük" in risk.lower():
+            elif "düşük" in risk_lower or "low" in risk_lower:
                 return "Düşük"
+        
+        # Eski format desteği (geriye dönük uyumluluk için)
+        # "🛑 Risk: Yüksek" formatını da destekle
+        match_old = re.search(r'🛑\s*Risk:\s*([Düşük|Orta|Yüksek]+)', analysis, re.IGNORECASE)
+        if match_old:
+            risk = match_old.group(1).strip()
+            risk_lower = risk.lower()
+            if "yüksek" in risk_lower or "high" in risk_lower:
+                return "Yüksek"
+            elif "orta" in risk_lower or "medium" in risk_lower:
+                return "Orta"
+            elif "düşük" in risk_lower or "low" in risk_lower:
+                return "Düşük"
+        
+        # Eğer hiçbir eşleşme bulunamazsa, analiz içeriğinden tahmin et
+        analysis_lower = analysis.lower()
+        if any(keyword in analysis_lower for keyword in ['brute', 'saldırı', 'attack', 'unauthorized', 'yetkisiz', 'şüpheli', 'suspicious']):
+            return "Yüksek"
+        elif any(keyword in analysis_lower for keyword in ['başarısız', 'failed', 'failed logon', 'sıradışı', 'unusual']):
+            return "Orta"
+        
         return "Orta"  # Varsayılan
     
     def process_event(self, event):
@@ -118,8 +149,21 @@ class LogWatcher:
             event_time = event.TimeGenerated
             message = self.get_event_message(event)
             
-            # Event'i zaman damgası ile birleştir
-            log_text = f"Event ID: {event_id}\nZaman: {event_time}\nMesaj: {message}"
+            # StringInserts'ten ek bilgiler al (AI'ın analiz edebilmesi için)
+            additional_info = ""
+            if event.StringInserts:
+                # StringInserts genellikle Event ID'ye göre farklı alanlar içerir
+                # Örneğin: Account Name, Workstation Name, Source Network Address vb.
+                inserts_str = " | ".join([str(insert) for insert in event.StringInserts if insert])
+                if inserts_str:
+                    additional_info = f"\nEk Detaylar (StringInserts): {inserts_str}"
+            
+            # Event'i zengin bir formatta birleştir (AI'ın daha iyi analiz edebilmesi için)
+            log_text = f"""Event ID: {event_id}
+Zaman: {event_time}
+Mesaj: {message}{additional_info}
+
+Not: Mesaj içinde 'Account Name', 'Workstation Name', 'Source Network Address', 'Logon Type' gibi alanları özellikle tarayın."""
             
             # AI'ye gönder ve analiz ettir
             print(f"\n🔍 Event ID {event_id} analiz ediliyor...")
@@ -128,12 +172,12 @@ class LogWatcher:
             # Risk seviyesini parse et
             risk_level = self.parse_risk_level(analysis)
             
-            # Veritabanına kaydet
+            # Veritabanına kaydet (ai_analysis artık Markdown formatında)
             insert_log(
                 timestamp=event_time,
                 event_id=event_id,
                 message=message[:500],  # Mesaj çok uzunsa kısalt
-                ai_analysis=analysis,
+                ai_analysis=analysis,  # Artık zengin Markdown formatında
                 risk_score=risk_level,
                 conn=self.db_conn
             )

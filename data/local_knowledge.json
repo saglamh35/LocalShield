@@ -1,0 +1,33 @@
+{
+    "4624": {
+        "title": "Başarılı Oturum Açma",
+        "description": "Bir kullanıcı başarılı şekilde sisteme giriş yaptı. Bu genelde normal bir durumdur, özellikle kullanıcı kendi bilgisayarında oturum açtıysa.",
+        "risk_level": "Düşük",
+        "advice": "Bu işlemi siz yaptıysanız görmezden gelebilirsiniz. Eğer beklenmedik bir zamanda veya IP adresinden giriş yapıldıysa, hesap güvenliğinizi kontrol edin."
+    },
+    "4625": {
+        "title": "Başarısız Oturum Açma Denemesi",
+        "description": "Birisi sisteme giriş yapmaya çalıştı ancak şifre yanlış veya hesap devre dışı. Bu bir brute-force saldırısının işareti olabilir.",
+        "risk_level": "Yüksek",
+        "advice": "IP adresini kontrol edin ve brute-force saldırısı olup olmadığına bakın. Aynı IP'den çok sayıda deneme varsa, bu IP'yi engelleyin. Şifre güvenliğinizi kontrol edin."
+    },
+    "4672": {
+        "title": "Özel Yetkilerle Oturum Açma",
+        "description": "Bir yönetici hesabı veya özel yetkilere sahip bir kullanıcı sisteme giriş yaptı. Bu normal bir durum olabilir, ancak yetkisiz erişim denemesi de olabilir.",
+        "risk_level": "Orta",
+        "advice": "Bu işlemi bir yönetici yaptıysa normaldir. Ancak beklenmedik bir zamanda veya bilinmeyen bir kaynaktan geliyorsa dikkatli olun. Yönetici hesaplarınızın güvenliğini kontrol edin."
+    },
+    "4720": {
+        "title": "Kullanıcı Hesabı Oluşturuldu",
+        "description": "Sistemde yeni bir kullanıcı hesabı oluşturuldu. Bu, yetkili bir yönetici tarafından yapılmış olabilir veya yetkisiz bir erişim göstergesi olabilir.",
+        "risk_level": "Yüksek",
+        "advice": "Bu hesabı kim oluşturdu? Yetkili bir yönetici değilse, bu ciddi bir güvenlik ihlalidir. Hemen hesabı devre dışı bırakın ve logları inceleyin."
+    },
+    "1102": {
+        "title": "Olay Günlüğü Temizlendi",
+        "description": "Windows olay günlüğü (Event Log) temizlendi. Bu, bir saldırganın izlerini örtmeye çalıştığının işareti olabilir.",
+        "risk_level": "Yüksek",
+        "advice": "Olay günlüğü temizlenmesi ciddi bir durumdur. Bir saldırgan izlerini örtmeye çalışıyor olabilir. Hemen sistem yöneticisi ile iletişime geçin ve tüm güvenlik önlemlerini gözden geçirin."
+    }
+}
+
