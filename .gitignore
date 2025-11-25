@@ -9,3 +9,11 @@ venv/
 logs.db
 *.log
 .DS_Store
+
+# Environment variables
+.env
+.env.local
+
+# Log files
+localshield.log
+*.log

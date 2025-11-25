@@ -6,7 +6,7 @@ import pandas as pd
 import altair as alt
 from datetime import datetime
 import config
-from db_manager import get_all_logs, get_high_risk_count, get_total_log_count, get_latest_detection
+from db_manager import get_all_logs, get_high_risk_count, get_total_log_count, get_latest_detection, clear_all_logs
 from modules.network_scanner import scan_open_ports, get_port_summary
 from modules.chat_manager import ask_assistant
 
@@ -71,9 +71,9 @@ def load_data():
         if not logs:
             return pd.DataFrame()
         
-        # DataFrame oluştur
+        # DataFrame oluştur (mitre_technique dahil)
         df = pd.DataFrame(logs, columns=[
-            'ID', 'Zaman', 'Event ID', 'Mesaj', 'AI Analiz', 'Risk Seviyesi'
+            'ID', 'Zaman', 'Event ID', 'Mesaj', 'AI Analiz', 'Risk Seviyesi', 'MITRE Tekniği'
         ])
         
         # Zaman sütununu datetime'a çevir
@@ -118,7 +118,7 @@ def get_risk_color_class(risk_level):
     return ""
 
 
-def filter_data(df, risk_filters, event_id_filter):
+def filter_data(df, risk_filters, event_id_filter, text_search=None):
     """Verileri filtreler"""
     filtered_df = df.copy()
     
@@ -133,6 +133,16 @@ def filter_data(df, risk_filters, event_id_filter):
         filtered_df = filtered_df[
             filtered_df['Event ID'].astype(str).str.contains(event_id_filter, case=False, na=False)
         ]
+    
+    # Gelişmiş Arama (Text Search) - Mesaj, AI Analiz, MITRE Tekniği içinde ara
+    if text_search and text_search.strip():
+        search_term = text_search.strip().lower()
+        mask = (
+            filtered_df['Mesaj'].astype(str).str.lower().str.contains(search_term, na=False) |
+            filtered_df['AI Analiz'].astype(str).str.lower().str.contains(search_term, na=False) |
+            filtered_df['MITRE Tekniği'].astype(str).str.lower().str.contains(search_term, na=False)
+        )
+        filtered_df = filtered_df[mask]
     
     return filtered_df
 
@@ -267,8 +277,14 @@ def render_log_card(row):
     
     event_id = str(row.get('Event ID', 'N/A'))
     
+    # MITRE tekniğini al
+    mitre_technique = row.get('MITRE Tekniği', None)
+    mitre_display = ""
+    if mitre_technique and pd.notna(mitre_technique) and str(mitre_technique).strip():
+        mitre_display = f" 🔴 {mitre_technique}"
+    
     # Başlık oluştur - risk seviyesi vurgulanmış (Markdown formatında)
-    header = f"{risk_icon} {time_str} - {risk_level} - Event ID: {event_id}"
+    header = f"{risk_icon} {time_str} - {risk_level}{mitre_display} - Event ID: {event_id}"
     
     # Genişletici içeriği
     with st.expander(header, expanded=False):
@@ -281,6 +297,10 @@ def render_log_card(row):
             st.write(f"**Zaman:** `{time_str}`")
             risk_display = f"<span class='{risk_class}'>**{risk_level}** {risk_icon}</span>"
             st.markdown(f"**Risk Seviyesi:** {risk_display}", unsafe_allow_html=True)
+            
+            # MITRE Tekniği göster
+            if mitre_technique and pd.notna(mitre_technique) and str(mitre_technique).strip():
+                st.markdown(f"**🔴 MITRE ATT&CK:** `{mitre_technique}`")
         
         with col2:
             st.markdown("**🤖 AI Analizi**")
@@ -326,8 +346,42 @@ def main():
             placeholder="Örn: 4625, 4624..."
         )
         
+        # Gelişmiş Arama (Text Search)
+        text_search = st.text_input(
+            "🔎 Gelişmiş Arama",
+            placeholder="Mesaj, AI Analiz veya MITRE Tekniği içinde ara..."
+        )
+        
         st.markdown("---")
         st.caption("💡 Filtreleri temizlemek için seçimleri kaldırın.")
+        
+        # Veritabanını Temizle Butonu
+        st.markdown("---")
+        st.header("⚙️ Yönetim")
+        
+        # Session state ile onay kontrolü
+        if 'confirm_reset' not in st.session_state:
+            st.session_state.confirm_reset = False
+        
+        if not st.session_state.confirm_reset:
+            if st.button("🗑️ Veritabanını Temizle", type="secondary", use_container_width=True):
+                st.session_state.confirm_reset = True
+                st.rerun()
+        else:
+            st.warning("⚠️ Tüm log kayıtları silinecek! Bu işlem geri alınamaz.")
+            col_confirm1, col_confirm2 = st.columns(2)
+            with col_confirm1:
+                if st.button("✅ Onayla", type="primary", use_container_width=True):
+                    if clear_all_logs(config.DB_PATH):
+                        st.session_state.confirm_reset = False
+                        st.success("✅ Veritabanı başarıyla temizlendi!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Veritabanı temizlenirken hata oluştu.")
+            with col_confirm2:
+                if st.button("❌ İptal", use_container_width=True):
+                    st.session_state.confirm_reset = False
+                    st.rerun()
     
     # Metrikler
     col1, col2, col3 = st.columns(3)
@@ -403,10 +457,23 @@ def main():
             st.markdown("---")
             
             # Filtreleme
-            filtered_df = filter_data(df, selected_risks, event_id_filter)
+            filtered_df = filter_data(df, selected_risks, event_id_filter, text_search)
             
-            # Log kartları
-            st.subheader(f"📋 Güvenlik Logları ({len(filtered_df)} kayıt)")
+            # CSV İndirme Butonu ve Log Başlığı
+            col_header1, col_header2 = st.columns([3, 1])
+            with col_header1:
+                st.subheader(f"📋 Güvenlik Logları ({len(filtered_df)} kayıt)")
+            with col_header2:
+                if not filtered_df.empty:
+                    # CSV olarak indir
+                    csv = filtered_df.to_csv(index=False, encoding='utf-8-sig')
+                    st.download_button(
+                        label="📥 CSV Olarak İndir",
+                        data=csv,
+                        file_name=f"localshield_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
             
             if filtered_df.empty:
                 st.info("🔍 Filtre kriterlerine uygun log bulunamadı.")

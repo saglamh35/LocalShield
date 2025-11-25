@@ -3,7 +3,7 @@ Network Scanner Module - Açık Portları Tarayan Modül
 """
 import psutil
 import socket
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 
 # Yüksek riskli portlar (güvenlik açısından kritik)
@@ -54,7 +54,7 @@ def get_process_name(pid: int) -> str:
         return "Bilinmiyor"
 
 
-def get_port_info(port: int, pid: Optional[int] = None) -> Dict[str, any]:
+def get_port_info(port: int, pid: Optional[int] = None) -> Dict[str, Any]:
     """
     Port hakkında bilgi toplar
     
@@ -98,7 +98,7 @@ def get_port_info(port: int, pid: Optional[int] = None) -> Dict[str, any]:
     return port_info
 
 
-def scan_open_ports() -> List[Dict[str, any]]:
+def scan_open_ports() -> List[Dict[str, Any]]:
     """
     Bilgisayardaki LISTEN (Dinleme) modundaki tüm TCP portlarını tarar
     
@@ -160,7 +160,7 @@ def scan_open_ports() -> List[Dict[str, any]]:
     return open_ports
 
 
-def get_port_summary(ports: List[Dict[str, any]]) -> Dict[str, int]:
+def get_port_summary(ports: List[Dict[str, Any]]) -> Dict[str, int]:
     """
     Port tarama sonuçlarının özetini döndürür
     

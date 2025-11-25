@@ -3,8 +3,6 @@ Chat Manager Module - AI Chatbot Asistanı
 LocalShield için interaktif AI asistan modülü
 """
 import ollama
-from datetime import datetime
-from typing import List, Dict
 import config
 from db_manager import get_all_logs
 from modules.network_scanner import scan_open_ports

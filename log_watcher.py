@@ -1,11 +1,13 @@
 """
 Log Watcher - Windows Security Event Log'larını sürekli dinleyen servis
+Production-Ready: Asenkron yapı ve logging ile güncellendi
 """
-import time
+import asyncio
 import sys
+import logging
 from datetime import datetime
-from typing import Optional
-import re
+from typing import Optional, List, Any
+from concurrent.futures import ThreadPoolExecutor
 
 try:
     import win32evtlog
@@ -18,127 +20,86 @@ except ImportError:
 import config
 from db_manager import init_db, insert_log
 from modules.ai_engine import Brain
+from modules.detection_engine import DetectionEngine
+
+# Logging yapılandırması
+logging.basicConfig(
+    level=getattr(logging, config.LOG_LEVEL, logging.INFO),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(config.LOG_FILE, encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 
 class LogWatcher:
     """
-    Windows Security Event Log'larını sürekli dinleyen ve AI ile analiz eden sınıf
+    Windows Security Event Log'larını asenkron olarak dinleyen ve AI ile analiz eden sınıf
+    Production-Ready: AsyncIO kullanarak non-blocking yapı
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         """LogWatcher'ı başlatır"""
         self.brain = Brain()
+        self.detection_engine = DetectionEngine()  # Kural Motoru
         self.db_conn = init_db(config.DB_PATH)
-        self.log_handle = None
-        self.last_check_time = datetime.now()  # Son kontrol zamanı
-        self.check_interval = 5  # 5 saniyede bir kontrol et
-        
-    def open_event_log(self):
-        """Windows Event Log'unu açar"""
+        self.log_handle: Optional[Any] = None
+        self.last_check_time = datetime.now()
+        self.check_interval: int = config.CHECK_INTERVAL
+        self.executor = ThreadPoolExecutor(max_workers=3)  # Thread pool for blocking operations
+        self.running: bool = False
+    
+    def open_event_log(self) -> None:
+        """Windows Event Log'unu açar (senkron işlem)"""
         try:
             self.log_handle = win32evtlog.OpenEventLog(
                 None,  # Local machine
                 config.EVENT_LOG_NAME
             )
-            print(f"✅ '{config.EVENT_LOG_NAME}' log'u başarıyla açıldı.")
+            logger.info(f"'{config.EVENT_LOG_NAME}' log'u başarıyla açıldı")
             
         except Exception as e:
-            print(f"❌ Event Log açılamadı: {e}")
-            print("💡 Yönetici haklarıyla çalıştırdığınızdan emin olun.")
+            logger.error(f"Event Log açılamadı: {e}")
+            logger.warning("💡 Yönetici haklarıyla çalıştırdığınızdan emin olun.")
             raise
     
-    def close_event_log(self):
+    def close_event_log(self) -> None:
         """Windows Event Log'unu kapatır"""
         if self.log_handle:
             try:
                 win32evtlog.CloseEventLog(self.log_handle)
                 self.log_handle = None
             except Exception as e:
-                print(f"⚠️  Log kapatılırken hata: {e}")
+                logger.warning(f"Log kapatılırken hata: {e}")
     
-    def get_event_message(self, event):
+    def get_event_message(self, event: Any) -> str:
         """
         Event'ten okunabilir mesaj metnini alır
         
         Args:
             event: win32evtlog event nesnesi
-            
+        
         Returns:
             str: Event mesajı
         """
         try:
-            # Win32evtlogutil ile mesajı formatla
             message = win32evtlogutil.SafeFormatMessage(event, config.EVENT_LOG_NAME)
             if not message or message.strip() == "":
-                # Mesaj alınamazsa StringInserts'ten oluştur
                 if event.StringInserts:
                     message = " | ".join(str(insert) for insert in event.StringInserts)
                 else:
                     message = "Mesaj alınamadı"
             return message
         except Exception as e:
-            # Mesaj alınamazsa alternatif yöntemler dene
             if event.StringInserts:
                 return " | ".join(str(insert) for insert in event.StringInserts)
             return f"Event ID {event.EventID} (Mesaj parse edilemedi: {e})"
     
-    def parse_risk_level(self, analysis: str) -> str:
+    async def process_event_async(self, event: Any) -> None:
         """
-        AI analizinden risk seviyesini çıkarır (Yeni Eğitici Markdown formatı için)
-        
-        Yeni format:
-        🕵️‍♂️ Olay Analizi
-        Kullanıcı: ...
-        Durum: ...
-        Risk: [Düşük/Orta/Yüksek]
-        
-        Args:
-            analysis: AI analiz metni (Markdown formatında)
-        
-        Returns:
-            str: Risk seviyesi (Düşük/Orta/Yüksek)
-        """
-        # Yeni format: "Risk: [Düşük/Orta/Yüksek]" satırını ara
-        # Bu satır genellikle "🕵️‍♂️ Olay Analizi" bölümünde bulunur
-        # Regex: "Risk:" kelimesinden sonra gelen risk seviyesini yakala
-        match = re.search(r'Risk:\s*([Düşük|Orta|Yüksek]+)', analysis, re.IGNORECASE | re.MULTILINE)
-        
-        if match:
-            risk = match.group(1).strip()
-            # Türkçe karakterleri ve büyük/küçük harf kontrolü
-            risk_lower = risk.lower()
-            if "yüksek" in risk_lower or "high" in risk_lower:
-                return "Yüksek"
-            elif "orta" in risk_lower or "medium" in risk_lower:
-                return "Orta"
-            elif "düşük" in risk_lower or "low" in risk_lower:
-                return "Düşük"
-        
-        # Eski format desteği (geriye dönük uyumluluk için)
-        # "🛑 Risk: Yüksek" formatını da destekle
-        match_old = re.search(r'🛑\s*Risk:\s*([Düşük|Orta|Yüksek]+)', analysis, re.IGNORECASE)
-        if match_old:
-            risk = match_old.group(1).strip()
-            risk_lower = risk.lower()
-            if "yüksek" in risk_lower or "high" in risk_lower:
-                return "Yüksek"
-            elif "orta" in risk_lower or "medium" in risk_lower:
-                return "Orta"
-            elif "düşük" in risk_lower or "low" in risk_lower:
-                return "Düşük"
-        
-        # Eğer hiçbir eşleşme bulunamazsa, analiz içeriğinden tahmin et
-        analysis_lower = analysis.lower()
-        if any(keyword in analysis_lower for keyword in ['brute', 'saldırı', 'attack', 'unauthorized', 'yetkisiz', 'şüpheli', 'suspicious']):
-            return "Yüksek"
-        elif any(keyword in analysis_lower for keyword in ['başarısız', 'failed', 'failed logon', 'sıradışı', 'unusual']):
-            return "Orta"
-        
-        return "Orta"  # Varsayılan
-    
-    def process_event(self, event):
-        """
-        Tek bir event'i işler: AI'ye gönderir, veritabanına kaydeder
+        Tek bir event'i asenkron olarak işler: AI'ye gönderir, veritabanına kaydeder
         
         Args:
             event: win32evtlog event nesnesi
@@ -149,57 +110,146 @@ class LogWatcher:
             event_time = event.TimeGenerated
             message = self.get_event_message(event)
             
-            # StringInserts'ten ek bilgiler al (AI'ın analiz edebilmesi için)
+            # StringInserts'ten ek bilgiler al
             additional_info = ""
             if event.StringInserts:
-                # StringInserts genellikle Event ID'ye göre farklı alanlar içerir
-                # Örneğin: Account Name, Workstation Name, Source Network Address vb.
                 inserts_str = " | ".join([str(insert) for insert in event.StringInserts if insert])
                 if inserts_str:
                     additional_info = f"\nEk Detaylar (StringInserts): {inserts_str}"
             
-            # Event'i zengin bir formatta birleştir (AI'ın daha iyi analiz edebilmesi için)
+            # Event'i zengin bir formatta birleştir
             log_text = f"""Event ID: {event_id}
 Zaman: {event_time}
 Mesaj: {message}{additional_info}
 
 Not: Mesaj içinde 'Account Name', 'Workstation Name', 'Source Network Address', 'Logon Type' gibi alanları özellikle tarayın."""
             
-            # AI'ye gönder ve analiz ettir
-            print(f"\n🔍 Event ID {event_id} analiz ediliyor...")
-            analysis = self.brain.analyze(log_text)
-            
-            # Risk seviyesini parse et
-            risk_level = self.parse_risk_level(analysis)
-            
-            # Veritabanına kaydet (ai_analysis artık Markdown formatında)
-            insert_log(
-                timestamp=event_time,
-                event_id=event_id,
-                message=message[:500],  # Mesaj çok uzunsa kısalt
-                ai_analysis=analysis,  # Artık zengin Markdown formatında
-                risk_score=risk_level,
-                conn=self.db_conn
+            # ÖNCE: Kural Motoru kontrolü (Hızlı ve Kesin)
+            logger.info(f"Event ID {event_id} kural motorunda kontrol ediliyor...")
+            loop = asyncio.get_event_loop()
+            detection_result = await loop.run_in_executor(
+                self.executor,
+                self.detection_engine.check_event,
+                event_id,
+                event_time,
+                message
             )
             
-            # Ekrana yazdır
-            print(f"✅ Log işlendi: {event_id} - {risk_level}")
+            # Kural Motoru sonucu
+            rule_risk_level: Optional[str] = None
+            mitre_technique: Optional[str] = None
+            rule_match_message: Optional[str] = None
+            
+            if detection_result:
+                rule_risk_level = detection_result.get('risk_level')
+                mitre_technique = detection_result.get('mitre_technique')
+                rule_match_message = detection_result.get('match_message')
+                logger.warning(f"🔴 KURAL EŞLEŞMESİ: {detection_result.get('rule_name')} - Risk: {rule_risk_level}, MITRE: {mitre_technique}")
+            
+            # SONRA: AI analizini thread pool'da çalıştır (blocking operation)
+            logger.info(f"Event ID {event_id} AI ile analiz ediliyor...")
+            analysis, ai_risk_level = await loop.run_in_executor(
+                self.executor,
+                self.brain.analyze,
+                log_text
+            )
+            
+            # Kural Motoru override mantığı: Eğer Kural Motoru "Yüksek Risk" derse, AI'ın risk skorunu override et
+            final_risk_level = ai_risk_level
+            final_analysis = analysis
+            
+            if rule_risk_level:
+                # Kural Motoru sonucunu AI analizine ekle
+                if rule_match_message:
+                    final_analysis = f"{rule_match_message}\n\n---\n\n{analysis}"
+                
+                # Kural Motoru "Yüksek Risk" derse, AI'ın risk skorunu override et
+                if rule_risk_level == "Yüksek":
+                    final_risk_level = "Yüksek"
+                    logger.warning(f"⚠️ Kural Motoru risk skorunu override etti: {ai_risk_level} -> {final_risk_level}")
+                else:
+                    # Kural Motoru "Yüksek" değilse, AI'ın skorunu kullan ama kural sonucunu da göster
+                    final_risk_level = ai_risk_level
+            
+            # Veritabanına kaydet (thread pool'da çalıştır)
+            # DÜZELTME: conn=None yaparak her thread'in kendi connection'ını açmasını sağlıyoruz
+            # SQLite thread-safe değil, bu yüzden her thread kendi connection'ını kullanmalı
+            await loop.run_in_executor(
+                self.executor,
+                lambda: insert_log(
+                    timestamp=event_time,
+                    event_id=event_id,
+                    message=message[:500],
+                    ai_analysis=final_analysis,
+                    risk_score=final_risk_level,
+                    mitre_technique=mitre_technique,
+                    conn=None  # Her thread kendi connection'ını açacak
+                )
+            )
+            
+            logger.info(f"Log işlendi: Event ID {event_id} - Risk: {final_risk_level} - MITRE: {mitre_technique or 'N/A'}")
             
         except Exception as e:
-            print(f"❌ Event işlenirken hata: {e}")
+            logger.error(f"Event işlenirken hata: {e}", exc_info=True)
     
-    def check_new_events(self):
-        """Yeni event'leri kontrol eder ve işler"""
+    async def check_new_events_async(self) -> None:
+        """Yeni event'leri asenkron olarak kontrol eder ve işler"""
+        try:
+            # Event log okuma işlemini thread pool'da çalıştır (blocking operation)
+            loop = asyncio.get_event_loop()
+            events = await loop.run_in_executor(
+                self.executor,
+                self._read_events_sync
+            )
+            
+            if events:
+                # Yeni event'leri asenkron olarak işle
+                tasks = []
+                for event in events:
+                    task = self.process_event_async(event)
+                    tasks.append(task)
+                
+                # Tüm event'leri paralel işle
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Son kontrol zamanını güncelle
+            self.last_check_time = datetime.now()
+                    
+        except Exception as e:
+            error_code = getattr(e, 'winerror', None)
+            error_msg = str(e).lower()
+            
+            # Normal hataları loglamadan atla
+            if error_code == 122 or error_code == 1223:
+                pass
+            elif "no more data" in error_msg or "no more events" in error_msg or "no records" in error_msg:
+                pass
+            else:
+                logger.warning(f"Log okuma hatası: {e}")
+                # Log'u yeniden kurmayı dene
+                try:
+                    self.close_event_log()
+                    await asyncio.sleep(1)
+                except Exception:
+                    pass
+    
+    def _read_events_sync(self) -> List[Any]:
+        """
+        Event'leri senkron olarak okur (thread pool'da çalıştırılacak)
+        
+        Returns:
+            list: Yeni event'lerin listesi
+        """
         try:
             # Her seferinde log'u kapatıp aç (yeni logları görmek için)
             self.close_event_log()
             self.open_event_log()
             
             if not self.log_handle:
-                return
+                return []
             
             # Son kontrol zamanından sonraki event'leri oku
-            # En yeni kayıtlardan başlayarak oku (backwards read)
             flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
             
             events = win32evtlog.ReadEventLog(
@@ -216,80 +266,78 @@ Not: Mesaj içinde 'Account Name', 'Workstation Name', 'Source Network Address',
                 # Event'leri zaman damgasına göre filtrele
                 for event in events:
                     event_time = event.TimeGenerated
-                    # Son kontrol zamanından sonraki event'leri al
                     if event_time > self.last_check_time:
                         new_events.append(event)
                 
-                # Yeni event'leri zaman sırasına göre sırala (en eskiden en yeniye)
+                # Yeni event'leri zaman sırasına göre sırala
                 new_events.sort(key=lambda e: e.TimeGenerated)
-                
-                # Yeni event'leri işle
-                for event in new_events:
-                    self.process_event(event)
+                return new_events
             
-            # Son kontrol zamanını güncelle
-            self.last_check_time = datetime.now()
-                    
+            return []
+            
         except Exception as e:
-            # Hata durumunda
             error_code = getattr(e, 'winerror', None)
             error_msg = str(e).lower()
             
-            if error_code == 122:  # ERROR_INSUFFICIENT_BUFFER
-                # Buffer çok küçük, bu normal olabilir
-                pass
-            elif "no more data" in error_msg or "no more events" in error_msg or "no records" in error_msg:
-                # Yeni log yok, bu normal
-                pass
-            elif error_code == 1223:  # ERROR_NO_MORE_ITEMS
-                # Daha fazla item yok, normal
-                pass
-            else:
-                print(f"⚠️  Log okuma hatası: {e}")
-                # Log'u yeniden kurmayı dene
-                try:
-                    self.close_event_log()
-                    time.sleep(1)
-                except:
-                    pass
+            # Normal hataları sessizce atla
+            if error_code == 122 or error_code == 1223:
+                return []
+            elif "no more data" in error_msg or "no more events" in error_msg:
+                return []
+            
+            logger.warning(f"Event okuma hatası: {e}")
+            return []
     
-    def run(self):
-        """Sonsuz döngüde log'ları dinler"""
-        print("🛡️  LocalShield Log Watcher başlatılıyor...")
-        print("=" * 60)
+    async def run_async(self) -> None:
+        """Asenkron olarak log'ları dinler"""
+        logger.info("🛡️  LocalShield Log Watcher başlatılıyor...")
+        logger.info("=" * 60)
         
         try:
-            # Event Log'u aç
-            self.open_event_log()
+            # Event Log'u aç (senkron işlem, thread pool'da çalıştır)
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(self.executor, self.open_event_log)
             
-            print(f"⏰ Her {self.check_interval} saniyede bir yeni log kontrol ediliyor...")
-            print("💡 Çıkmak için Ctrl+C tuşlarına basın.")
-            print("=" * 60)
+            logger.info(f"⏰ Her {self.check_interval} saniyede bir yeni log kontrol ediliyor...")
+            logger.info("💡 Çıkmak için Ctrl+C tuşlarına basın.")
+            logger.info("=" * 60)
             
-            # Sonsuz döngü
-            while True:
+            self.running = True
+            
+            # Asenkron döngü
+            while self.running:
                 try:
-                    self.check_new_events()
+                    await self.check_new_events_async()
+                    await asyncio.sleep(self.check_interval)
                 except KeyboardInterrupt:
-                    print("\n\n⚠️  Kullanıcı tarafından durduruldu.")
+                    logger.info("\n\n⚠️  Kullanıcı tarafından durduruldu.")
+                    self.running = False
                     break
                 except Exception as e:
-                    print(f"❌ Beklenmeyen hata: {e}")
-                
-                # 5 saniye bekle
-                time.sleep(self.check_interval)
-                
+                    logger.error(f"Beklenmeyen hata: {e}", exc_info=True)
+                    await asyncio.sleep(1)  # Hata durumunda kısa bekle
+                    
         except Exception as e:
-            print(f"❌ Kritik hata: {e}")
+            logger.error(f"Kritik hata: {e}", exc_info=True)
         finally:
             # Temizlik
             self.close_event_log()
             if self.db_conn:
                 self.db_conn.close()
-            print("\n🛡️  LocalShield Log Watcher kapatıldı.")
+            self.executor.shutdown(wait=True)
+            logger.info("\n🛡️  LocalShield Log Watcher kapatıldı.")
+    
+    def run(self) -> None:
+        """
+        Senkron wrapper - asenkron run_async'i çalıştırır
+        Geriye dönük uyumluluk için
+        """
+        try:
+            asyncio.run(self.run_async())
+        except KeyboardInterrupt:
+            logger.info("Log Watcher durduruldu.")
 
 
 if __name__ == "__main__":
     watcher = LogWatcher()
     watcher.run()
-
