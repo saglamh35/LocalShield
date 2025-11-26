@@ -31,7 +31,11 @@ LocalShield, modern bir **Pipeline** mimarisi kullanır:
 3. **Storage:** SQLite (WAL Modu) ile yüksek performanslı kayıt.
 4. **Visualization:** Streamlit tabanlı interaktif dashboard ve AI Asistan.
 
----![Uploading Gemini_Generated_Image_rmjc5mrmjc5mrmjc.png…]()
+<img width="2816" height="1536" alt="Gemini_Generated_Image_rmjc5mrmjc5mrmjc" src="https://github.com/user-attachments/assets/3398cb0e-07d8-4d3b-9fe4-e71dcea6518a" />
+
+
+
+
 
 
 ## 🚀 Hızlı Başlangıç (Quick Start)
