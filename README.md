@@ -18,7 +18,7 @@ Verileriniz asla buluta gönderilmez. %100 Yerel ve Çevrimdışı çalışır.
 | **🛡️ Privacy-First** | İnternet gerekmez. Loglar ve AI analizi tamamen makinenizde (`localhost`) kalır. |
 | **📊 SOC Dashboard** | Profesyonel bir SIEM arayüzü ile riskleri, zaman çizelgesini ve portları görselleştirir. |
 
----
+
 
 ## 🏗️ Mimari
 
@@ -31,7 +31,8 @@ LocalShield, modern bir **Pipeline** mimarisi kullanır:
 3. **Storage:** SQLite (WAL Modu) ile yüksek performanslı kayıt.
 4. **Visualization:** Streamlit tabanlı interaktif dashboard ve AI Asistan.
 
----
+---![Uploading Gemini_Generated_Image_rmjc5mrmjc5mrmjc.png…]()
+
 
 ## 🚀 Hızlı Başlangıç (Quick Start)
 
@@ -217,29 +218,6 @@ Proje, pytest ile test edilmiştir:
 pytest tests/
 ```
 
----
-
-## 📤 GitHub'a Yükleme (Force Push)
-
-Eğer GitHub'da daha önce bir şeyler yüklediysen ve şu anki yerel (local) halinle çakışıyorsa, hata alırsın. Aşağıdaki komut, yerel halini **"Tek Gerçek"** kabul eder ve GitHub'ı ezer.
-
-Terminali aç ve proje klasöründe şu komutları sırasıyla gir:
-
-```powershell
-# 1. Git durumunu hazırla
-git add .
-git commit -m "Final Release v1.0: Async Architecture, Detection Engine & Dashboard Polish"
-
-# 2. Branch adının main olduğundan emin ol
-git branch -M main
-
-# 3. FORCE PUSH (DİKKAT: GitHub'daki eski kodları ezer, yereldekini yükler)
-git push -u origin main --force
-```
-
-> ⚠️ **Uyarı**: `--force` flag'i GitHub'daki mevcut kodu tamamen ezer. Kullanmadan önce emin olun!
-
----
 
 ## 📝 Lisans
 
@@ -264,13 +242,6 @@ Sorularınız veya önerileriniz için issue açabilirsiniz.
 
 ---
 
-## 🙏 Teşekkürler
-
-- **Ollama** - Lokal LLM desteği için
-- **Streamlit** - Dashboard framework'ü için
-- **MITRE ATT&CK** - Framework için
-
----
 
 <div align="center">
 
