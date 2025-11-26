@@ -1,12 +1,12 @@
 """
-Network Scanner Module - Açık Portları Tarayan Modül
+Network Scanner Module - Module for Scanning Open Ports
 """
 import psutil
 import socket
 from typing import List, Dict, Optional, Any
 
 
-# Yüksek riskli portlar (güvenlik açısından kritik)
+# High-risk ports (critical from security perspective)
 HIGH_RISK_PORTS = {
     21: "FTP",
     23: "Telnet",
@@ -21,7 +21,7 @@ HIGH_RISK_PORTS = {
     139: "NetBIOS"
 }
 
-# Düşük riskli ama yaygın portlar
+# Low-risk but common ports
 KNOWN_SAFE_PORTS = {
     80: "HTTP",
     443: "HTTPS",
@@ -37,124 +37,124 @@ KNOWN_SAFE_PORTS = {
 
 def get_process_name(pid: int) -> str:
     """
-    Process ID'den uygulama adını alır
+    Gets application name from Process ID
     
     Args:
         pid: Process ID
     
     Returns:
-        str: Uygulama adı veya "Bilinmiyor"
+        str: Application name or "Unknown"
     """
     try:
         process = psutil.Process(pid)
         return process.name()
     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-        return "Erişim Reddedildi"
+        return "Access Denied"
     except Exception:
-        return "Bilinmiyor"
+        return "Unknown"
 
 
 def get_port_info(port: int, pid: Optional[int] = None) -> Dict[str, Any]:
     """
-    Port hakkında bilgi toplar
+    Collects information about a port
     
     Args:
-        port: Port numarası
-        pid: Process ID (opsiyonel)
+        port: Port number
+        pid: Process ID (optional)
     
     Returns:
-        dict: Port bilgisi (ad, risk, açıklama)
+        dict: Port information (name, risk, description)
     """
     port_info = {
         "port": port,
-        "name": "Bilinmeyen",
-        "risk": "Düşük",
-        "description": "Bilinmeyen servis"
+        "name": "Unknown",
+        "risk": "Low",
+        "description": "Unknown service"
     }
     
-    # Yüksek riskli portları kontrol et
+    # Check high-risk ports
     if port in HIGH_RISK_PORTS:
         port_info["name"] = HIGH_RISK_PORTS[port]
-        port_info["risk"] = "Yüksek"
-        port_info["description"] = f"{HIGH_RISK_PORTS[port]} servisi - Güvenlik açısından dikkatli olunmalı"
+        port_info["risk"] = "High"
+        port_info["description"] = f"{HIGH_RISK_PORTS[port]} service - Should be carefully monitored from security perspective"
         return port_info
     
-    # Bilinen güvenli portları kontrol et
+    # Check known safe ports
     if port in KNOWN_SAFE_PORTS:
         port_info["name"] = KNOWN_SAFE_PORTS[port]
-        port_info["risk"] = "Düşük"
-        port_info["description"] = f"{KNOWN_SAFE_PORTS[port]} servisi - Genelde güvenli"
+        port_info["risk"] = "Low"
+        port_info["description"] = f"{KNOWN_SAFE_PORTS[port]} service - Generally safe"
         return port_info
     
-    # Bilinmeyen portlar için socket servisini sorgula
+    # Query socket service for unknown ports
     try:
         service_name = socket.getservbyport(port, 'tcp')
         port_info["name"] = service_name.upper()
-        port_info["description"] = f"{service_name.upper()} servisi"
+        port_info["description"] = f"{service_name.upper()} service"
     except (OSError, socket.error):
-        port_info["name"] = "Bilinmeyen"
-        port_info["description"] = "Bilinmeyen servis"
+        port_info["name"] = "Unknown"
+        port_info["description"] = "Unknown service"
     
     return port_info
 
 
 def scan_open_ports() -> List[Dict[str, Any]]:
     """
-    Bilgisayardaki LISTEN (Dinleme) modundaki tüm TCP portlarını tarar
+    Scans all TCP ports in LISTEN mode on the computer
     
     Returns:
-        list: Port bilgileri listesi (port, pid, process_name, risk, description)
+        list: List of port information (port, pid, process_name, risk, description)
     """
     open_ports = []
     
     try:
-        # Tüm network bağlantılarını al
+        # Get all network connections
         connections = psutil.net_connections(kind='inet')
         
         for conn in connections:
             try:
-                # Sadece LISTEN durumundaki TCP bağlantılarını al
+                # Get only TCP connections in LISTEN state
                 if conn.status == psutil.CONN_LISTEN and conn.type == socket.SOCK_STREAM:
                     port = conn.laddr.port
                     pid = conn.pid
                     
-                    # Port bilgisini al
+                    # Get port information
                     port_info = get_port_info(port, pid)
                     
-                    # Process adını al
+                    # Get process name
                     if pid:
                         process_name = get_process_name(pid)
                     else:
-                        process_name = "Bilinmiyor"
+                        process_name = "Unknown"
                     
-                    # Port bilgisini ekle
+                    # Add port information
                     port_data = {
                         "Port": port,
                         "PID": pid if pid else "N/A",
-                        "Uygulama": process_name,
-                        "Servis": port_info["name"],
+                        "Application": process_name,
+                        "Service": port_info["name"],
                         "Risk": port_info["risk"],
-                        "Açıklama": port_info["description"]
+                        "Description": port_info["description"]
                     }
                     
                     open_ports.append(port_data)
             
             except (psutil.AccessDenied, AttributeError, OSError) as e:
-                # Erişim reddedildi veya bilgi alınamadı, devam et
+                # Access denied or information unavailable, continue
                 continue
             except Exception as e:
-                # Beklenmeyen hata, logla ama devam et
-                print(f"⚠️  Port tarama hatası: {e}")
+                # Unexpected error, log but continue
+                print(f"⚠️  Port scan error: {e}")
                 continue
     
     except psutil.AccessDenied:
-        print("❌ Yönetici hakları gerekli. Port taraması için yönetici olarak çalıştırın.")
+        print("❌ Administrator privileges required. Run as administrator for port scanning.")
         return []
     except Exception as e:
-        print(f"❌ Port tarama sırasında kritik hata: {e}")
+        print(f"❌ Critical error during port scan: {e}")
         return []
     
-    # Port numarasına göre sırala
+    # Sort by port number
     open_ports.sort(key=lambda x: x["Port"])
     
     return open_ports
@@ -162,25 +162,25 @@ def scan_open_ports() -> List[Dict[str, Any]]:
 
 def get_port_summary(ports: List[Dict[str, Any]]) -> Dict[str, int]:
     """
-    Port tarama sonuçlarının özetini döndürür
+    Returns summary of port scan results
     
     Args:
-        ports: Port bilgileri listesi
+        ports: List of port information
     
     Returns:
-        dict: Özet istatistikler
+        dict: Summary statistics
     """
     summary = {
-        "Toplam": len(ports),
-        "Yüksek Risk": 0,
-        "Düşük Risk": 0
+        "Total": len(ports),
+        "High Risk": 0,
+        "Low Risk": 0
     }
     
     for port_info in ports:
-        if port_info.get("Risk") == "Yüksek":
-            summary["Yüksek Risk"] += 1
+        if port_info.get("Risk") == "High" or port_info.get("Risk") == "Yüksek":
+            summary["High Risk"] += 1
         else:
-            summary["Düşük Risk"] += 1
+            summary["Low Risk"] += 1
     
     return summary
 

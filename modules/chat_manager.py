@@ -10,119 +10,121 @@ from modules.network_scanner import scan_open_ports
 
 def get_system_summary() -> str:
     """
-    Sistem özetini oluşturur: Son yüksek riskli loglar ve riskli portlar
+    Creates system summary: Latest high-risk logs and risky ports
     
     Returns:
-        str: Sistem özeti metni
+        str: System summary text
     """
     summary_parts = []
     
     try:
-        # Veritabanından son 10 yüksek riskli logu al
+        # Get last 10 high-risk logs from database
         all_logs = get_all_logs(config.DB_PATH, limit=50, order_by='DESC')
         high_risk_logs = []
         
         for log in all_logs:
-            if len(log) >= 6 and str(log[5]).strip().lower() == 'yüksek':
-                high_risk_logs.append(log)
-            if len(high_risk_logs) >= 10:  # En fazla 10 adet
+            if len(log) >= 6:
+                risk_level = str(log[5]).strip().lower()
+                if risk_level == 'yüksek' or risk_level == 'high':
+                    high_risk_logs.append(log)
+            if len(high_risk_logs) >= 10:  # Maximum 10 entries
                 break
         
-        # Log özeti
+        # Log summary
         if high_risk_logs:
-            summary_parts.append("=== YÜKSEK RİSKLİ LOGLAR ===\n")
+            summary_parts.append("=== HIGH RISK LOGS ===\n")
             for log in high_risk_logs:
                 log_id = log[0]
                 timestamp = log[1]
                 event_id = log[2]
-                message = log[3] if len(log) > 3 and log[3] else "Mesaj yok"
-                ai_analysis = log[4] if len(log) > 4 and log[4] else "Analiz yok"
-                risk_score = log[5] if len(log) > 5 else "Bilinmiyor"
+                message = log[3] if len(log) > 3 and log[3] else "No message"
+                ai_analysis = log[4] if len(log) > 4 and log[4] else "No analysis"
+                risk_score = log[5] if len(log) > 5 else "Unknown"
                 
-                # Mesajı kısalt (çok uzunsa)
+                # Shorten message (if too long)
                 message_short = message[:200] if len(message) > 200 else message
                 ai_analysis_short = ai_analysis[:200] if len(ai_analysis) > 200 else ai_analysis
                 
                 summary_parts.append(
-                    f"- Event ID {event_id} (Zaman: {timestamp})\n"
-                    f"  Mesaj: {message_short}\n"
-                    f"  AI Analiz: {ai_analysis_short}\n"
+                    f"- Event ID {event_id} (Time: {timestamp})\n"
+                    f"  Message: {message_short}\n"
+                    f"  AI Analysis: {ai_analysis_short}\n"
                     f"  Risk: {risk_score}\n"
                 )
         else:
-            summary_parts.append("=== YÜKSEK RİSKLİ LOG ===\nYüksek riskli log bulunmuyor.\n")
+            summary_parts.append("=== HIGH RISK LOGS ===\nNo high-risk logs found.\n")
         
         summary_parts.append("\n")
         
     except Exception as e:
-        summary_parts.append(f"=== LOG VERİLERİ ===\nLog verileri okunamadı: {e}\n\n")
+        summary_parts.append(f"=== LOG DATA ===\nCould not read log data: {e}\n\n")
     
     try:
-        # Port taraması yap
+        # Perform port scan
         ports = scan_open_ports()
-        high_risk_ports = [p for p in ports if p.get('Risk') == 'Yüksek']
+        high_risk_ports = [p for p in ports if p.get('Risk') == 'Yüksek' or p.get('Risk') == 'High']
         
-        # Port özeti
+        # Port summary
         if high_risk_ports:
-            summary_parts.append("=== YÜKSEK RİSKLİ AÇIK PORTLAR ===\n")
-            for port_info in high_risk_ports[:10]:  # En fazla 10 adet
+            summary_parts.append("=== HIGH RISK OPEN PORTS ===\n")
+            for port_info in high_risk_ports[:10]:  # Maximum 10 entries
                 summary_parts.append(
-                    f"- Port {port_info['Port']} ({port_info['Servis']})\n"
+                    f"- Port {port_info['Port']} ({port_info.get('Service', port_info.get('Servis', 'N/A'))})\n"
                     f"  PID: {port_info.get('PID', 'N/A')}\n"
-                    f"  Uygulama: {port_info.get('Uygulama', 'Bilinmiyor')}\n"
-                    f"  Açıklama: {port_info.get('Açıklama', 'Açıklama yok')}\n"
+                    f"  Application: {port_info.get('Application', port_info.get('Uygulama', 'Unknown'))}\n"
+                    f"  Description: {port_info.get('Description', port_info.get('Açıklama', 'No description'))}\n"
                 )
         else:
-            summary_parts.append("=== AÇIK PORTLAR ===\nYüksek riskli açık port bulunmuyor.\n")
+            summary_parts.append("=== OPEN PORTS ===\nNo high-risk open ports found.\n")
         
-        # Toplam port istatistiği
+        # Total port statistics
         if ports:
             total_ports = len(ports)
             high_count = len(high_risk_ports)
             low_count = total_ports - high_count
             summary_parts.append(
-                f"\nToplam Açık Port: {total_ports}\n"
-                f"Yüksek Riskli: {high_count}\n"
-                f"Düşük Riskli: {low_count}\n"
+                f"\nTotal Open Ports: {total_ports}\n"
+                f"High Risk: {high_count}\n"
+                f"Low Risk: {low_count}\n"
             )
         
     except Exception as e:
-        summary_parts.append(f"=== PORT VERİLERİ ===\nPort verileri okunamadı: {e}\n")
+        summary_parts.append(f"=== PORT DATA ===\nCould not read port data: {e}\n")
     
     return "\n".join(summary_parts)
 
 
 def ask_assistant(user_question: str) -> str:
     """
-    AI asistanına soru sorar ve sistem verilerine göre cevap alır
+    Asks the AI assistant a question and gets a response based on system data
     
     Args:
-        user_question: Kullanıcının sorusu
+        user_question: User's question
     
     Returns:
-        str: AI'ın cevabı
+        str: AI's response
     """
     try:
-        # Sistem özetini al
+        # Get system summary
         system_data = get_system_summary()
         
-        # System prompt oluştur
+        # Create system prompt
         system_prompt = (
-            "Sen LocalShield Siber Güvenlik Asistanısın. "
-            "Görevin, kullanıcının güvenlik sorularını aşağıdaki sistem verilerine göre yanıtlamak.\n\n"
+            "You are the LocalShield Cybersecurity Assistant. "
+            "Your task is to answer the user's security questions based on the system data below.\n\n"
             
-            "SİSTEM VERİLERİ:\n"
+            "SYSTEM DATA:\n"
             f"{system_data}\n\n"
             
-            "KURALLAR:\n"
-            "1. Yanıtlarını Türkçe, net ve anlaşılır şekilde ver.\n"
-            "2. Sistem verilerindeki bilgilere dayanarak yanıt ver.\n"
-            "3. Eğer yüksek riskli durum varsa bunu vurgula ve tavsiyelerde bulun.\n"
-            "4. Kullanıcı dostu, teknik olmayan bir dil kullan.\n"
-            "5. Eğer sistem verilerinde ilgili bilgi yoksa, bunu dürüstçe belirt.\n"
-            "6. Tavsiyeler verirken pratik ve uygulanabilir öneriler sun.\n\n"
+            "RULES:\n"
+            "1. Respond in English, clearly and understandably.\n"
+            "2. Base your response on the information in the system data.\n"
+            "3. If there are high-risk situations, emphasize them and provide recommendations.\n"
+            "4. Use user-friendly, non-technical language.\n"
+            "5. If there is no relevant information in the system data, state this honestly.\n"
+            "6. When providing recommendations, offer practical and actionable suggestions.\n\n"
             
-            "Kullanıcının sorusunu yanıtla:"
+            "Answer the user's question:"
         )
         
         # Ollama'ya gönder
@@ -146,8 +148,8 @@ def ask_assistant(user_question: str) -> str:
         return answer
         
     except Exception as e:
-        # Hata durumunda
-        error_message = f"Üzgünüm, bir hata oluştu: {str(e)}\n"
-        error_message += "Lütfen tekrar deneyin veya sistem yöneticisi ile iletişime geçin."
+        # Error case
+        error_message = f"Sorry, an error occurred: {str(e)}\n"
+        error_message += "Please try again or contact the system administrator."
         return error_message
 

@@ -1,6 +1,6 @@
 """
-AI Engine Module - Windows Log Analizi için Brain Sınıfı
-Production-Ready: JSON çıktı formatı ve type hints ile güncellendi
+AI Engine Module - Brain Class for Windows Log Analysis
+Production-Ready: Updated with JSON output format and type hints
 """
 import ollama
 import re
@@ -19,97 +19,97 @@ logger = logging.getLogger(__name__)
 
 class Brain:
     """
-    Windows güvenlik loglarını analiz eden AI sınıfı.
-    Ollama üzerinde çalışan lokal LLM kullanır.
-    Production-Ready: JSON çıktı formatı ve type-safe parsing
+    AI class that analyzes Windows security logs.
+    Uses local LLM running on Ollama.
+    Production-Ready: JSON output format and type-safe parsing
     """
     
     def __init__(self, model_name: Optional[str] = None) -> None:
         """
-        Brain sınıfını başlatır.
+        Initializes Brain class.
         
         Args:
-            model_name: Ollama model adı (varsayılan: config.py'den alınır)
+            model_name: Ollama model name (default: from config.py)
         """
         self.model_name: str = model_name or config.MODEL_NAME
         
-        # JSON çıktı formatı için system prompt
-        self.system_prompt: str = """Sen Kıdemli bir SOC Analistisin (Cyber Security Expert).
-Sana verilen Windows Logunu analiz et ve yanıtını MUTLAKA şu JSON formatında ver:
+        # System prompt for JSON output format
+        self.system_prompt: str = """You are a Senior SOC Analyst (Cyber Security Expert).
+Analyze the Windows Log provided to you and respond in the following JSON format:
 
 {
-    "risk_score": "Düşük" veya "Orta" veya "Yüksek",
-    "user_entity": "Tespit edilen kullanıcı adı veya makine adı",
-    "summary": "Olayın teknik olmayan, net Türkçe açıklaması",
-    "advice": "Bu durumda ne yapılmalı? Pratik tavsiyeler",
-    "event_id_explanation": "Event ID hakkında eğitici açıklama (opsiyonel)"
+    "risk_score": "Low" or "Medium" or "High",
+    "user_entity": "Detected username or machine name",
+    "summary": "Non-technical, clear English explanation of the event",
+    "advice": "What should be done in this case? Practical recommendations",
+    "event_id_explanation": "Educational explanation about Event ID (optional)"
 }
 
-ÖNEMLİ: 
-- Cevabın SADECE JSON olmalı, başka metin olmamalı
-- JSON geçerli ve parse edilebilir olmalı
-- Kısa, net ve profesyonel ol"""
+IMPORTANT: 
+- Your response must be ONLY JSON, no other text
+- JSON must be valid and parseable
+- Be brief, clear, and professional"""
     
     def extract_event_id(self, log_text: str) -> Optional[str]:
         """
-        Log metninden Event ID'yi çıkarır.
+        Extracts Event ID from log text.
         
         Args:
-            log_text: Log metni
+            log_text: Log text
         
         Returns:
-            Event ID (string) veya None
+            Event ID (string) or None
         """
         match = re.search(r'Event ID\s*[:#]?\s*(\d+)', log_text, re.IGNORECASE)
         return match.group(1) if match else None
     
     def analyze(self, log_text: str) -> Tuple[str, str]:
         """
-        Windows log metnini analiz eder ve JSON formatında yanıt döndürür.
-        Knowledge base'den bilgi çekerek analiz kalitesini artırır (Hibrit RAG).
+        Analyzes Windows log text and returns response in JSON format.
+        Improves analysis quality by retrieving information from knowledge base (Hybrid RAG).
         
         Args:
-            log_text: Analiz edilecek Windows log metni
+            log_text: Windows log text to analyze
         
         Returns:
-            tuple[str, str]: (markdown_analysis, risk_score) - Dashboard için markdown ve risk seviyesi
+            tuple[str, str]: (markdown_analysis, risk_score) - Markdown and risk level for Dashboard
         """
         try:
-            # Log metninden Event ID'yi çıkarmaya çalış
+            # Try to extract Event ID from log text
             event_id: Optional[str] = self.extract_event_id(log_text)
             
-            # Knowledge base'den bilgi çek (RAG)
+            # Retrieve information from knowledge base (RAG)
             kb_info: Optional[Dict[str, Any]] = None
             if event_id:
                 try:
                     kb_info = get_event_info(event_id)
                     if kb_info:
-                        logger.info(f"Knowledge base bilgisi bulundu (Event ID: {event_id}, Kaynak: {kb_info.get('source', 'bilinmiyor')})")
+                        logger.info(f"Knowledge base information found (Event ID: {event_id}, Source: {kb_info.get('source', 'unknown')})")
                 except Exception as e:
-                    logger.warning(f"Knowledge base hatası: {e}")
+                    logger.warning(f"Knowledge base error: {e}")
             
-            # System prompt'u hazırla
+            # Prepare system prompt
             enhanced_prompt = self.system_prompt
             
-            # RAG bilgisini prompt'a ekle (eğer varsa) - PROMPT HARDENING
+            # Add RAG information to prompt (if exists) - PROMPT HARDENING
             if kb_info:
                 extra_instruction = f"""
 
-[🛑 ÖZEL TALİMAT - KRİTİK GÜVENLİK PROTOKOLÜ]:
-Bu olay (ID: {event_id}) için tanımlanmış bir GÜVENLİK PROTOKOLÜ var.
+[🛑 SPECIAL INSTRUCTION - CRITICAL SECURITY PROTOCOL]:
+There is a SECURITY PROTOCOL defined for this event (ID: {event_id}).
 
-JSON çıktındaki "advice" alanına, aşağıdaki metni KELİMESİ KELİMESİNE (Verbatim) yapıştır. Kendin cümle kurma.
+In the JSON output's "advice" field, paste the following text VERBATIM. Do not create your own sentences.
 
-ZORUNLU METİN: "{kb_info.get('advice', '')}"
+MANDATORY TEXT: "{kb_info.get('advice', '')}"
 
-Ayrıca "risk_score" alanına şunu yaz: "{kb_info.get('risk_level', 'Orta')}"
+Also write this in the "risk_score" field: "{kb_info.get('risk_level', 'Medium')}"
 
-[ÖNEMLİ]: Yukarıdaki "ZORUNLU METİN"i değiştirme, kopyala-yapıştır yap.
+[IMPORTANT]: Do not modify the "MANDATORY TEXT" above, copy-paste it.
 """
                 enhanced_prompt += extra_instruction
             
-            # AI'a gönder
-            logger.debug(f"AI analizi başlatılıyor (Event ID: {event_id})")
+            # Send to AI
+            logger.debug(f"Starting AI analysis (Event ID: {event_id})")
             response = ollama.chat(
                 model=self.model_name,
                 messages=[
@@ -119,65 +119,65 @@ Ayrıca "risk_score" alanına şunu yaz: "{kb_info.get('risk_level', 'Orta')}"
                     },
                     {
                         'role': 'user',
-                        'content': f"Bu Windows güvenlik logunu analiz et:\n\n{log_text}"
+                        'content': f"Analyze this Windows security log:\n\n{log_text}"
                     }
                 ]
             )
             
-            # AI'ın cevabını al
+            # Get AI's response
             raw_response: str = response['message']['content'].strip()
             
-            # JSON parse et
+            # Parse JSON
             try:
-                # JSON'u temizle (eğer markdown code block içindeyse)
+                # Clean JSON (if in markdown code block)
                 json_str = raw_response
                 if "```json" in json_str:
                     json_str = json_str.split("```json")[1].split("```")[0].strip()
                 elif "```" in json_str:
                     json_str = json_str.split("```")[1].split("```")[0].strip()
                 
-                # JSON parse et
+                # Parse JSON
                 json_data = json.loads(json_str)
                 
-                # Pydantic model ile validate et
+                # Validate with Pydantic model
                 analysis_response = AIAnalysisResponse(**json_data)
                 
-                logger.info(f"AI analizi başarıyla parse edildi (Risk: {analysis_response.risk_score})")
+                logger.info(f"AI analysis successfully parsed (Risk: {analysis_response.risk_score})")
                 
-                # Markdown formatına çevir ve risk_score ile birlikte döndür
+                # Convert to markdown format and return with risk_score
                 markdown_analysis = analysis_response.to_markdown()
                 return markdown_analysis, analysis_response.risk_score
                 
             except (json.JSONDecodeError, ValidationError) as e:
-                logger.error(f"JSON parse hatası: {e}, Raw response: {raw_response[:200]}")
-                # Fallback: Raw response'u döndür
+                logger.error(f"JSON parse error: {e}, Raw response: {raw_response[:200]}")
+                # Fallback: Return raw response
                 fallback_markdown = self._create_fallback_response(event_id, raw_response)
-                return fallback_markdown, "Orta"
+                return fallback_markdown, "Medium"
                 
         except Exception as e:
-            logger.error(f"AI analiz hatası: {e}", exc_info=True)
-            fallback_markdown = self._create_fallback_response(event_id, f"AI Hatası: {str(e)}")
-            return fallback_markdown, "Orta"
+            logger.error(f"AI analysis error: {e}", exc_info=True)
+            fallback_markdown = self._create_fallback_response(event_id, f"AI Error: {str(e)}")
+            return fallback_markdown, "Medium"
     
     def _create_fallback_response(self, event_id: Optional[str], error_message: str) -> str:
         """
-        Hata durumunda fallback response oluşturur.
+        Creates fallback response in error cases.
         
         Args:
-            event_id: Event ID (varsa)
-            error_message: Hata mesajı
+            event_id: Event ID (if exists)
+            error_message: Error message
         
         Returns:
             str: Fallback markdown response
         """
-        event_id_str = event_id if event_id else "Bilinmiyor"
-        return f"""🆔 Event ID {event_id_str} Nedir?
-Bu Event ID, Windows güvenlik sisteminin kaydettiği bir olaydır.
+        event_id_str = event_id if event_id else "Unknown"
+        return f"""🆔 What is Event ID {event_id_str}?
+This Event ID is an event recorded by the Windows security system.
 
-🕵️‍♂️ Olay Analizi
-Kullanıcı: Analiz Edilemedi
-Durum: {error_message}
-Risk: Orta
+🕵️‍♂️ Event Analysis
+User: Could Not Be Analyzed
+Status: {error_message}
+Risk: Medium
 
-💡 Tavsiye
-Log mesajını manuel olarak kontrol edin veya sistem yöneticisi ile iletişime geçin."""
+💡 Recommendation
+Check the log message manually or contact the system administrator."""

@@ -1,6 +1,6 @@
 """
-Database Manager - SQLite veritabanı yönetimi
-Production-Ready: Type hints ve logging ile güncellendi
+Database Manager - SQLite database management
+Production-Ready: Updated with type hints and logging
 """
 import sqlite3
 import logging
@@ -16,24 +16,24 @@ logger = logging.getLogger(__name__)
 
 def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
     """
-    SQLite veritabanını oluşturur ve security_logs tablosunu hazırlar.
+    Creates SQLite database and prepares security_logs table.
     
     Args:
-        db_path: Veritabanı dosya yolu (varsayılan: config.DB_PATH)
+        db_path: Database file path (default: config.DB_PATH)
     
     Returns:
-        sqlite3.Connection: Veritabanı bağlantısı
+        sqlite3.Connection: Database connection
     """
     db_path = db_path or config.DB_PATH
     
     try:
-        # Thread-safe connection: timeout ve WAL modu ile
+        # Thread-safe connection: with timeout and WAL mode
         conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
-        # WAL (Write-Ahead Logging) modunu etkinleştir (daha iyi performans ve thread-safety)
+        # Enable WAL (Write-Ahead Logging) mode (better performance and thread-safety)
         conn.execute('PRAGMA journal_mode=WAL')
         cursor = conn.cursor()
         
-        # security_logs tablosunu oluştur
+        # Create security_logs table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS security_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,22 +46,22 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
             )
         ''')
         
-        # Mevcut tablolara mitre_technique sütunu ekle (eğer yoksa)
+        # Add mitre_technique column to existing tables (if not exists)
         try:
             cursor.execute('ALTER TABLE security_logs ADD COLUMN mitre_technique TEXT')
             conn.commit()
-            logger.debug("'mitre_technique' sütunu eklendi")
+            logger.debug("'mitre_technique' column added")
         except sqlite3.OperationalError:
-            # Sütun zaten varsa hata verme
+            # Don't error if column already exists
             pass
         
         conn.commit()
-        logger.info(f"Veritabanı '{db_path}' başarıyla oluşturuldu/bağlandı")
-        logger.debug("'security_logs' tablosu hazır")
+        logger.info(f"Database '{db_path}' successfully created/connected")
+        logger.debug("'security_logs' table ready")
         
         return conn
     except Exception as e:
-        logger.error(f"Veritabanı başlatma hatası: {e}", exc_info=True)
+        logger.error(f"Database initialization error: {e}", exc_info=True)
         raise
 
 
@@ -76,34 +76,34 @@ def insert_log(
     conn: Optional[sqlite3.Connection] = None
 ) -> int:
     """
-    security_logs tablosuna yeni bir log kaydı ekler.
+    Adds a new log entry to security_logs table.
     
     Args:
-        timestamp: Kayıt zamanı (datetime nesnesi)
-        event_id: Event ID (opsiyonel)
-        message: Log mesajı (opsiyonel)
-        ai_analysis: AI analiz sonucu (opsiyonel)
-        risk_score: Risk skoru (opsiyonel)
-        mitre_technique: MITRE ATT&CK tekniği (opsiyonel)
-        db_path: Veritabanı dosya yolu (varsayılan: config.DB_PATH)
-        conn: Mevcut veritabanı bağlantısı (opsiyonel, verilmezse yeni bağlantı açar)
+        timestamp: Record time (datetime object)
+        event_id: Event ID (optional)
+        message: Log message (optional)
+        ai_analysis: AI analysis result (optional)
+        risk_score: Risk score (optional)
+        mitre_technique: MITRE ATT&CK technique (optional)
+        db_path: Database file path (default: config.DB_PATH)
+        conn: Existing database connection (optional, opens new connection if not provided)
     
     Returns:
-        int: Eklenen kaydın ID'si
+        int: ID of the inserted record
     """
     should_close = False
     if conn is None:
         db_path = db_path or config.DB_PATH
-        # Thread-safe connection: timeout ve WAL modu ile
+        # Thread-safe connection: with timeout and WAL mode
         conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
-        # WAL (Write-Ahead Logging) modunu etkinleştir (daha iyi performans ve thread-safety)
+        # Enable WAL (Write-Ahead Logging) mode (better performance and thread-safety)
         conn.execute('PRAGMA journal_mode=WAL')
         should_close = True
     
     try:
         cursor = conn.cursor()
         
-        # Timestamp'i string formatına çevir
+        # Convert timestamp to string format
         timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
         
         cursor.execute('''
@@ -114,11 +114,11 @@ def insert_log(
         conn.commit()
         log_id: int = cursor.lastrowid
         
-        logger.debug(f"Log kaydı eklendi. ID: {log_id}, Event ID: {event_id}, Risk: {risk_score}")
+        logger.debug(f"Log entry added. ID: {log_id}, Event ID: {event_id}, Risk: {risk_score}")
         return log_id
         
     except Exception as e:
-        logger.error(f"Log ekleme hatası: {e}", exc_info=True)
+        logger.error(f"Error adding log: {e}", exc_info=True)
         raise
     finally:
         if should_close:
@@ -131,15 +131,15 @@ def get_all_logs(
     order_by: str = 'DESC'
 ) -> List[Tuple[int, str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]]:
     """
-    security_logs tablosundan tüm log kayıtlarını getirir.
+    Gets all log entries from security_logs table.
     
     Args:
-        db_path: Veritabanı dosya yolu (varsayılan: config.DB_PATH)
-        limit: Maksimum kayıt sayısı (opsiyonel)
-        order_by: Sıralama yönü ('DESC' veya 'ASC', varsayılan: 'DESC')
+        db_path: Database file path (default: config.DB_PATH)
+        limit: Maximum number of records (optional)
+        order_by: Sort direction ('DESC' or 'ASC', default: 'DESC')
     
     Returns:
-        list: Log kayıtlarının listesi (tuple listesi: id, timestamp, event_id, message, ai_analysis, risk_score, mitre_technique)
+        list: List of log entries (tuple list: id, timestamp, event_id, message, ai_analysis, risk_score, mitre_technique)
     """
     db_path = db_path or config.DB_PATH
     conn = sqlite3.connect(db_path)
@@ -159,11 +159,11 @@ def get_all_logs(
         cursor.execute(query)
         results: List[Tuple[int, str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]] = cursor.fetchall()
         
-        logger.debug(f"{len(results)} log kaydı getirildi (limit: {limit})")
+        logger.debug(f"{len(results)} log entries retrieved (limit: {limit})")
         return results
         
     except Exception as e:
-        logger.error(f"Log okuma hatası: {e}", exc_info=True)
+        logger.error(f"Log reading error: {e}", exc_info=True)
         return []
     finally:
         conn.close()
@@ -171,13 +171,13 @@ def get_all_logs(
 
 def get_high_risk_count(db_path: Optional[str] = None) -> int:
     """
-    Yüksek riskli olay sayısını döndürür.
+    Returns the count of high-risk events.
     
     Args:
-        db_path: Veritabanı dosya yolu (varsayılan: config.DB_PATH)
+        db_path: Database file path (default: config.DB_PATH)
     
     Returns:
-        int: Yüksek riskli olay sayısı
+        int: Count of high-risk events
     """
     db_path = db_path or config.DB_PATH
     conn = sqlite3.connect(db_path)
@@ -187,13 +187,13 @@ def get_high_risk_count(db_path: Optional[str] = None) -> int:
         
         cursor.execute('''
             SELECT COUNT(*) FROM security_logs
-            WHERE risk_score = 'Yüksek'
+            WHERE risk_score = 'Yüksek' OR risk_score = 'High'
         ''')
         count: int = cursor.fetchone()[0]
         return count
         
     except Exception as e:
-        logger.error(f"Yüksek riskli olay sayısı hesaplama hatası: {e}", exc_info=True)
+        logger.error(f"Error calculating high-risk event count: {e}", exc_info=True)
         return 0
     finally:
         conn.close()
@@ -201,13 +201,13 @@ def get_high_risk_count(db_path: Optional[str] = None) -> int:
 
 def get_total_log_count(db_path: Optional[str] = None) -> int:
     """
-    Toplam log sayısını döndürür.
+    Returns the total log count.
     
     Args:
-        db_path: Veritabanı dosya yolu (varsayılan: config.DB_PATH)
+        db_path: Database file path (default: config.DB_PATH)
     
     Returns:
-        int: Toplam log sayısı
+        int: Total log count
     """
     db_path = db_path or config.DB_PATH
     conn = sqlite3.connect(db_path)
@@ -219,7 +219,7 @@ def get_total_log_count(db_path: Optional[str] = None) -> int:
         return count
         
     except Exception as e:
-        logger.error(f"Toplam log sayısı hesaplama hatası: {e}", exc_info=True)
+        logger.error(f"Error calculating total log count: {e}", exc_info=True)
         return 0
     finally:
         conn.close()
@@ -227,13 +227,13 @@ def get_total_log_count(db_path: Optional[str] = None) -> int:
 
 def get_latest_detection(db_path: Optional[str] = None) -> Optional[str]:
     """
-    En son tespit edilen olayın zamanını döndürür.
+    Returns the time of the latest detected event.
     
     Args:
-        db_path: Veritabanı dosya yolu (varsayılan: config.DB_PATH)
+        db_path: Database file path (default: config.DB_PATH)
     
     Returns:
-        str: Son tespit zamanı (varsa), yoksa None
+        str: Latest detection time (if exists), otherwise None
     """
     db_path = db_path or config.DB_PATH
     conn = sqlite3.connect(db_path)
@@ -250,7 +250,7 @@ def get_latest_detection(db_path: Optional[str] = None) -> Optional[str]:
         return result[0] if result else None
         
     except Exception as e:
-        logger.error(f"Son tespit zamanı alma hatası: {e}", exc_info=True)
+        logger.error(f"Error getting latest detection time: {e}", exc_info=True)
         return None
     finally:
         conn.close()
@@ -258,13 +258,13 @@ def get_latest_detection(db_path: Optional[str] = None) -> Optional[str]:
 
 def clear_all_logs(db_path: Optional[str] = None) -> bool:
     """
-    Veritabanındaki tüm log kayıtlarını siler (tablo yapısı korunur).
+    Deletes all log entries in the database (table structure is preserved).
     
     Args:
-        db_path: Veritabanı dosya yolu (varsayılan: config.DB_PATH)
+        db_path: Database file path (default: config.DB_PATH)
     
     Returns:
-        bool: İşlem başarılıysa True, hata varsa False
+        bool: True if successful, False if error occurred
     """
     db_path = db_path or config.DB_PATH
     conn = sqlite3.connect(db_path)
@@ -275,39 +275,39 @@ def clear_all_logs(db_path: Optional[str] = None) -> bool:
         conn.commit()
         
         deleted_count = cursor.rowcount
-        logger.info(f"Tüm log kayıtları silindi. Silinen kayıt sayısı: {deleted_count}")
+        logger.info(f"All log entries deleted. Deleted count: {deleted_count}")
         return True
         
     except Exception as e:
-        logger.error(f"Log kayıtları silinirken hata: {e}", exc_info=True)
+        logger.error(f"Error deleting log entries: {e}", exc_info=True)
         conn.rollback()
         return False
     finally:
         conn.close()
 
 
-# Test için örnek kullanım
+# Example usage for testing
 if __name__ == "__main__":
-    # Logging yapılandırması
+    # Logging configuration
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    # Veritabanını başlat
+    # Initialize database
     conn = init_db(config.DB_PATH)
     
-    # Örnek log kaydı ekle
+    # Add example log entry
     now = datetime.now()
     insert_log(
         timestamp=now,
         event_id="4625",
-        message="Yönetici hesabına yanlış şifre girildi",
-        ai_analysis="Potansiyel brute-force saldırısı tespit edildi.",
-        risk_score="Yüksek",
+        message="Failed login attempt to administrator account",
+        ai_analysis="Potential brute-force attack detected.",
+        risk_score="High",
         conn=conn
     )
     
-    # Bağlantıyı kapat
+    # Close connection
     conn.close()
-    logger.info("Test tamamlandı!")
+    logger.info("Test completed!")

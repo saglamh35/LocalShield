@@ -1,5 +1,5 @@
 """
-Streamlit Dashboard - LocalShield Professional SIEM Arayüzü
+Streamlit Dashboard - LocalShield Professional SIEM Interface
 """
 import streamlit as st
 import pandas as pd
@@ -11,7 +11,7 @@ from modules.network_scanner import scan_open_ports, get_port_summary
 from modules.chat_manager import ask_assistant
 
 
-# Sayfa yapılandırması
+# Page configuration
 st.set_page_config(
     page_title="LocalShield Dashboard",
     page_icon="🛡️",
@@ -19,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Özel CSS - Profesyonel SIEM tasarımı
+# Custom CSS - Professional SIEM design
 st.markdown("""
 <style>
     .main > div {
@@ -62,85 +62,85 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-@st.cache_data(ttl=5)  # 5 saniye cache
+@st.cache_data(ttl=5)  # 5 second cache
 def load_data():
-    """Veritabanından log verilerini yükler"""
+    """Loads log data from database"""
     try:
         logs = get_all_logs(config.DB_PATH, limit=1000)
         
         if not logs:
             return pd.DataFrame()
         
-        # DataFrame oluştur (mitre_technique dahil)
+        # Create DataFrame (including mitre_technique)
         df = pd.DataFrame(logs, columns=[
-            'ID', 'Zaman', 'Event ID', 'Mesaj', 'AI Analiz', 'Risk Seviyesi', 'MITRE Tekniği'
+            'ID', 'Time', 'Event ID', 'Message', 'AI Analysis', 'Risk Level', 'MITRE Technique'
         ])
         
-        # Zaman sütununu datetime'a çevir
+        # Convert Time column to datetime
         try:
-            df['Zaman'] = pd.to_datetime(df['Zaman'])
+            df['Time'] = pd.to_datetime(df['Time'])
         except:
             pass
         
         return df
     except Exception as e:
-        st.error(f"Veri yüklenirken hata oluştu: {e}")
+        st.error(f"Error loading data: {e}")
         return pd.DataFrame()
 
 
 def get_risk_icon(risk_level):
-    """Risk seviyesine göre ikon döndürür"""
+    """Returns icon based on risk level"""
     if pd.isna(risk_level):
         return "❓"
     
     risk_str = str(risk_level).strip().lower()
-    if 'yüksek' in risk_str or 'high' in risk_str:
+    if 'high' in risk_str or 'yüksek' in risk_str:
         return "🔴"
-    elif 'orta' in risk_str or 'medium' in risk_str:
+    elif 'medium' in risk_str or 'orta' in risk_str:
         return "🟠"
-    elif 'düşük' in risk_str or 'low' in risk_str:
+    elif 'low' in risk_str or 'düşük' in risk_str:
         return "🟢"
     return "⚪"
 
 
 def get_risk_color_class(risk_level):
-    """Risk seviyesine göre CSS class döndürür"""
+    """Returns CSS class based on risk level"""
     if pd.isna(risk_level):
         return ""
     
     risk_str = str(risk_level).strip().lower()
-    if 'yüksek' in risk_str or 'high' in risk_str:
+    if 'high' in risk_str or 'yüksek' in risk_str:
         return "risk-high"
-    elif 'orta' in risk_str or 'medium' in risk_str:
+    elif 'medium' in risk_str or 'orta' in risk_str:
         return "risk-medium"
-    elif 'düşük' in risk_str or 'low' in risk_str:
+    elif 'low' in risk_str or 'düşük' in risk_str:
         return "risk-low"
     return ""
 
 
 def filter_data(df, risk_filters, event_id_filter, text_search=None):
-    """Verileri filtreler"""
+    """Filters data"""
     filtered_df = df.copy()
     
-    # Risk seviyesi filtresi
+    # Risk level filter
     if risk_filters:
         filtered_df = filtered_df[
-            filtered_df['Risk Seviyesi'].str.contains('|'.join(risk_filters), case=False, na=False)
+            filtered_df['Risk Level'].str.contains('|'.join(risk_filters), case=False, na=False)
         ]
     
-    # Event ID filtresi
+    # Event ID filter
     if event_id_filter:
         filtered_df = filtered_df[
             filtered_df['Event ID'].astype(str).str.contains(event_id_filter, case=False, na=False)
         ]
     
-    # Gelişmiş Arama (Text Search) - Mesaj, AI Analiz, MITRE Tekniği içinde ara
+    # Advanced Search (Text Search) - Search in Message, AI Analysis, MITRE Technique
     if text_search and text_search.strip():
         search_term = text_search.strip().lower()
         mask = (
-            filtered_df['Mesaj'].astype(str).str.lower().str.contains(search_term, na=False) |
-            filtered_df['AI Analiz'].astype(str).str.lower().str.contains(search_term, na=False) |
-            filtered_df['MITRE Tekniği'].astype(str).str.lower().str.contains(search_term, na=False)
+            filtered_df['Message'].astype(str).str.lower().str.contains(search_term, na=False) |
+            filtered_df['AI Analysis'].astype(str).str.lower().str.contains(search_term, na=False) |
+            filtered_df['MITRE Technique'].astype(str).str.lower().str.contains(search_term, na=False)
         )
         filtered_df = filtered_df[mask]
     
@@ -148,27 +148,27 @@ def filter_data(df, risk_filters, event_id_filter, text_search=None):
 
 
 def create_timeline_chart(df):
-    """Zaman çizelgesine göre log yoğunluğu grafiği (Area Chart)"""
-    if df.empty or 'Zaman' not in df.columns:
+    """Log intensity chart by timeline (Area Chart)"""
+    if df.empty or 'Time' not in df.columns:
         return None
     
     try:
         # Zaman damgasına göre grupla (15 dakikalık aralıklar)
         df_chart = df.copy()
         
-        # Zaman sütununu datetime'a çevir (eğer değilse)
-        if not pd.api.types.is_datetime64_any_dtype(df_chart['Zaman']):
-            df_chart['Zaman'] = pd.to_datetime(df_chart['Zaman'], errors='coerce')
+        # Convert Time column to datetime (if not already)
+        if not pd.api.types.is_datetime64_any_dtype(df_chart['Time']):
+            df_chart['Time'] = pd.to_datetime(df_chart['Time'], errors='coerce')
         
-        # Geçersiz tarihleri filtrele
-        df_chart = df_chart[df_chart['Zaman'].notna()]
+        # Filter invalid dates
+        df_chart = df_chart[df_chart['Time'].notna()]
         
         if df_chart.empty:
             return None
         
-        # 15 dakikalık aralıklara böl
-        df_chart['Zaman_Aralik'] = df_chart['Zaman'].dt.floor('15min')
-        timeline_data = df_chart.groupby('Zaman_Aralik').size().reset_index(name='Log Sayısı')
+        # Split into 15-minute intervals
+        df_chart['Time_Interval'] = df_chart['Time'].dt.floor('15min')
+        timeline_data = df_chart.groupby('Time_Interval').size().reset_index(name='Log Count')
         
         chart = alt.Chart(timeline_data).mark_area(
             interpolate='monotone',
@@ -176,15 +176,15 @@ def create_timeline_chart(df):
             stroke='#1f77b4',
             strokeWidth=2
         ).encode(
-            x=alt.X('Zaman_Aralik:T', title='Zaman', axis=alt.Axis(format='%H:%M')),
-            y=alt.Y('Log Sayısı:Q', title='Log Sayısı'),
+            x=alt.X('Time_Interval:T', title='Time', axis=alt.Axis(format='%H:%M')),
+            y=alt.Y('Log Count:Q', title='Log Count'),
             tooltip=[
-                alt.Tooltip('Zaman_Aralik:T', format='%Y-%m-%d %H:%M', title='Zaman'),
-                alt.Tooltip('Log Sayısı:Q', title='Log Sayısı')
+                alt.Tooltip('Time_Interval:T', format='%Y-%m-%d %H:%M', title='Time'),
+                alt.Tooltip('Log Count:Q', title='Log Count')
             ]
         ).properties(
             height=300,
-            title='Zaman Çizelgesine Göre Log Yoğunluğu'
+            title='Log Intensity by Timeline'
         ).configure_axis(
             gridColor='rgba(255,255,255,0.1)'
         ).configure_view(
@@ -193,220 +193,220 @@ def create_timeline_chart(df):
         
         return chart
     except Exception as e:
-        # Hata mesajını sessizce yoksay (boş grafik göster)
+        # Silently ignore error (show empty chart)
         return None
 
 
 def create_risk_distribution_chart(df):
-    """Risk seviyelerine göre dağılım grafiği (Donut Chart)"""
-    if df.empty or 'Risk Seviyesi' not in df.columns:
+    """Risk level distribution chart (Donut Chart)"""
+    if df.empty or 'Risk Level' not in df.columns:
         return None
     
     try:
-        # Risk seviyelerini normalize et
+        # Normalize risk levels
         df_chart = df.copy()
-        df_chart['Risk_Seviyesi_Normal'] = df_chart['Risk Seviyesi'].apply(
-            lambda x: 'Yüksek' if 'yüksek' in str(x).lower() or 'high' in str(x).lower()
-            else 'Orta' if 'orta' in str(x).lower() or 'medium' in str(x).lower()
-            else 'Düşük' if 'düşük' in str(x).lower() or 'low' in str(x).lower()
-            else 'Belirtilmemiş'
+        df_chart['Risk_Level_Normal'] = df_chart['Risk Level'].apply(
+            lambda x: 'High' if 'high' in str(x).lower() or 'yüksek' in str(x).lower()
+            else 'Medium' if 'medium' in str(x).lower() or 'orta' in str(x).lower()
+            else 'Low' if 'low' in str(x).lower() or 'düşük' in str(x).lower()
+            else 'Unspecified'
         )
         
-        risk_counts = df_chart['Risk_Seviyesi_Normal'].value_counts().reset_index()
-        risk_counts.columns = ['Risk Seviyesi', 'Sayı']
+        risk_counts = df_chart['Risk_Level_Normal'].value_counts().reset_index()
+        risk_counts.columns = ['Risk Level', 'Count']
         
-        # Renk paleti
+        # Color palette
         color_map = {
-            'Yüksek': '#ff4444',
-            'Orta': '#ffaa00',
-            'Düşük': '#44ff44',
-            'Belirtilmemiş': '#888888'
+            'High': '#ff4444',
+            'Medium': '#ffaa00',
+            'Low': '#44ff44',
+            'Unspecified': '#888888'
         }
-        risk_counts['Renk'] = risk_counts['Risk Seviyesi'].map(color_map).fillna('#888888')
+        risk_counts['Color'] = risk_counts['Risk Level'].map(color_map).fillna('#888888')
         
         chart = alt.Chart(risk_counts).mark_arc(
             innerRadius=60,
             outerRadius=120
         ).encode(
-            theta=alt.Theta(field='Sayı', type='quantitative'),
+            theta=alt.Theta(field='Count', type='quantitative'),
             color=alt.Color(
-                field='Risk Seviyesi',
+                field='Risk Level',
                 type='nominal',
                 scale=alt.Scale(
-                    domain=risk_counts['Risk Seviyesi'].tolist(),
-                    range=risk_counts['Renk'].tolist()
+                    domain=risk_counts['Risk Level'].tolist(),
+                    range=risk_counts['Color'].tolist()
                 ),
-                legend=alt.Legend(title="Risk Seviyesi")
+                legend=alt.Legend(title="Risk Level")
             ),
-            tooltip=['Risk Seviyesi:N', 'Sayı:Q']
+            tooltip=['Risk Level:N', 'Count:Q']
         ).properties(
             height=300,
-            title='Risk Seviyesi Dağılımı'
+            title='Risk Level Distribution'
         )
         
         return chart
     except Exception as e:
-        st.error(f"Risk dağılım grafiği oluşturulurken hata: {e}")
+        st.error(f"Error creating risk distribution chart: {e}")
         return None
 
 
 def render_log_card(row):
-    """Bir log kaydını kart olarak render eder"""
-    risk_level = str(row.get('Risk Seviyesi', 'Belirtilmemiş'))
+    """Renders a log entry as a card"""
+    risk_level = str(row.get('Risk Level', 'Unspecified'))
     risk_icon = get_risk_icon(risk_level)
     risk_class = get_risk_color_class(risk_level)
     
-    # Zaman formatı
+    # Time format
     try:
-        if pd.notna(row.get('Zaman')):
-            if isinstance(row['Zaman'], pd.Timestamp):
-                time_str = row['Zaman'].strftime('%Y-%m-%d %H:%M:%S')
-            elif isinstance(row['Zaman'], str):
-                # String ise parse et
+        if pd.notna(row.get('Time')):
+            if isinstance(row['Time'], pd.Timestamp):
+                time_str = row['Time'].strftime('%Y-%m-%d %H:%M:%S')
+            elif isinstance(row['Time'], str):
+                # If string, parse it
                 try:
-                    dt = pd.to_datetime(row['Zaman'])
+                    dt = pd.to_datetime(row['Time'])
                     time_str = dt.strftime('%Y-%m-%d %H:%M:%S')
                 except:
-                    time_str = row['Zaman']
+                    time_str = row['Time']
             else:
-                time_str = str(row['Zaman'])
+                time_str = str(row['Time'])
         else:
-            time_str = "Bilinmiyor"
+            time_str = "Unknown"
     except:
-        time_str = str(row.get('Zaman', 'Bilinmiyor'))
+        time_str = str(row.get('Time', 'Unknown'))
     
     event_id = str(row.get('Event ID', 'N/A'))
     
-    # MITRE tekniğini al
-    mitre_technique = row.get('MITRE Tekniği', None)
+    # Get MITRE technique
+    mitre_technique = row.get('MITRE Technique', None)
     mitre_display = ""
     if mitre_technique and pd.notna(mitre_technique) and str(mitre_technique).strip():
         mitre_display = f" 🔴 {mitre_technique}"
     
-    # Başlık oluştur - risk seviyesi vurgulanmış (Markdown formatında)
+    # Create header - risk level emphasized (Markdown format)
     header = f"{risk_icon} {time_str} - {risk_level}{mitre_display} - Event ID: {event_id}"
     
-    # Genişletici içeriği
+    # Expander content
     with st.expander(header, expanded=False):
         col1, col2 = st.columns([1, 1])
         
         with col1:
-            st.markdown("**📋 Event Detayları**")
+            st.markdown("**📋 Event Details**")
             st.write(f"**ID:** `{row.get('ID', 'N/A')}`")
             st.write(f"**Event ID:** `{event_id}`")
-            st.write(f"**Zaman:** `{time_str}`")
+            st.write(f"**Time:** `{time_str}`")
             risk_display = f"<span class='{risk_class}'>**{risk_level}** {risk_icon}</span>"
-            st.markdown(f"**Risk Seviyesi:** {risk_display}", unsafe_allow_html=True)
+            st.markdown(f"**Risk Level:** {risk_display}", unsafe_allow_html=True)
             
-            # MITRE Tekniği göster
+            # Show MITRE Technique
             if mitre_technique and pd.notna(mitre_technique) and str(mitre_technique).strip():
                 st.markdown(f"**🔴 MITRE ATT&CK:** `{mitre_technique}`")
         
         with col2:
-            st.markdown("**🤖 AI Analizi**")
-            ai_analysis = str(row.get('AI Analiz', 'Analiz yok'))
-            if ai_analysis and ai_analysis != 'Analiz yok':
-                # AI analizini daha okunabilir formata çevir
+            st.markdown("**🤖 AI Analysis**")
+            ai_analysis = str(row.get('AI Analysis', 'No analysis'))
+            if ai_analysis and ai_analysis != 'No analysis':
+                # Convert AI analysis to more readable format
                 st.info(f"💭 {ai_analysis}")
             else:
-                st.warning("⚠️ Analiz bulunamadı")
+                st.warning("⚠️ Analysis not found")
         
         st.markdown("---")
-        st.markdown("**📝 Tam Mesaj**")
-        message = str(row.get('Mesaj', 'Mesaj yok'))
+        st.markdown("**📝 Full Message**")
+        message = str(row.get('Message', 'No message'))
         if message and len(message) > 0:
-            # Mesajı daha okunabilir yap
+            # Make message more readable
             st.code(message, language=None)
         else:
-            st.caption("Mesaj içeriği bulunmuyor.")
+            st.caption("No message content available.")
 
 
 def main():
-    """Ana dashboard fonksiyonu"""
+    """Main dashboard function"""
     
-    # Başlık
-    st.title("🛡️ LocalShield - AI Destekli SIEM")
+    # Header
+    st.title("🛡️ LocalShield - AI-Powered SIEM")
     st.markdown("---")
     
-    # Sidebar - Filtreler
+    # Sidebar - Filters
     with st.sidebar:
-        st.header("🔍 Filtreler")
+        st.header("🔍 Filters")
         
-        # Risk seviyesi filtresi
-        risk_options = ["Yüksek", "Orta", "Düşük"]
+        # Risk level filter
+        risk_options = ["High", "Medium", "Low"]
         selected_risks = st.multiselect(
-            "Risk Seviyesi",
+            "Risk Level",
             options=risk_options,
             default=[]
         )
         
-        # Event ID filtresi
+        # Event ID filter
         event_id_filter = st.text_input(
             "Event ID",
-            placeholder="Örn: 4625, 4624..."
+            placeholder="E.g.: 4625, 4624..."
         )
         
-        # Gelişmiş Arama (Text Search)
+        # Advanced Search (Text Search)
         text_search = st.text_input(
-            "🔎 Gelişmiş Arama",
-            placeholder="Mesaj, AI Analiz veya MITRE Tekniği içinde ara..."
+            "🔎 Advanced Search",
+            placeholder="Search in Message, AI Analysis or MITRE Technique..."
         )
         
         st.markdown("---")
-        st.caption("💡 Filtreleri temizlemek için seçimleri kaldırın.")
+        st.caption("💡 Clear selections to reset filters.")
         
-        # Veritabanını Temizle Butonu
+        # Clear Database Button
         st.markdown("---")
-        st.header("⚙️ Yönetim")
+        st.header("⚙️ Management")
         
-        # Session state ile onay kontrolü
+        # Session state for confirmation check
         if 'confirm_reset' not in st.session_state:
             st.session_state.confirm_reset = False
         
         if not st.session_state.confirm_reset:
-            if st.button("🗑️ Veritabanını Temizle", type="secondary", use_container_width=True):
+            if st.button("🗑️ Clear Database", type="secondary", use_container_width=True):
                 st.session_state.confirm_reset = True
                 st.rerun()
         else:
-            st.warning("⚠️ Tüm log kayıtları silinecek! Bu işlem geri alınamaz.")
+            st.warning("⚠️ All log entries will be deleted! This action cannot be undone.")
             col_confirm1, col_confirm2 = st.columns(2)
             with col_confirm1:
-                if st.button("✅ Onayla", type="primary", use_container_width=True):
+                if st.button("✅ Confirm", type="primary", use_container_width=True):
                     if clear_all_logs(config.DB_PATH):
                         st.session_state.confirm_reset = False
-                        st.success("✅ Veritabanı başarıyla temizlendi!")
+                        st.success("✅ Database cleared successfully!")
                         st.rerun()
                     else:
-                        st.error("❌ Veritabanı temizlenirken hata oluştu.")
+                        st.error("❌ Error clearing database.")
             with col_confirm2:
-                if st.button("❌ İptal", use_container_width=True):
+                if st.button("❌ Cancel", use_container_width=True):
                     st.session_state.confirm_reset = False
                     st.rerun()
     
-    # Metrikler
+    # Metrics
     col1, col2, col3 = st.columns(3)
     
     try:
-        # Metrik 1: Toplam Log
+        # Metric 1: Total Logs
         total_logs = get_total_log_count(config.DB_PATH)
         with col1:
             st.metric(
-                label="📊 Toplam Log",
+                label="📊 Total Logs",
                 value=total_logs,
                 delta=None
             )
         
-        # Metrik 2: Yüksek Riskli Olaylar
+        # Metric 2: High Risk Events
         high_risk = get_high_risk_count(config.DB_PATH)
         with col2:
             st.metric(
-                label="🚨 Yüksek Riskli Olaylar",
+                label="🚨 High Risk Events",
                 value=high_risk,
                 delta=None,
                 delta_color="inverse"
             )
         
-        # Metrik 3: Son Tespit
+        # Metric 3: Latest Detection
         latest = get_latest_detection(config.DB_PATH)
         if latest:
             try:
@@ -415,29 +415,29 @@ def main():
             except:
                 latest_str = str(latest)
         else:
-            latest_str = "Henüz yok"
+            latest_str = "None yet"
         
         with col3:
             st.metric(
-                label="⏰ Son Tespit",
+                label="⏰ Latest Detection",
                 value=latest_str,
                 delta=None
             )
     except Exception as e:
-        st.error(f"Metrikler yüklenirken hata: {e}")
+        st.error(f"Error loading metrics: {e}")
     
     st.markdown("---")
     
-    # 3 Sekmeli yapı (Chat artık sekme)
-    tab_logs, tab_network, tab_chat = st.tabs(["📋 Log Analizi", "🌐 Ağ Taraması", "💬 AI Asistan"])
+    # 3 Tab structure (Chat is now a tab)
+    tab_logs, tab_network, tab_chat = st.tabs(["📋 Log Analysis", "🌐 Network Scan", "💬 AI Assistant"])
     
     with tab_logs:
-        # Log Analizi sekmesi
-        # Grafikler
+        # Log Analysis tab
+        # Charts
         df = load_data()
         
         if not df.empty:
-            # Grafik satırı
+            # Chart row
             chart_col1, chart_col2 = st.columns(2)
             
             with chart_col1:
@@ -445,30 +445,30 @@ def main():
                 if timeline_chart:
                     st.altair_chart(timeline_chart, use_container_width=True)
                 else:
-                    st.info("Zaman çizelgesi grafiği oluşturulamadı.")
+                    st.info("Could not create timeline chart.")
             
             with chart_col2:
                 risk_chart = create_risk_distribution_chart(df)
                 if risk_chart:
                     st.altair_chart(risk_chart, use_container_width=True)
                 else:
-                    st.info("Risk dağılım grafiği oluşturulamadı.")
+                    st.info("Could not create risk distribution chart.")
             
             st.markdown("---")
             
-            # Filtreleme
+            # Filtering
             filtered_df = filter_data(df, selected_risks, event_id_filter, text_search)
             
-            # CSV İndirme Butonu ve Log Başlığı
+            # CSV Download Button and Log Header
             col_header1, col_header2 = st.columns([3, 1])
             with col_header1:
-                st.subheader(f"📋 Güvenlik Logları ({len(filtered_df)} kayıt)")
+                st.subheader(f"📋 Security Logs ({len(filtered_df)} entries)")
             with col_header2:
                 if not filtered_df.empty:
-                    # CSV olarak indir
+                    # Download as CSV
                     csv = filtered_df.to_csv(index=False, encoding='utf-8-sig')
                     st.download_button(
-                        label="📥 CSV Olarak İndir",
+                        label="📥 Download as CSV",
                         data=csv,
                         file_name=f"localshield_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                         mime="text/csv",
@@ -476,70 +476,70 @@ def main():
                     )
             
             if filtered_df.empty:
-                st.info("🔍 Filtre kriterlerine uygun log bulunamadı.")
+                st.info("🔍 No logs found matching filter criteria.")
             else:
-                # Her log için kart oluştur
+                # Create card for each log
                 for idx, row in filtered_df.iterrows():
                     render_log_card(row)
         else:
-            st.info("📭 Henüz log kaydı bulunmuyor. Log watcher'ı çalıştırdığınızdan emin olun.")
+            st.info("📭 No log entries found yet. Make sure the log watcher is running.")
     
     with tab_network:
-        # Ağ Taraması sekmesi
-        st.subheader("🌐 Ağ Taraması - Açık Portlar")
-        st.markdown("Bu bölüm, bilgisayarınızdaki dinleme (LISTEN) modundaki TCP portlarını gösterir.")
+        # Network Scan tab
+        st.subheader("🌐 Network Scan - Open Ports")
+        st.markdown("This section shows TCP ports in LISTEN mode on your computer.")
         
-        # Port tarama butonu
+        # Port scan button
         col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
         with col_btn2:
-            scan_button = st.button("🔍 Anlık Port Taraması Yap", type="primary", use_container_width=True)
+            scan_button = st.button("🔍 Scan Ports Now", type="primary", use_container_width=True)
         
-        # Port tarama sonuçlarını göster
+        # Show port scan results
         if scan_button or 'port_scan_results' not in st.session_state:
-            with st.spinner("Portlar taranıyor, lütfen bekleyin..."):
+            with st.spinner("Scanning ports, please wait..."):
                 try:
                     ports = scan_open_ports()
                     st.session_state.port_scan_results = ports
                     st.session_state.port_scan_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 except Exception as e:
-                    st.error(f"❌ Port tarama sırasında hata oluştu: {e}")
+                    st.error(f"❌ Error during port scan: {e}")
                     st.session_state.port_scan_results = []
         
-        # Sonuçları göster
+        # Show results
         if 'port_scan_results' in st.session_state and st.session_state.port_scan_results:
             ports = st.session_state.port_scan_results
-            scan_time = st.session_state.get('port_scan_time', 'Bilinmiyor')
+            scan_time = st.session_state.get('port_scan_time', 'Unknown')
             
-            # Özet metrikler
+            # Summary metrics
             summary = get_port_summary(ports)
             col_sum1, col_sum2, col_sum3 = st.columns(3)
             
             with col_sum1:
-                st.metric("🔌 Toplam Açık Port", summary["Toplam"])
+                st.metric("🔌 Total Open Ports", summary["Total"])
             with col_sum2:
-                st.metric("🚨 Yüksek Riskli Port", summary["Yüksek Risk"], delta_color="inverse")
+                st.metric("🚨 High Risk Ports", summary["High Risk"], delta_color="inverse")
             with col_sum3:
-                st.metric("✅ Düşük Riskli Port", summary["Düşük Risk"])
+                st.metric("✅ Low Risk Ports", summary["Low Risk"])
             
-            st.caption(f"📅 Son tarama: {scan_time}")
+            st.caption(f"📅 Last scan: {scan_time}")
             st.markdown("---")
             
-            # Port tablosu
+            # Port table
             if ports:
-                # DataFrame oluştur
+                # Create DataFrame
                 df_ports = pd.DataFrame(ports)
                 
-                # Yüksek riskli portları vurgula
+                # Highlight high risk ports
                 def highlight_high_risk(row):
                     styles = [''] * len(row)
-                    if row['Risk'] == 'Yüksek':
+                    if row['Risk'] == 'High' or row['Risk'] == 'Yüksek':
                         return ['background-color: #ff4444; color: white; font-weight: bold;'] * len(row)
                     return styles
                 
-                # Risk sütununa ikon ekle
+                # Add icon to Risk column
                 df_ports_display = df_ports.copy()
                 df_ports_display['Risk'] = df_ports_display['Risk'].apply(
-                    lambda x: f"🚨 {x}" if x == "Yüksek" else f"✅ {x}"
+                    lambda x: f"🚨 {x}" if x == "High" or x == "Yüksek" else f"✅ {x}"
                 )
                 
                 styled_df = df_ports_display.style.apply(highlight_high_risk, axis=1)
@@ -551,93 +551,93 @@ def main():
                     height=500
                 )
                 
-                # Yüksek riskli portlar için uyarı
-                high_risk_ports = [p for p in ports if p['Risk'] == 'Yüksek']
+                # Warning for high risk ports
+                high_risk_ports = [p for p in ports if p['Risk'] == 'High' or p['Risk'] == 'Yüksek']
                 if high_risk_ports:
-                    st.warning(f"⚠️ **{len(high_risk_ports)} adet yüksek riskli port tespit edildi!** "
-                              "Bu portlar güvenlik açısından dikkatli incelenmelidir.")
+                    st.warning(f"⚠️ **{len(high_risk_ports)} high risk port(s) detected!** "
+                              "These ports should be carefully examined from a security perspective.")
                     
-                    # Yüksek riskli portların detayları
-                    with st.expander("🚨 Yüksek Riskli Port Detayları", expanded=True):
+                    # High risk port details
+                    with st.expander("🚨 High Risk Port Details", expanded=True):
                         for port_info in high_risk_ports:
                             st.markdown(f"""
-                            **Port {port_info['Port']}** - {port_info['Servis']}
+                            **Port {port_info['Port']}** - {port_info.get('Service', port_info.get('Servis', 'N/A'))}
                             - **PID:** {port_info['PID']}
-                            - **Uygulama:** {port_info['Uygulama']}
-                            - **Açıklama:** {port_info['Açıklama']}
+                            - **Application:** {port_info.get('Application', port_info.get('Uygulama', 'N/A'))}
+                            - **Description:** {port_info.get('Description', port_info.get('Açıklama', 'N/A'))}
                             """)
                             st.markdown("---")
             else:
-                st.info("✅ Açık port bulunamadı veya tarama başarısız oldu.")
+                st.info("✅ No open ports found or scan failed.")
         else:
-            st.info("🔍 Port taraması yapmak için yukarıdaki butona tıklayın.")
+            st.info("🔍 Click the button above to scan ports.")
     
-    # --- SEKME 3: AI ASİSTAN (YENİLENMİŞ UI) ---
+    # --- TAB 3: AI ASSISTANT (UPDATED UI) ---
     with tab_chat:
-        st.header("💬 Siber Güvenlik Asistanı")
-        st.caption("Sisteminiz hakkında sorular sorabilirsiniz. AI, log ve port verilerine göre yanıt verecektir.")
+        st.header("💬 Cybersecurity Assistant")
+        st.caption("You can ask questions about your system. AI will respond based on log and port data.")
         
-        # Session State Başlatma
+        # Initialize Session State
         if "messages" not in st.session_state:
             st.session_state.messages = []
-            # İlk karşılama mesajı
+            # Initial welcome message
             st.session_state.messages.append({
                 "role": "assistant",
-                "content": "Merhaba! Ben LocalShield Siber Güvenlik Asistanıyım. "
-                          "Sisteminiz hakkında sorular sorabilirsiniz. "
-                          "Örneğin: 'Sistemimde risk var mı?', 'Hangi portlar açık?', 'Son güvenlik olayları neler?'"
+                "content": "Hello! I'm the LocalShield Cybersecurity Assistant. "
+                          "You can ask questions about your system. "
+                          "For example: 'Are there any risks in my system?', 'Which ports are open?', 'What are the latest security events?'"
             })
         
-        # Geçmiş Mesajları Ekrana Bas (Baloncuk Şeklinde)
+        # Display Message History (in bubbles)
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
         
-        # Yeni Mesaj Girişi
-        if prompt := st.chat_input("Sistemin durumu hakkında ne bilmek istersiniz?"):
-            # Kullanıcı mesajını ekle ve göster
+        # New Message Input
+        if prompt := st.chat_input("What would you like to know about your system's status?"):
+            # Add and show user message
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.markdown(prompt)
             
-            # Asistana Sor
+            # Ask Assistant
             with st.chat_message("assistant"):
-                with st.spinner("Veriler analiz ediliyor..."):
+                with st.spinner("Analyzing data..."):
                     try:
                         response = ask_assistant(prompt)
                         st.markdown(response)
                         st.session_state.messages.append({"role": "assistant", "content": response})
                     except Exception as e:
-                        error_msg = f"Üzgünüm, bir hata oluştu: {str(e)}"
+                        error_msg = f"Sorry, an error occurred: {str(e)}"
                         st.error(error_msg)
                         st.session_state.messages.append({"role": "assistant", "content": error_msg})
         
-        # Chat geçmişini temizleme butonu
+        # Clear chat history button
         if st.session_state.messages and len(st.session_state.messages) > 1:
             st.markdown("---")
             col_clear1, col_clear2, col_clear3 = st.columns([1, 1, 1])
             with col_clear2:
-                if st.button("🗑️ Sohbet Geçmişini Temizle", use_container_width=True):
+                if st.button("🗑️ Clear Chat History", use_container_width=True):
                     st.session_state.messages = []
                     st.rerun()
     
-    # Alt kısım - Otomatik yenileme bilgisi (sadece log sekmesinde göster)
-    # Chat sekmesinde otomatik yenileme olmamalı (kullanıcı yazıyor olabilir)
+    # Bottom section - Auto refresh info (only shown on log tab)
+    # Chat tab should not auto-refresh (user might be typing)
     st.markdown("---")
     col_refresh1, col_refresh2, col_refresh3 = st.columns([1, 2, 1])
     with col_refresh2:
         current_time = datetime.now().strftime("%H:%M:%S")
-        st.caption(f"🔄 Son güncelleme: {current_time}")
+        st.caption(f"🔄 Last update: {current_time}")
     
-    # Otomatik yenileme sadece log sekmesi aktifken çalışmalı
-    # JavaScript ile kontrol ediyoruz - chat sekmesi aktifse yenileme yok
+    # Auto refresh should only work when log tab is active
+    # We check with JavaScript - no refresh if chat tab is active
     auto_refresh_script = """
     <script>
-        // Sadece log sekmesinde otomatik yenileme (chat sekmesinde olmasın)
+        // Auto refresh only on log tab (not on chat tab)
         var currentTab = window.location.hash || '';
         if (currentTab === '' || currentTab.includes('log') || !currentTab.includes('chat')) {
             setTimeout(function(){
-                // Chat input'u aktif değilse yenile
+                // Refresh if chat input is not active
                 var chatInput = document.querySelector('[data-testid="stChatInput"] textarea');
                 if (!chatInput || document.activeElement !== chatInput) {
                     location.reload();
