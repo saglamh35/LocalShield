@@ -3,47 +3,47 @@ setlocal
 title LocalShield Launcher
 
 echo ========================================
-echo    LocalShield - Baslatiliyor...
+echo    LocalShield - Starting...
 echo ========================================
 echo.
 
-:: 1. Calisma dizinini sabitle
+:: 1. Set working directory
 cd /d "%~dp0"
 set "ROOT_DIR=%cd%"
-echo [0/4] Calisma dizini: %ROOT_DIR%
+echo [0/4] Working directory: %ROOT_DIR%
 echo.
 
-:: 2. Sanal ortam kontrolu ve olusturma
+:: 2. Virtual environment check and creation
 if exist "venv\Scripts\activate.bat" (
-    echo [1/4] Sanal ortam bulundu, aktif ediliyor...
+    echo [1/4] Virtual environment found, activating...
     call venv\Scripts\activate.bat
 ) else (
-    echo [1/4] Sanal ortam bulunamadi, olusturuluyor...
+    echo [1/4] Virtual environment not found, creating...
     python -m venv venv
     if errorlevel 1 (
-        echo HATA: Sanal ortam olusturulamadi!
+        echo ERROR: Could not create virtual environment!
         pause
         exit /b 1
     )
     call venv\Scripts\activate.bat
 )
 
-:: 3. Bagimliliklari yukle (her zaman)
-echo [2/4] Bagimliliklar kontrol ediliyor ve yukleniyor...
+:: 3. Install dependencies (always)
+echo [2/4] Checking and installing dependencies...
 pip install -r requirements.txt --quiet
 if errorlevel 1 (
-    echo UYARI: Bazı bagimliliklar yuklenemedi, tekrar deneniyor...
+    echo WARNING: Some dependencies could not be installed, retrying...
     pip install -r requirements.txt
 )
-echo Bagimliliklar hazir.
+echo Dependencies ready.
 echo.
 
-:: 4. Log Watcher'i Yeni Pencerede Baslat (Yonetici Haklariyla)
-:: Duzeltme: Log Watcher Windows Event Log okumak icin yonetici haklari gerektirir
-echo [3/4] Log Watcher arka planda baslatiliyor (Yonetici haklari gerekli)...
-echo UYARI: Log Watcher icin yonetici haklari gerekiyor. UAC penceresi acilabilir.
+:: 4. Start Log Watcher in New Window (With Administrator Privileges)
+:: Note: Log Watcher requires administrator privileges to read Windows Event Log
+echo [3/4] Starting Log Watcher in background (Administrator privileges required)...
+echo WARNING: Log Watcher requires administrator privileges. UAC window may open.
 
-:: Gecici batch dosyasi olustur (yonetici haklariyla calistirilmak icin)
+:: Create temporary batch file (to be run with administrator privileges)
 set "TEMP_BATCH=%TEMP%\localshield_logwatcher_%RANDOM%.bat"
 (
     echo @echo off
@@ -55,17 +55,17 @@ set "TEMP_BATCH=%TEMP%\localshield_logwatcher_%RANDOM%.bat"
     echo del "%%~f0" ^>nul 2^>^&1
 ) > "%TEMP_BATCH%"
 
-:: PowerShell ile yonetici haklariyla baslat
+:: Start with administrator privileges using PowerShell
 powershell -Command "Start-Process cmd -ArgumentList '/k \"%TEMP_BATCH%\"' -Verb RunAs"
 
-:: Kisa bekleme (Database kilidi olusmamasi icin)
+:: Short wait (to avoid database lock)
 timeout /t 3 /nobreak >nul
 
-:: 5. Dashboard'u Baslat
-echo [4/4] Dashboard baslatiliyor...
+:: 5. Start Dashboard
+echo [4/4] Starting Dashboard...
 echo.
 echo ========================================
-echo    LocalShield Hazir!
+echo    LocalShield Ready!
 echo ========================================
 echo.
 

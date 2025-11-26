@@ -1,6 +1,6 @@
 """
-Detection Engine Module - Kural Motoru
-Production-Ready: YAML tabanlı kural sistemi ve MITRE ATT&CK entegrasyonu
+Detection Engine Module - Rule Engine
+Production-Ready: YAML-based rule system and MITRE ATT&CK integration
 """
 import yaml
 import logging
@@ -14,60 +14,60 @@ logger = logging.getLogger(__name__)
 
 
 class DetectionRule:
-    """Tek bir detection rule'ı temsil eden sınıf"""
+    """Class representing a single detection rule"""
     
     def __init__(self, rule_data: Dict[str, Any], rule_file: str):
         """
-        DetectionRule oluşturur.
+        Creates DetectionRule.
         
         Args:
-            rule_data: YAML dosyasından parse edilmiş kural verisi
-            rule_file: Kural dosyasının adı
+            rule_data: Rule data parsed from YAML file
+            rule_file: Rule file name
         """
         self.name: str = rule_data.get('name', 'Unknown Rule')
         self.description: str = rule_data.get('description', '')
         self.enabled: bool = rule_data.get('enabled', True)
         self.priority: str = rule_data.get('priority', 'medium')
         self.conditions: Dict[str, Any] = rule_data.get('conditions', {})
-        self.risk_level: str = rule_data.get('risk_level', 'Orta')
+        self.risk_level: str = rule_data.get('risk_level', 'Medium')
         self.mitre_technique: Optional[str] = rule_data.get('mitre_technique')
         self.match_message: str = rule_data.get('match_message', f'Detection Rule Match: {self.name}')
         self.filters: Dict[str, Any] = rule_data.get('filters', {})
         self.rule_file: str = rule_file
         
-        # Zaman penceresi ve eşik değerleri
-        self.time_window: int = self.conditions.get('time_window', 60)  # saniye
+        # Time window and threshold values
+        self.time_window: int = self.conditions.get('time_window', 60)  # seconds
         self.threshold: int = self.conditions.get('threshold', 5)
         self.event_id: Optional[str] = self.conditions.get('event_id')
         
-        # Tekrar sayısını takip etmek için (event_id -> [(timestamp, user), ...])
+        # Track repeat count (event_id -> [(timestamp, user), ...])
         self.event_history: Dict[str, List[Tuple[datetime, str]]] = defaultdict(list)
     
     def matches(self, event_id: str, timestamp: datetime, message: str = "") -> bool:
         """
-        Event'in bu kurala uyup uymadığını kontrol eder.
+        Checks if event matches this rule.
         
         Args:
             event_id: Event ID
-            timestamp: Event zamanı
-            message: Event mesajı (opsiyonel, filtreleme için)
+            timestamp: Event time
+            message: Event message (optional, for filtering)
         
         Returns:
-            bool: Kural eşleşiyorsa True
+            bool: True if rule matches
         """
         if not self.enabled:
             return False
         
-        # Event ID kontrolü
+        # Event ID check
         if self.event_id and event_id != self.event_id:
             return False
         
-        # Kullanıcı filtreleme
+        # User filtering
         if self.filters:
             exclude_users = self.filters.get('exclude_users', [])
             include_users = self.filters.get('include_users', [])
             
-            # Mesajdan kullanıcı adını çıkarmaya çalış (basit regex)
+            # Try to extract username from message (simple regex)
             user_in_message = self._extract_user_from_message(message)
             
             if exclude_users and user_in_message:
@@ -78,20 +78,20 @@ class DetectionRule:
                 if user_in_message.upper() not in [u.upper() for u in include_users]:
                     return False
         
-        # Zaman penceresi kontrolü (eğer threshold varsa)
+        # Time window check (if threshold exists)
         if self.threshold > 0:
-            # Eski kayıtları temizle (time_window'dan eski olanları)
+            # Clear old records (older than time_window)
             cutoff_time = timestamp - timedelta(seconds=self.time_window)
             self.event_history[event_id] = [
                 (ts, user) for ts, user in self.event_history[event_id]
                 if ts > cutoff_time
             ]
             
-            # Yeni event'i ekle
+            # Add new event
             user_in_message = self._extract_user_from_message(message)
             self.event_history[event_id].append((timestamp, user_in_message or 'UNKNOWN'))
             
-            # Eşik kontrolü
+            # Threshold check
             if len(self.event_history[event_id]) >= self.threshold:
                 return True
         
@@ -99,13 +99,13 @@ class DetectionRule:
     
     def _extract_user_from_message(self, message: str) -> Optional[str]:
         """
-        Mesajdan kullanıcı adını çıkarmaya çalışır.
+        Tries to extract username from message.
         
         Args:
-            message: Event mesajı
+            message: Event message
         
         Returns:
-            str: Kullanıcı adı (varsa), yoksa None
+            str: Username (if exists), otherwise None
         """
         if not message:
             return None
@@ -129,10 +129,10 @@ class DetectionRule:
     
     def get_result(self) -> Dict[str, Any]:
         """
-        Kural eşleştiğinde döndürülecek sonuç bilgilerini getirir.
+        Gets result information to return when rule matches.
         
         Returns:
-            dict: Kural sonucu (risk_level, mitre_technique, match_message)
+            dict: Rule result (risk_level, mitre_technique, match_message)
         """
         return {
             'risk_level': self.risk_level,
@@ -144,35 +144,35 @@ class DetectionRule:
 
 class DetectionEngine:
     """
-    YAML tabanlı detection rule'ları yükleyen ve logları kontrol eden motor.
+    Engine that loads YAML-based detection rules and checks logs.
     """
     
     def __init__(self, rules_dir: str = "rules"):
         """
-        DetectionEngine'i başlatır.
+        Initializes DetectionEngine.
         
         Args:
-            rules_dir: Kural dosyalarının bulunduğu dizin
+            rules_dir: Directory where rule files are located
         """
         self.rules_dir = Path(rules_dir)
         self.rules: List[DetectionRule] = []
         self.load_rules()
     
     def load_rules(self) -> None:
-        """rules/ dizinindeki tüm YAML dosyalarını yükler"""
+        """Loads all YAML files in rules/ directory"""
         try:
             if not self.rules_dir.exists():
-                logger.warning(f"Kural dizini bulunamadı: {self.rules_dir}")
+                logger.warning(f"Rule directory not found: {self.rules_dir}")
                 return
             
-            # Tüm YAML dosyalarını bul
+            # Find all YAML files
             yaml_files = list(self.rules_dir.glob("*.yaml")) + list(self.rules_dir.glob("*.yml"))
             
             if not yaml_files:
-                logger.warning(f"Kural dizininde YAML dosyası bulunamadı: {self.rules_dir}")
+                logger.warning(f"No YAML files found in rule directory: {self.rules_dir}")
                 return
             
-            # Her YAML dosyasını yükle
+            # Load each YAML file
             for yaml_file in yaml_files:
                 try:
                     with open(yaml_file, 'r', encoding='utf-8') as f:
@@ -181,15 +181,15 @@ class DetectionEngine:
                     if rule_data:
                         rule = DetectionRule(rule_data, yaml_file.name)
                         self.rules.append(rule)
-                        logger.info(f"Kural yüklendi: {rule.name} ({yaml_file.name})")
+                        logger.info(f"Rule loaded: {rule.name} ({yaml_file.name})")
                 
                 except Exception as e:
-                    logger.error(f"Kural yüklenirken hata ({yaml_file}): {e}", exc_info=True)
+                    logger.error(f"Error loading rule ({yaml_file}): {e}", exc_info=True)
             
-            logger.info(f"Toplam {len(self.rules)} kural yüklendi")
+            logger.info(f"Total {len(self.rules)} rules loaded")
         
         except Exception as e:
-            logger.error(f"Kurallar yüklenirken hata: {e}", exc_info=True)
+            logger.error(f"Error loading rules: {e}", exc_info=True)
     
     def check_event(
         self,
@@ -198,18 +198,18 @@ class DetectionEngine:
         message: str = ""
     ) -> Optional[Dict[str, Any]]:
         """
-        Bir event'i tüm kurallara göre kontrol eder.
+        Checks an event against all rules.
         
         Args:
             event_id: Event ID
-            timestamp: Event zamanı
-            message: Event mesajı
+            timestamp: Event time
+            message: Event message
         
         Returns:
-            dict: Eğer kural eşleşirse, kural sonucu (risk_level, mitre_technique, match_message)
-                 Eşleşme yoksa None
+            dict: If rule matches, rule result (risk_level, mitre_technique, match_message)
+                 None if no match
         """
-        # Tüm kuralları kontrol et (priority'ye göre sırala: high -> medium -> low)
+        # Check all rules (sort by priority: high -> medium -> low)
         priority_order = {'high': 0, 'medium': 1, 'low': 2}
         sorted_rules = sorted(
             self.rules,
@@ -219,7 +219,7 @@ class DetectionEngine:
         for rule in sorted_rules:
             if rule.matches(event_id, timestamp, message):
                 logger.warning(
-                    f"🔴 KURAL EŞLEŞMESİ: {rule.name} - Event ID: {event_id}, "
+                    f"🔴 RULE MATCH: {rule.name} - Event ID: {event_id}, "
                     f"Risk: {rule.risk_level}, MITRE: {rule.mitre_technique}"
                 )
                 return rule.get_result()
@@ -227,8 +227,8 @@ class DetectionEngine:
         return None
     
     def reload_rules(self) -> None:
-        """Kuralları yeniden yükler (hot reload)"""
+        """Reloads rules (hot reload)"""
         self.rules.clear()
         self.load_rules()
-        logger.info("Kurallar yeniden yüklendi")
+        logger.info("Rules reloaded")
 

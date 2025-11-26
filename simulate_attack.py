@@ -1,11 +1,17 @@
 """
-Saldırı Simülasyonu - Demo Aracı
-Veritabanına fake brute force logları enjekte eder (Event ID 4625)
-Amaç: Log Watcher'ı beklemeden Dashboard'da MITRE T1110 etiketinin görünmesini test etmek
+Attack Simulation - Demo Tool
+Injects fake brute force logs into database (Event ID 4625)
+Purpose: Test MITRE T1110 tag appearance in Dashboard without waiting for Log Watcher
 """
 import sys
+import io
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# Windows terminal encoding sorunu için UTF-8 ayarı
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Add current directory to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -21,47 +27,47 @@ def simulate_brute_force_attack(
     db_path: str = None
 ):
     """
-    Fake brute force saldırısı simüle eder.
+    Simulates a fake brute force attack.
     
     Args:
-        num_attempts: Kaç başarısız giriş denemesi simüle edilecek (varsayılan: 5)
-        time_window_seconds: Bu denemeler kaç saniye içinde yapılacak (varsayılan: 60)
-        attacker_name: Saldırgan kullanıcı adı (varsayılan: "ATTACKER")
-        db_path: Veritabanı yolu (varsayılan: config.DB_PATH)
+        num_attempts: Number of failed login attempts to simulate (default: 5)
+        time_window_seconds: Time window in seconds for these attempts (default: 60)
+        attacker_name: Attacker username (default: "ATTACKER")
+        db_path: Database path (default: config.DB_PATH)
     """
     db_path = db_path or config.DB_PATH
     
     print("=" * 60)
-    print("🛡️  LocalShield - Saldırı Simülasyonu")
+    print("🛡️  LocalShield - Attack Simulation")
     print("=" * 60)
-    print(f"📊 Simüle edilecek deneme sayısı: {num_attempts}")
-    print(f"⏰ Zaman penceresi: {time_window_seconds} saniye")
-    print(f"👤 Saldırgan: {attacker_name}")
-    print(f"💾 Veritabanı: {db_path}")
+    print(f"📊 Number of attempts to simulate: {num_attempts}")
+    print(f"⏰ Time window: {time_window_seconds} seconds")
+    print(f"👤 Attacker: {attacker_name}")
+    print(f"💾 Database: {db_path}")
     print("=" * 60)
     print()
     
-    # Veritabanını başlat
+    # Initialize database
     try:
         conn = init_db(db_path)
-        print("✅ Veritabanı bağlantısı başarılı")
+        print("✅ Database connection successful")
     except Exception as e:
-        print(f"❌ Veritabanı bağlantı hatası: {e}")
+        print(f"❌ Database connection error: {e}")
         return
     
-    # Zaman aralığını hesapla
+    # Calculate time interval
     base_time = datetime.now()
     time_interval = time_window_seconds / num_attempts if num_attempts > 1 else 0
     
-    print(f"🚀 {num_attempts} adet fake log kaydı ekleniyor...")
+    print(f"🚀 Adding {num_attempts} fake log entries...")
     print()
     
-    # Her deneme için log kaydı oluştur
+    # Create log entry for each attempt
     for i in range(num_attempts):
-        # Zamanı hesapla (eşit aralıklarla dağıt)
+        # Calculate time (distribute evenly)
         timestamp = base_time + timedelta(seconds=i * time_interval)
         
-        # Event mesajı oluştur (gerçekçi Windows Event 4625 formatı)
+        # Create event message (realistic Windows Event 4625 format)
         message = f"""An account failed to log on.
 
 Subject:
@@ -113,42 +119,42 @@ The authentication information fields provide detailed information about this sp
 - Package name indicates which sub-protocol was used among the NTLM protocols.
 - Key length indicates the length of the generated session key. This will be 0 if no session key was requested."""
         
-        # AI analizi (kural motoru tetiklenirse bu override edilecek)
-        ai_analysis = f"Başarısız logon denemesi tespit edildi. Kullanıcı: {attacker_name}"
+        # AI analysis (will be overridden if detection engine triggers)
+        ai_analysis = f"Failed logon attempt detected. User: {attacker_name}"
         
-        # Risk seviyesi (kural motoru tetiklenirse "Yüksek" olacak)
-        risk_score = "Orta"  # Tek tek denemeler için orta, 5+ denemede Yüksek olacak
+        # Risk level (will be "High" if detection engine triggers)
+        risk_score = "Medium"  # Medium for individual attempts, High for 5+ attempts
         
-        # MITRE tekniği (kural motoru tetiklenirse "T1110" olacak)
-        mitre_technique = None  # Kural motoru tetiklenene kadar None
+        # MITRE technique (will be "T1110" if detection engine triggers)
+        mitre_technique = None  # None until detection engine triggers
         
         try:
             log_id = insert_log(
                 timestamp=timestamp,
                 event_id="4625",
-                message=message[:500],  # İlk 500 karakter
+                message=message[:500],  # First 500 characters
                 ai_analysis=ai_analysis,
                 risk_score=risk_score,
                 mitre_technique=mitre_technique,
                 conn=conn
             )
             
-            print(f"  ✅ Log #{i+1} eklendi (ID: {log_id}, Zaman: {timestamp.strftime('%H:%M:%S')})")
+            print(f"  ✅ Log #{i+1} added (ID: {log_id}, Time: {timestamp.strftime('%H:%M:%S')})")
             
         except Exception as e:
-            print(f"  ❌ Log #{i+1} eklenirken hata: {e}")
+            print(f"  ❌ Error adding log #{i+1}: {e}")
     
-    # Bağlantıyı kapat
+    # Close connection
     conn.close()
     
     print()
     print("=" * 60)
-    print("✅ Simülasyon tamamlandı!")
+    print("✅ Simulation completed!")
     print()
-    print("💡 Şimdi Dashboard'ı açın ve şunları kontrol edin:")
-    print("   - Event ID 4625 logları görünüyor mu?")
-    print("   - 5+ deneme varsa MITRE T1110 etiketi görünüyor mu?")
-    print("   - Risk seviyesi 'Yüksek' olarak işaretlenmiş mi?")
+    print("💡 Now open the Dashboard and check:")
+    print("   - Are Event ID 4625 logs visible?")
+    print("   - If 5+ attempts, is MITRE T1110 tag visible?")
+    print("   - Is risk level marked as 'High'?")
     print("=" * 60)
 
 
@@ -156,31 +162,31 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="LocalShield - Brute Force Saldırısı Simülasyonu"
+        description="LocalShield - Brute Force Attack Simulation"
     )
     parser.add_argument(
         "-n", "--num-attempts",
         type=int,
         default=5,
-        help="Simüle edilecek başarısız giriş denemesi sayısı (varsayılan: 5)"
+        help="Number of failed login attempts to simulate (default: 5)"
     )
     parser.add_argument(
         "-t", "--time-window",
         type=int,
         default=60,
-        help="Zaman penceresi (saniye) (varsayılan: 60)"
+        help="Time window in seconds (default: 60)"
     )
     parser.add_argument(
         "-u", "--user",
         type=str,
         default="ATTACKER",
-        help="Saldırgan kullanıcı adı (varsayılan: ATTACKER)"
+        help="Attacker username (default: ATTACKER)"
     )
     parser.add_argument(
         "-d", "--db-path",
         type=str,
         default=None,
-        help="Veritabanı yolu (varsayılan: config.DB_PATH)"
+        help="Database path (default: config.DB_PATH)"
     )
     
     args = parser.parse_args()
