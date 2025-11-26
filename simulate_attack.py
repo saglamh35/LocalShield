@@ -4,8 +4,14 @@ Veritabanına fake brute force logları enjekte eder (Event ID 4625)
 Amaç: Log Watcher'ı beklemeden Dashboard'da MITRE T1110 etiketinin görünmesini test etmek
 """
 import sys
+import io
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# Windows terminal encoding sorunu için UTF-8 ayarı
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Add current directory to path
 sys.path.insert(0, str(Path(__file__).parent))
