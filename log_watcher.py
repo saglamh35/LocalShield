@@ -5,7 +5,11 @@ Production-Ready: Asenkron yapı ve logging ile güncellendi
 import asyncio
 import sys
 import logging
+<<<<<<< HEAD
 from datetime import datetime, timedelta
+=======
+from datetime import datetime
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
 from typing import Optional, List, Any
 from concurrent.futures import ThreadPoolExecutor
 
@@ -22,8 +26,11 @@ import re
 from db_manager import init_db, insert_log
 from modules.ai_engine import Brain
 from modules.detection_engine import DetectionEngine
+<<<<<<< HEAD
 from modules.response_engine import FirewallManager
 from modules.threat_intel import ThreatIntel
+=======
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
 
 # Logging yapılandırması
 logging.basicConfig(
@@ -47,28 +54,44 @@ class LogWatcher:
         """Initializes LogWatcher"""
         self.brain = Brain()
         self.detection_engine = DetectionEngine()  # Kural Motoru
+<<<<<<< HEAD
         self.firewall_manager = FirewallManager()  # Active Response Engine
         self.threat_intel = ThreatIntel()  # Threat Intelligence Engine
         self.db_conn = init_db(config.DB_PATH)
         # Dictionary to hold multiple log handles: {log_name: handle}
         self.log_handles: dict[str, Optional[Any]] = {}
+=======
+        self.db_conn = init_db(config.DB_PATH)
+        self.log_handle: Optional[Any] = None
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
         self.last_check_time = datetime.now()
         self.check_interval: int = config.CHECK_INTERVAL
         self.executor = ThreadPoolExecutor(max_workers=3)  # Thread pool for blocking operations
         self.running: bool = False
     
     def open_event_log(self) -> None:
+<<<<<<< HEAD
         """Opens Windows Event Logs for both Security and Sysmon (synchronous operation)"""
         # Always try to open Security log
+=======
+        """Opens Windows Event Log (synchronous operation)"""
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
         try:
             security_handle = win32evtlog.OpenEventLog(
                 None,  # Local machine
                 config.EVENT_LOG_NAME
             )
+<<<<<<< HEAD
             self.log_handles[config.EVENT_LOG_NAME] = security_handle
             logger.info(f"✅ Successfully opened '{config.EVENT_LOG_NAME}' log")
         except Exception as e:
             logger.error(f"❌ Could not open Security Event Log: {e}")
+=======
+            logger.info(f"Successfully opened '{config.EVENT_LOG_NAME}' log")
+            
+        except Exception as e:
+            logger.error(f"Could not open Event Log: {e}")
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
             logger.warning("💡 Make sure you're running with administrator privileges.")
             raise
         
@@ -86,6 +109,7 @@ class LogWatcher:
             # Don't raise - continue with Security log only
     
     def close_event_log(self) -> None:
+<<<<<<< HEAD
         """Closes all Windows Event Log handles"""
         for log_name, handle in self.log_handles.items():
             if handle:
@@ -96,12 +120,26 @@ class LogWatcher:
         self.log_handles.clear()
     
     def get_event_message(self, event: Any, log_name: str = None) -> str:
+=======
+        """Closes Windows Event Log"""
+        if self.log_handle:
+            try:
+                win32evtlog.CloseEventLog(self.log_handle)
+                self.log_handle = None
+            except Exception as e:
+                logger.warning(f"Error closing log: {e}")
+    
+    def get_event_message(self, event: Any) -> str:
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
         """
         Gets readable message text from event
         
         Args:
             event: win32evtlog event object
+<<<<<<< HEAD
             log_name: Name of the log channel (for proper message formatting)
+=======
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
         
         Returns:
             str: Event message
@@ -110,7 +148,11 @@ class LogWatcher:
         log_channel = log_name or config.EVENT_LOG_NAME
         
         try:
+<<<<<<< HEAD
             message = win32evtlogutil.SafeFormatMessage(event, log_channel)
+=======
+            message = win32evtlogutil.SafeFormatMessage(event, config.EVENT_LOG_NAME)
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
             if not message or message.strip() == "":
                 if event.StringInserts:
                     message = " | ".join(str(insert) for insert in event.StringInserts)
@@ -122,6 +164,7 @@ class LogWatcher:
                 return " | ".join(str(insert) for insert in event.StringInserts)
             return f"Event ID {event.EventID} (Message could not be parsed: {e})"
     
+<<<<<<< HEAD
     def parse_sysmon_event_1(self, event: Any) -> dict:
         """
         Parses Sysmon Event ID 1 (Process Creation) and extracts critical fields
@@ -248,12 +291,21 @@ class LogWatcher:
         Args:
             event: win32evtlog event object
             log_source: Source log channel name (Security or Sysmon)
+=======
+    async def process_event_async(self, event: Any) -> None:
+        """
+        Processes a single event asynchronously: sends to AI, saves to database
+        
+        Args:
+            event: win32evtlog event object
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
         """
         try:
             # Event bilgilerini al
             event_id = str(event.EventID)
             event_time = event.TimeGenerated
             
+<<<<<<< HEAD
             # Get log channel name for message formatting
             log_channel = config.SYSMON_LOG_NAME if log_source == "Sysmon" else config.EVENT_LOG_NAME
             message = self.get_event_message(event, log_channel)
@@ -277,6 +329,8 @@ Sysmon Process Terminated Details:
   ProcessId: {parsed['ProcessId']}
 """
             
+=======
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
             # Get additional info from StringInserts
             additional_info = ""
             if event.StringInserts:
@@ -285,6 +339,7 @@ Sysmon Process Terminated Details:
                     additional_info = f"\nAdditional Details (StringInserts): {inserts_str}"
             
             # Combine event in rich format
+<<<<<<< HEAD
             log_text = f"""Log Source: {log_source}
 Event ID: {event_id}
 Time: {event_time}
@@ -312,6 +367,14 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                 threat_intel_header = f"🚨 [THREAT INTEL MATCH] IP {threat_intel_match['ip']} zararlı listede bulundu! Kategori: {threat_intel_match['category']}, Güven: {threat_intel_match['confidence']}%\n\n"
                 logger.warning(f"🚨 THREAT INTEL: {threat_intel_match['ip']} zararlı listede - Risk seviyesi otomatik olarak 'High' yapıldı")
             
+=======
+            log_text = f"""Event ID: {event_id}
+Time: {event_time}
+Message: {message}{additional_info}
+
+Note: Pay special attention to fields like 'Account Name', 'Workstation Name', 'Source Network Address', 'Logon Type' in the message."""
+            
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
             # FIRST: Detection Engine check (Fast and Precise)
             logger.info(f"Checking Event ID {event_id} in detection engine...")
             loop = asyncio.get_event_loop()
@@ -342,6 +405,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                 log_text
             )
             
+<<<<<<< HEAD
             # Risk seviyesi belirleme mantığı (öncelik sırası):
             # 1. Threat Intelligence (en yüksek öncelik - zararlı IP varsa direkt High)
             # 2. Detection Engine (kural eşleşmesi)
@@ -359,6 +423,13 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             
             # Detection Engine override logic: If Detection Engine says "High Risk", override AI's risk score
             elif rule_risk_level:
+=======
+            # Detection Engine override logic: If Detection Engine says "High Risk", override AI's risk score
+            final_risk_level = ai_risk_level
+            final_analysis = analysis
+            
+            if rule_risk_level:
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
                 # Add Detection Engine result to AI analysis
                 if rule_match_message:
                     final_analysis = f"{rule_match_message}\n\n---\n\n{analysis}"
@@ -371,6 +442,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                     # If Detection Engine is not "High", use AI's score but also show rule result
                     final_risk_level = ai_risk_level
             
+<<<<<<< HEAD
             # ACTIVE RESPONSE: Yüksek riskli olaylarda IP engelleme
             action_taken = ""
             if final_risk_level in ["Yüksek", "High"]:
@@ -402,6 +474,8 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             if action_taken:
                 final_analysis = action_taken + final_analysis
             
+=======
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
             # Save to database (run in thread pool)
             # FIX: Set conn=None so each thread opens its own connection
             # SQLite is not thread-safe, so each thread should use its own connection
@@ -424,6 +498,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             logger.error(f"Error processing event: {e}", exc_info=True)
     
     async def check_new_events_async(self) -> None:
+<<<<<<< HEAD
         """Checks and processes new events asynchronously from all log channels"""
         try:
             # Run event log reading in thread pool (blocking operation)
@@ -431,14 +506,21 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             all_events = await loop.run_in_executor(
                 self.executor,
                 self._read_events_sync
+=======
+        """Checks and processes new events asynchronously"""
+        try:
+            # Run event log reading in thread pool (blocking operation)
+            loop = asyncio.get_event_loop()
+            events = await loop.run_in_executor(
+                self.executor,
+                self._read_events_sync
             )
             
-            if all_events:
+            if events:
                 # Process new events asynchronously
-                # all_events is a list of tuples: (event, log_source)
                 tasks = []
-                for event, log_source in all_events:
-                    task = self.process_event_async(event, log_source)
+                for event in events:
+                    task = self.process_event_async(event)
                     tasks.append(task)
                 
                 # Process all events in parallel
@@ -452,6 +534,81 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             error_code = getattr(e, 'winerror', None)
             error_msg = str(e).lower()
             
+            # Skip normal errors without logging
+            if error_code == 122 or error_code == 1223:
+                pass
+            elif "no more data" in error_msg or "no more events" in error_msg or "no records" in error_msg:
+                pass
+            else:
+                logger.warning(f"Log reading error: {e}")
+                # Try to reinitialize log
+                try:
+                    self.close_event_log()
+                    await asyncio.sleep(1)
+                except Exception:
+                    pass
+    
+    def _read_events_sync(self) -> List[Any]:
+        """
+        Reads events synchronously (to be run in thread pool)
+        
+        Returns:
+            list: List of new events
+        """
+        try:
+            # Close and reopen log each time (to see new logs)
+            self.close_event_log()
+            self.open_event_log()
+            
+            if not self.log_handle:
+                return []
+            
+            # Read events after last check time
+            flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
+            
+            events = win32evtlog.ReadEventLog(
+                self.log_handle,
+                flags,
+                0,
+                100  # Read maximum 100 events
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
+            )
+            
+            if all_events:
+                # Process new events asynchronously
+                # all_events is a list of tuples: (event, log_source)
+                tasks = []
+                for event, log_source in all_events:
+                    task = self.process_event_async(event, log_source)
+                    tasks.append(task)
+                
+<<<<<<< HEAD
+                # Process all events in parallel
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Update last check time
+            self.last_check_time = datetime.now()
+                    
+=======
+                # Filter events by timestamp
+                for event in events:
+                    event_time = event.TimeGenerated
+                    if event_time > self.last_check_time:
+                        new_events.append(event)
+                
+                # Sort new events by time
+                new_events.sort(key=lambda e: e.TimeGenerated)
+                return new_events
+            
+            return []
+            
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
+        except Exception as e:
+            error_code = getattr(e, 'winerror', None)
+            error_msg = str(e).lower()
+            
+<<<<<<< HEAD
             # Skip normal errors without logging
             if error_code == 122 or error_code == 1223:
                 pass
@@ -559,6 +716,36 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             # Async loop
             while self.running:
                 try:
+=======
+            # Silently skip normal errors
+            if error_code == 122 or error_code == 1223:
+                return []
+            elif "no more data" in error_msg or "no more events" in error_msg:
+                return []
+            
+            logger.warning(f"Event reading error: {e}")
+            return []
+    
+    async def run_async(self) -> None:
+        """Monitors logs asynchronously"""
+        logger.info("🛡️  LocalShield Log Watcher starting...")
+        logger.info("=" * 60)
+        
+        try:
+            # Open Event Log (synchronous operation, run in thread pool)
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(self.executor, self.open_event_log)
+            
+            logger.info(f"⏰ Checking for new logs every {self.check_interval} seconds...")
+            logger.info("💡 Press Ctrl+C to exit.")
+            logger.info("=" * 60)
+            
+            self.running = True
+            
+            # Async loop
+            while self.running:
+                try:
+>>>>>>> ff2c3a1a620d79ebb5b7912d96799cb40a6ed913
                     await self.check_new_events_async()
                     await asyncio.sleep(self.check_interval)
                 except KeyboardInterrupt:
