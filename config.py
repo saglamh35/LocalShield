@@ -22,6 +22,7 @@ DB_PATH: str = os.getenv("DB_PATH", "logs.db")
 
 # Windows Event Log Settings
 EVENT_LOG_NAME: str = os.getenv("EVENT_LOG_NAME", "Security")
+SYSMON_LOG_NAME: str = os.getenv("SYSMON_LOG_NAME", "Microsoft-Windows-Sysmon/Operational")
 MAX_LOGS_TO_READ: int = int(os.getenv("MAX_LOGS_TO_READ", "10"))
 
 # Streamlit Dashboard Settings
