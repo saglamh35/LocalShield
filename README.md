@@ -96,26 +96,32 @@ The dashboard will automatically open in your browser (default: `http://localhos
 ---
 
 
-🧪 Simulation & Testing
+## 🧪 Simulation & Testing
+
 You can test the system's capabilities using the included tools:
 
-Brute Force Simulation:
+1.  **Brute Force Simulation:**
 
-Bash
+    ```bash
+    python simulate_attack.py
+    ```
 
-python simulate_attack.py
-Generates fake failed login attempts to trigger the Rule Engine.
+    *Generates fake failed login attempts to trigger the Rule Engine.*
 
-Sysmon Test: Open CMD and run:
+2.  **Sysmon Test:**
+    Open CMD as Administrator and run:
 
-DOS
+    ```cmd
+    whoami /all
+    ```
 
-whoami /all
-Triggers Event ID 1 (Process Creation), visible in the dashboard.
+    *Triggers Event ID 1 (Process Creation), visible in the dashboard.*
 
-📁 Project Structure
-Plaintext
+-----
 
+## 📁 Project Structure
+
+```text
 LocalShield/
 ├── modules/
 │   ├── response_engine.py    # SOAR: Firewall Block Logic
@@ -127,35 +133,47 @@ LocalShield/
 ├── rules/                    # Detection Logic (YAML)
 ├── data/                     # Threat Intel Feeds (CSV)
 ├── dashboard.py              # Streamlit UI
-└── run_localshield.bat       # Launcher
-🛡️ Stay Safe!
-Built with ❤️ for the Blue Team community.
+├── config.py                 # Configuration File
+├── requirements.txt          # Dependencies
+├── LICENSE                   # MIT License
+└── run_localshield.bat       # Windows Launcher
+```
+
+-----
 
 ## 🔍 Feature Details
 
-### 1. 👁️ Full-Spectrum Visibility (Security + Sysmon)
+### 1\. 👁️ Full-Spectrum Visibility (Security + Sysmon)
+
 LocalShield goes beyond standard logging by integrating **Microsoft Sysmon**.
-* **Security Logs:** Tracks logons, privilege escalation, and account management (Event ID 4625, 4672).
-* **Sysmon Telemetry:** Captures deep endpoint activity like Process Creation (Event ID 1) and Network Connections (Event ID 3), enabling detection of complex malware execution chains.
 
-### 2. 🛡️ Automated Active Response (SOAR)
+  * **Security Logs:** Tracks logons, privilege escalation, and account management (Event ID 4625, 4672).
+  * **Sysmon Telemetry:** Captures deep endpoint activity like Process Creation (Event ID 1) and Network Connections (Event ID 3), enabling detection of complex malware execution chains.
+
+### 2\. 🛡️ Automated Active Response (SOAR)
+
 The system effectively closes the loop between detection and mitigation.
-* **Mechanism:** When a "High Risk" threat (e.g., Brute Force, Known Bad IP) is detected, the **Response Engine** triggers immediately.
-* **Action:** It interacts with the Windows Network Stack to create a dynamic **Firewall Rule**, blocking the attacker's IP address in real-time.
-* **Safety:** Includes safeguards to prevent blocking private/local IPs (e.g., `192.168.x.x`).
 
-### 3. 🌍 Offline Threat Intelligence
+  * **Mechanism:** When a "High Risk" threat (e.g., Brute Force, Known Bad IP) is detected, the **Response Engine** triggers immediately.
+  * **Action:** It interacts with the Windows Network Stack to create a dynamic **Firewall Rule**, blocking the attacker's IP address in real-time.
+  * **Safety:** Includes safeguards to prevent blocking private/local IPs (e.g., `192.168.x.x`).
+
+### 3\. 🌍 Offline Threat Intelligence
+
 A built-in IOC (Indicator of Compromise) matching engine that requires no internet connection.
-* **Performance:** Uses high-performance Set data structures for **O(1)** lookup speed.
-* **Function:** Instantly flags IPs associated with known Botnets, C2 servers, or attackers before they can harm the system.
 
-### 4. 🧠 Hybrid Analysis Architecture
+  * **Performance:** Uses high-performance Set data structures for **O(1)** lookup speed.
+  * **Function:** Instantly flags IPs associated with known Botnets, C2 servers, or attackers before they can harm the system.
+
+### 4\. 🧠 Hybrid Analysis Architecture
+
 Combines three distinct detection layers for maximum accuracy:
-* **Layer 1 (Threat Intel):** Instant check against known bad actors.
-* **Layer 2 (Rule Engine):** Deterministic YAML rules for pattern matching (e.g., MITRE T1110).
-* **Layer 3 (AI Brain):** Local LLM (Ollama) analysis for context-aware interpretation of unknown events.
 
----
+  * **Layer 1 (Threat Intel):** Instant check against known bad actors.
+  * **Layer 2 (Rule Engine):** Deterministic YAML rules for pattern matching (e.g., MITRE T1110).
+  * **Layer 3 (AI Brain):** Local LLM (Ollama) analysis for context-aware interpretation of unknown events.
+
+-----
 
 ## ⚙️ Configuration
 
@@ -170,7 +188,7 @@ You can configure LocalShield through the `config.py` file or via a `.env` file:
 | `CHECK_INTERVAL`    | Log polling interval (seconds)                   | `5`                                  |
 | `LOG_LEVEL`         | Application logging level                        | `INFO`                               |
 
----
+-----
 
 ## 🏗️ Tech Stack
 
@@ -187,34 +205,35 @@ You can configure LocalShield through the `config.py` file or via a `.env` file:
 | **Rule Engine** | YAML-based detection rules |
 
 
-
-
+-----
 
 ## 📝 License
 
 This project is licensed under the **MIT License**. See the `LICENSE` file for details.
 
----
 
 
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to your branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
+-----
 
 ## 📧 Contact
 
 If you have questions or suggestions, feel free to open an issue.
 
----
+-----
+
+## 🙏 Acknowledgements
+
+  * **Ollama** – for local LLM support
+  * **Streamlit** – for the dashboard framework
+  * **MITRE ATT\&CK** – for the reference framework
+  * **Microsoft Sysinternals** – for Sysmon
+
+-----
+
+
+
+
+
 
 
 <div align="center">
