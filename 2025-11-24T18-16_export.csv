@@ -1,0 +1,301 @@
+﻿ID,Zaman,Event ID,Mesaj,AI Analiz,Risk Seviyesi
+19,2025-11-24 19:06:16,4672,"Special privileges assigned to new logon.
+
+Subject:
+	Security ID:		S-1-5-18
+	Account Name:		SYSTEM
+	Account Domain:		NT AUTHORITY
+	Logon ID:		0x3e7
+
+Privileges:		SeAssignPrimaryTokenPrivilege
+			SeTcbPrivilege
+			SeSecurityPrivilege
+			SeTakeOwnershipPrivilege
+			SeLoadDriverPrivilege
+			SeBackupPrivilege
+			SeRestorePrivilege
+			SeDebugPrivilege
+			SeAuditPrivilege
+			SeSystemEnvironmentPrivilege
+			SeImpersonatePrivilege
+			SeDelegateSessionUserImpersonatePrivilege
+","Risk Seviyesi: Orta | Özet: Sistem hesabı üzerinden yeni bir oturum açılması ve bu oturuma özel ayrıcalıkların atanması. Bu durum, potansiyel bir güvenlik açığına işaret edebilir.",Orta
+18,2025-11-24 19:06:08,4672,"Special privileges assigned to new logon.
+
+Subject:
+	Security ID:		S-1-5-18
+	Account Name:		SYSTEM
+	Account Domain:		NT AUTHORITY
+	Logon ID:		0x3e7
+
+Privileges:		SeAssignPrimaryTokenPrivilege
+			SeTcbPrivilege
+			SeSecurityPrivilege
+			SeTakeOwnershipPrivilege
+			SeLoadDriverPrivilege
+			SeBackupPrivilege
+			SeRestorePrivilege
+			SeDebugPrivilege
+			SeAuditPrivilege
+			SeSystemEnvironmentPrivilege
+			SeImpersonatePrivilege
+			SeDelegateSessionUserImpersonatePrivilege
+","Risk Seviyesi: Orta | Özet: Sistem hesabı için özel izinlerin atanması, olası kötü amaçlı faaliyetlere işaret edebilir ve güvenlik ihlali potansiyeli taşır. Bu durumun izlenmesi ve nedeninin araştırılması gerekir.",Orta
+17,2025-11-24 19:05:23,5379,"Credential Manager credentials were read.
+
+Subject:
+	Security ID:		S-1-5-21-80791494-3741759217-748678751-1001
+	Account Name:		sagla
+	Account Domain:		DESKTOP-KBKT76L
+	Logon ID:		0x4aae2c1e
+	Read Operation:		%%8100
+
+This event occurs when a user performs a read operation on stored credentials in Credential Manager.
+","Risk Seviyesi: Düşük | Özet: Kullanıcının Credential Manager'daki kaydedilmiş kimlik bilgilerini okuma işlemi yapması, olağan bir kullanım durumudur ve potansiyel bir güvenlik ihlali belirtmez.",Düşük
+16,2025-11-24 17:20:01,4672,"Special privileges assigned to new logon.
+
+Subject:
+	Security ID:		S-1-5-18
+	Account Name:		SYSTEM
+	Account Domain:		NT AUTHORITY
+	Logon ID:		0x3e7
+
+Privileges:		SeAssignPrimaryTokenPrivilege
+			SeTcbPrivilege
+			SeSecurityPrivilege
+			SeTakeOwnershipPrivilege
+			SeLoadDriverPrivilege
+			SeBackupPrivilege
+			SeRestorePrivilege
+			SeDebugPrivilege
+			SeAuditPrivilege
+			SeSystemEnvironmentPrivilege
+			SeImpersonatePrivilege
+			SeDelegateSessionUserImpersonatePrivilege
+","Risk Seviyesi: Orta | Özet: Sistem hesabı tarafından özel izinlerin atanması, potansiyel bir güvenlik ihlali olabilir ve izlenmesi gereken bir durumdur.",Orta
+15,2025-11-24 17:19:47,4672,"Special privileges assigned to new logon.
+
+Subject:
+	Security ID:		S-1-5-18
+	Account Name:		SYSTEM
+	Account Domain:		NT AUTHORITY
+	Logon ID:		0x3e7
+
+Privileges:		SeAssignPrimaryTokenPrivilege
+			SeTcbPrivilege
+			SeSecurityPrivilege
+			SeTakeOwnershipPrivilege
+			SeLoadDriverPrivilege
+			SeBackupPrivilege
+			SeRestorePrivilege
+			SeDebugPrivilege
+			SeAuditPrivilege
+			SeSystemEnvironmentPrivilege
+			SeImpersonatePrivilege
+			SeDelegateSessionUserImpersonatePrivilege
+","Risk Seviyesi: Orta | Özet: Sistem hesabı tarafından özel ayrıcalıklar (token ayrıcalığı, TCB ayrıcalığı, sistem ayrıcalığı vb.) verilmiş. Bu durum, potansiyel bir güvenlik açığına işaret edebilir ve daha fazla inceleme gerektirebilir.",Orta
+14,2025-11-24 17:18:18,5379,"Credential Manager credentials were read.
+
+Subject:
+	Security ID:		S-1-5-21-80791494-3741759217-748678751-1001
+	Account Name:		sagla
+	Account Domain:		DESKTOP-KBKT76L
+	Logon ID:		0x4aae2c1e
+	Read Operation:		%%8099
+
+This event occurs when a user performs a read operation on stored credentials in Credential Manager.
+",Risk Seviyesi: Düşük | Özet: Kullanıcının Credential Manager'dan saklanan kimlik bilgilerine eriştiği durum. Genellikle normal kullanıcı aktivitesinin bir parçasıdır.,Düşük
+13,2025-11-24 17:17:08,5379,"Credential Manager credentials were read.
+
+Subject:
+	Security ID:		S-1-5-21-80791494-3741759217-748678751-1001
+	Account Name:		sagla
+	Account Domain:		DESKTOP-KBKT76L
+	Logon ID:		0x4aae2c1e
+	Read Operation:		%%8099
+
+This event occurs when a user performs a read operation on stored credentials in Credential Manager.
+","Risk Seviyesi: Düşük | Özet: Kullanıcının Credential Manager'dan saklı kimlik bilgilerini okuduğu belirtiliyor. Bu, normal bir kullanım durumu ve doğrudan bir güvenlik riski oluşturmaz.",Düşük
+12,2025-11-24 17:05:12,5379,"Credential Manager credentials were read.
+
+Subject:
+	Security ID:		S-1-5-21-80791494-3741759217-748678751-1001
+	Account Name:		sagla
+	Account Domain:		DESKTOP-KBKT76L
+	Logon ID:		0x4aae2c1e
+	Read Operation:		%%8100
+
+This event occurs when a user performs a read operation on stored credentials in Credential Manager.
+",Risk Seviyesi: Düşük | Özet: Kullanıcının Credential Manager'daki depolanmış kimlik bilgilerini okuduğu bildiriliyor. Bu durum genellikle normal kullanımda meydana gelebilir.,Düşük
+11,2025-11-24 17:04:47,4672,"Special privileges assigned to new logon.
+
+Subject:
+	Security ID:		S-1-5-18
+	Account Name:		SYSTEM
+	Account Domain:		NT AUTHORITY
+	Logon ID:		0x3e7
+
+Privileges:		SeAssignPrimaryTokenPrivilege
+			SeTcbPrivilege
+			SeSecurityPrivilege
+			SeTakeOwnershipPrivilege
+			SeLoadDriverPrivilege
+			SeBackupPrivilege
+			SeRestorePrivilege
+			SeDebugPrivilege
+			SeAuditPrivilege
+			SeSystemEnvironmentPrivilege
+			SeImpersonatePrivilege
+			SeDelegateSessionUserImpersonatePrivilege
+","Risk Seviyesi: Orta | Özet: Sistem hesabı üzerinden yeni bir oturum açma işlemi gerçekleşti ve bu oturum açma işlemi için özel ayrıcalıklar (SeAssignPrimaryTokenPrivilege gibi) verildi. Bu durum, sistemdeki olası bir güvenlik açığına işaret edebilir.",Orta
+10,2025-11-24 17:03:14,5379,"Credential Manager credentials were read.
+
+Subject:
+	Security ID:		S-1-5-21-80791494-3741759217-748678751-1001
+	Account Name:		sagla
+	Account Domain:		DESKTOP-KBKT76L
+	Logon ID:		0x4aae2c1e
+	Read Operation:		%%8099
+
+This event occurs when a user performs a read operation on stored credentials in Credential Manager.
+",Risk Seviyesi: Düşük | Özet: Kullanıcının Credential Manager'daki saklı kimlik bilgilerini okuma işlemi gerçekleştirmesi.,Düşük
+9,2025-11-24 16:49:47,4672,"Special privileges assigned to new logon.
+
+Subject:
+	Security ID:		S-1-5-18
+	Account Name:		SYSTEM
+	Account Domain:		NT AUTHORITY
+	Logon ID:		0x3e7
+
+Privileges:		SeAssignPrimaryTokenPrivilege
+			SeTcbPrivilege
+			SeSecurityPrivilege
+			SeTakeOwnershipPrivilege
+			SeLoadDriverPrivilege
+			SeBackupPrivilege
+			SeRestorePrivilege
+			SeDebugPrivilege
+			SeAuditPrivilege
+			SeSystemEnvironmentPrivilege
+			SeImpersonatePrivilege
+			SeDelegateSessionUserImpersonatePrivilege
+","Risk Seviyesi: Orta | Özet: Sistem hesabı (NT AUTHORITY\SYSTEM) için özel ayrıcalıklar atanmış. Bu, potansiyel bir güvenlik açığına işaret edebilir ve özellikle sistemin hassas kaynaklara erişimini etkileyebilir.",Orta
+8,2025-11-24 16:48:07,5379,"Credential Manager credentials were read.
+
+Subject:
+	Security ID:		S-1-5-21-80791494-3741759217-748678751-1001
+	Account Name:		sagla
+	Account Domain:		DESKTOP-KBKT76L
+	Logon ID:		0x4aae2c1e
+	Read Operation:		%%8099
+
+This event occurs when a user performs a read operation on stored credentials in Credential Manager.
+","Risk Seviyesi: Düşük | Özet: Kullanıcının Credential Manager'dan sakladığı kimlik bilgilerini okuma işlemi gerçekleştirmesi. Bu durum genellikle normal bir kullanım davranışı olsa da, potansiyel güvenlik açıkları için göz önünde bulundurulmalıdır.",Düşük
+7,2025-11-24 16:33:03,5379,"Credential Manager credentials were read.
+
+Subject:
+	Security ID:		S-1-5-21-80791494-3741759217-748678751-1001
+	Account Name:		sagla
+	Account Domain:		DESKTOP-KBKT76L
+	Logon ID:		0x4aae2c1e
+	Read Operation:		%%8099
+
+This event occurs when a user performs a read operation on stored credentials in Credential Manager.
+","Risk Seviyesi: Düşük | Özet: Kullanıcının Credential Manager'dan sakladığı kimlik bilgilerini okuduğu tespit edildi. Bu, normal bir durumdur ve genellikle kullanıcıların parolalarını yeniden girme ihtiyacını azaltır.",Düşük
+6,2025-11-24 16:27:21,4672,"Special privileges assigned to new logon.
+
+Subject:
+	Security ID:		S-1-5-18
+	Account Name:		SYSTEM
+	Account Domain:		NT AUTHORITY
+	Logon ID:		0x3e7
+
+Privileges:		SeAssignPrimaryTokenPrivilege
+			SeTcbPrivilege
+			SeSecurityPrivilege
+			SeTakeOwnershipPrivilege
+			SeLoadDriverPrivilege
+			SeBackupPrivilege
+			SeRestorePrivilege
+			SeDebugPrivilege
+			SeAuditPrivilege
+			SeSystemEnvironmentPrivilege
+			SeImpersonatePrivilege
+			SeDelegateSessionUserImpersonatePrivilege
+","Risk Seviyesi: Orta | Özet: Sistem hesabı tarafından özel ayrıcalıkların atanması, potansiyel bir güvenlik açığına işaret eder. Bu durum, özellikle kötü amaçlı yazılım tarafından sisteme sızdırılmışsa, sistem üzerinde geniş kapsamlı yetkilere erişimi mümkün hale getirebilir.",Orta
+5,2025-11-24 16:19:47,4672,"Special privileges assigned to new logon.
+
+Subject:
+	Security ID:		S-1-5-18
+	Account Name:		SYSTEM
+	Account Domain:		NT AUTHORITY
+	Logon ID:		0x3e7
+
+Privileges:		SeAssignPrimaryTokenPrivilege
+			SeTcbPrivilege
+			SeSecurityPrivilege
+			SeTakeOwnershipPrivilege
+			SeLoadDriverPrivilege
+			SeBackupPrivilege
+			SeRestorePrivilege
+			SeDebugPrivilege
+			SeAuditPrivilege
+			SeSystemEnvironmentPrivilege
+			SeImpersonatePrivilege
+			SeDelegateSessionUserImpersonatePrivilege
+","Risk Seviyesi: Orta | Özet: Sistem hesabı üzerinden bir oturum açılması ve bu oturum açan hesabın yüksek erişim hakları (özellikle token yönetimi, sistem ortamı ve yetki devretme) ile donatılması. Bu durum potansiyel bir güvenlik açığına işaret edebilir ve daha fazla inceleme gerektirir.",Orta
+4,2025-11-24 16:11:34,4634,"An account was logged off.
+
+Subject:
+	Security ID:		S-1-5-21-80791494-3741759217-748678751-1001
+	Account Name:		sagla
+	Account Domain:		DESKTOP-KBKT76L
+	Logon ID:		0x520e0547
+
+Logon Type:			2
+
+This event is generated when a logon session is destroyed. It may be positively correlated with a logon event using the Logon ID value. Logon IDs are only unique between reboots on the same computer.
+",Analiz Edilemedi,Orta
+3,2025-11-24 16:11:23,4672,"Special privileges assigned to new logon.
+
+Subject:
+	Security ID:		S-1-5-18
+	Account Name:		SYSTEM
+	Account Domain:		NT AUTHORITY
+	Logon ID:		0x3e7
+
+Privileges:		SeAssignPrimaryTokenPrivilege
+			SeTcbPrivilege
+			SeSecurityPrivilege
+			SeTakeOwnershipPrivilege
+			SeLoadDriverPrivilege
+			SeBackupPrivilege
+			SeRestorePrivilege
+			SeDebugPrivilege
+			SeAuditPrivilege
+			SeSystemEnvironmentPrivilege
+			SeImpersonatePrivilege
+			SeDelegateSessionUserImpersonatePrivilege
+",Analiz Edilemedi,Orta
+2,2025-11-24 16:10:06,5379,"Credential Manager credentials were read.
+
+Subject:
+	Security ID:		S-1-5-21-80791494-3741759217-748678751-1001
+	Account Name:		sagla
+	Account Domain:		DESKTOP-KBKT76L
+	Logon ID:		0x4aae2c1e
+	Read Operation:		%%8100
+
+This event occurs when a user performs a read operation on stored credentials in Credential Manager.
+",Analiz Edilemedi,Orta
+1,2025-11-24 16:10:05,5379,"Credential Manager credentials were read.
+
+Subject:
+	Security ID:		S-1-5-21-80791494-3741759217-748678751-1001
+	Account Name:		sagla
+	Account Domain:		DESKTOP-KBKT76L
+	Logon ID:		0x4aae2c1e
+	Read Operation:		%%8100
+
+This event occurs when a user performs a read operation on stored credentials in Credential Manager.
+",Analiz Edilemedi,Orta
