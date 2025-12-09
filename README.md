@@ -455,4 +455,4 @@ For questions, issues, or contributions:
 
 **Built with ❤️ for the cybersecurity community**
 
-*Last updated: December 2024*
+*Last updated: December 2025*
