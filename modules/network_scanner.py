@@ -4,6 +4,7 @@ Network Scanner Module - Module for Scanning Open Ports
 import psutil
 import socket
 from typing import List, Dict, Optional, Any
+import config
 
 
 # High-risk ports (critical from security perspective)
@@ -98,13 +99,64 @@ def get_port_info(port: int, pid: Optional[int] = None) -> Dict[str, Any]:
     return port_info
 
 
-def scan_open_ports() -> List[Dict[str, Any]]:
+def scan_open_ports(mock: bool = False) -> List[Dict[str, Any]]:
     """
     Scans all TCP ports in LISTEN mode on the computer
+    
+    Args:
+        mock: If True, returns demo data instead of real scan (default: False, uses config.DEMO_MODE)
     
     Returns:
         list: List of port information (port, pid, process_name, risk, description)
     """
+    # Check demo mode
+    use_demo = mock or config.DEMO_MODE
+    
+    if use_demo:
+        # Return demo port data for screenshots
+        return [
+            {
+                "Port": 445,
+                "PID": 4,
+                "Application": "System",
+                "Service": "SMB",
+                "Risk": "High",
+                "Description": "SMB service - Should be carefully monitored from security perspective"
+            },
+            {
+                "Port": 3389,
+                "PID": 1234,
+                "Application": "svchost.exe",
+                "Service": "RDP",
+                "Risk": "High",
+                "Description": "RDP service - Should be carefully monitored from security perspective"
+            },
+            {
+                "Port": 135,
+                "PID": 567,
+                "Application": "svchost.exe",
+                "Service": "MSRPC",
+                "Risk": "High",
+                "Description": "MSRPC service - Should be carefully monitored from security perspective"
+            },
+            {
+                "Port": 80,
+                "PID": 8901,
+                "Application": "nginx",
+                "Service": "HTTP",
+                "Risk": "Low",
+                "Description": "HTTP service - Generally safe"
+            },
+            {
+                "Port": 443,
+                "PID": 8901,
+                "Application": "nginx",
+                "Service": "HTTPS",
+                "Risk": "Low",
+                "Description": "HTTPS service - Generally safe"
+            }
+        ]
+    
     open_ports = []
     
     try:

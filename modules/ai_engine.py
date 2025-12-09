@@ -171,13 +171,13 @@ Also write this in the "risk_score" field: "{kb_info.get('risk_level', 'Medium')
             str: Fallback markdown response
         """
         event_id_str = event_id if event_id else "Unknown"
-        return f"""🆔 What is Event ID {event_id_str}?
-This Event ID is an event recorded by the Windows security system.
+        return f"""🆔 Event ID Explained
+This Event ID ({event_id_str}) is an event recorded by the Windows security system.
 
-🕵️‍♂️ Event Analysis
-User: Could Not Be Analyzed
-Status: {error_message}
-Risk: Medium
+🕵️‍♂️ Analysis
+User/Entity: Could Not Be Analyzed
+Summary: {error_message}
+Risk Level: Medium
 
 💡 Recommendation
 Check the log message manually or contact the system administrator."""

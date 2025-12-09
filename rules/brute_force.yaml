@@ -1,28 +1,27 @@
-name: "Brute Force Attack Detection"
-description: "EventID 4625 (Failed Logon) için brute force saldırısı tespiti"
+id: "brute_force_001"
+name: "Windows Failed Logon Brute Force Detection"
+description: "Detects multiple failed logon attempts (Event ID 4625) within a time window, indicating brute force attack"
+mitre:
+  - "T1110"
+  - "T1110.001"
+severity: "high"
+tags:
+  - "brute_force"
+  - "authentication"
+  - "lateral_movement"
 enabled: true
-priority: "high"
 
-# Kural koşulları
 conditions:
   event_id: "4625"
-  time_window: 60  # saniye cinsinden (1 dakika)
-  threshold: 5     # Bu süre içinde kaç tekrar olursa tetiklenir
+  provider: "Security"
+  time_window: 60  # seconds (1 minute)
+  threshold: 5     # Trigger if 5+ failed logons in time window
 
-# Risk seviyesi (Kural Motoru bu değeri override eder)
-risk_level: "Yüksek"
+match_message: "🔴 Brute Force Attack Detected: Multiple failed logon attempts (Event ID 4625) detected within time window. Threshold exceeded."
 
-# MITRE ATT&CK Tekniği
-mitre_technique: "T1110"
-
-# Kural eşleştiğinde döndürülecek mesaj
-match_message: "Detection Rule Match: Brute Force Attack - EventID 4625 tekrar sayısı eşiği aşıldı"
-
-# Ek filtreleme (opsiyonel)
 filters:
-  # Belirli kullanıcı adlarını hariç tut (opsiyonel)
+  # Exclude specific users from detection (optional)
   exclude_users: []
   
-  # Sadece belirli kullanıcıları kontrol et (opsiyonel, boşsa tüm kullanıcılar)
+  # Only check specific users (optional, empty means all users)
   include_users: []
-

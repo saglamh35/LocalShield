@@ -1,0 +1,22 @@
+id: "powershell_encoded_001"
+name: "Suspicious PowerShell EncodedCommand Usage"
+description: "Detects PowerShell execution with -EncodedCommand parameter, commonly used by attackers to obfuscate malicious commands"
+mitre:
+  - "T1059.001"
+  - "T1027"
+severity: "high"
+tags:
+  - "powershell"
+  - "obfuscation"
+  - "execution"
+enabled: true
+
+conditions:
+  provider: "Sysmon"
+  event_id: "1"  # Process Creation
+  command_line_regex: "-EncodedCommand|-e\\s+[A-Za-z0-9+/=]+|FromBase64String"
+  # Alternative: also check for base64 encoded strings in command line
+  # This regex matches: -EncodedCommand, -e <base64>, or FromBase64String
+
+match_message: "🔴 Suspicious PowerShell Usage: PowerShell executed with EncodedCommand parameter detected. This technique is commonly used to obfuscate malicious commands."
+

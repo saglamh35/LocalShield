@@ -70,14 +70,14 @@ class AIAnalysisResponse(BaseModel):
         parts = []
         
         if self.event_id_explanation:
-            parts.append(f"🆔 Event ID Nedir?\n{self.event_id_explanation}\n")
+            parts.append(f"🆔 Event ID Explained\n{self.event_id_explanation}\n")
         
-        parts.append("🕵️‍♂️ Olay Analizi")
-        parts.append(f"Kullanıcı: {self.user_entity}")
-        parts.append(f"Durum: {self.summary}")
-        parts.append(f"Risk: {self.risk_score}\n")
+        parts.append("🕵️‍♂️ Analysis")
+        parts.append(f"User/Entity: {self.user_entity}")
+        parts.append(f"Summary: {self.summary}")
+        parts.append(f"Risk Level: {self.risk_score}\n")
         
-        parts.append(f"💡 Tavsiye\n{self.advice}")
+        parts.append(f"💡 Recommendation\n{self.advice}")
         
         return "\n".join(parts)
 

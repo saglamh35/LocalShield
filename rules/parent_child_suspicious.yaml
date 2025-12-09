@@ -1,0 +1,24 @@
+id: "parent_child_001"
+name: "Suspicious Parent-Child Process Combination"
+description: "Detects suspicious parent-child process relationships, such as Microsoft Word spawning PowerShell, which is a common attack technique"
+mitre:
+  - "T1059.001"
+  - "T1204.002"
+severity: "high"
+tags:
+  - "process_creation"
+  - "lateral_movement"
+  - "execution"
+enabled: true
+
+conditions:
+  provider: "Sysmon"
+  event_id: "1"  # Process Creation
+  parent_image_regex: "(?i)(winword\\.exe|excel\\.exe|outlook\\.exe|mshta\\.exe|regsvr32\\.exe)"
+  image_regex: "(?i)(powershell\\.exe|cmd\\.exe|wscript\\.exe|cscript\\.exe|rundll32\\.exe)"
+  # This matches:
+  # Parent: winword.exe, excel.exe, outlook.exe, mshta.exe, regsvr32.exe
+  # Child: powershell.exe, cmd.exe, wscript.exe, cscript.exe, rundll32.exe
+
+match_message: "🔴 Suspicious Process Chain Detected: Office application or suspicious parent process spawned PowerShell/Command interpreter. This is a common attack technique used in malicious documents."
+

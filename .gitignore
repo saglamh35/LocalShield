@@ -10,13 +10,38 @@ venv/
 
 # Database files (local data - should not be committed)
 logs.db
+logs.db-journal
 logs.db-shm
 logs.db-wal
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
 
 # Log files (local data - should not be committed)
 localshield.log
 *.log
 
+# Packet capture files (PCAP)
+*.pcap
+*.cap
+
 # Environment variables
 .env
 .env.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Test and cache files
+.pytest_cache/
+.coverage
+htmlcov/
