@@ -1,5 +1,5 @@
 
-# 🛡️ LocalShield - Next-Gen Offline SIEM & Network Monitor
+# 🛡️ LocalShield - Offline SIEM & Network Monitor
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
@@ -15,7 +15,7 @@
 
 ## 📋 TL;DR
 
-**LocalShield** is an enterprise-grade Security Information and Event Management (SIEM) system that runs entirely offline on Windows. It integrates:
+**LocalShield** is an educational prototype Security Information and Event Management (SIEM) system that runs entirely offline on Windows. It integrates:
 
 - **Windows Event Log Analysis** (Security + Sysmon) with real-time monitoring
 - **Live Network Packet Capture** (Wireshark-like functionality) using Scapy
@@ -24,7 +24,7 @@
 - **Automated Response (SOAR)** through Windows Firewall integration
 - **Professional Dashboard** built with Streamlit for real-time visualization
 
-**Perfect for:** Security researchers, SOC analysts, penetration testers, and cybersecurity professionals who need a powerful, privacy-respecting security monitoring solution.
+
 
 ---
 
@@ -71,7 +71,7 @@
 - **IP Extraction**: Intelligent IP address extraction from log messages and network traffic
 - **Private IP Filtering**: Automatic exclusion of internal network IPs from blocking
 
-### 📊 Professional Security Dashboard
+### 📊 Security Dashboard
 
 - **Real-Time Log Analysis**: Live event monitoring with risk level visualization
 - **Network Traffic Monitor**: Interactive packet capture interface with live charts
@@ -80,7 +80,7 @@
 - **MITRE Technique Mapping**: Visual representation of detected attack techniques
 - **Export Capabilities**: CSV export for log analysis and reporting
 
-### 🕵️‍♂️ Advanced Detection Rules
+### 🕵️‍♂️ Detection Rules
 
 - **YAML-Based Configuration**: Easy-to-write detection rules with flexible conditions
 - **Regex Pattern Matching**: Support for complex pattern matching in log messages
@@ -93,7 +93,7 @@
 - **100% Offline**: No cloud dependencies, all processing happens locally
 - **No Data Leakage**: Logs and network data never leave your machine
 - **Local AI**: Uses Ollama for AI analysis - no API keys or external services required
-- **Encrypted Storage**: SQLite database with WAL mode for secure data persistence
+- **Storage**: SQLite with WAL mode for reliable local storage
 
 ---
 
@@ -343,40 +343,6 @@ pytest tests/test_new_rules.py -v
 python test_sniffer.py
 ```
 
----
-
-## 📊 Use Cases
-
-### 1. Security Operations Center (SOC)
-
-- Real-time monitoring of Windows security events
-- Automated threat detection and response
-- MITRE ATT&CK technique mapping for threat hunting
-- AI-powered incident triage and analysis
-
-### 2. Penetration Testing
-
-- Network traffic analysis during security assessments
-- Detection rule validation and testing
-- Attack simulation with `generate_demo_data.py`
-- Vulnerability assessment with port scanning
-
-### 3. Security Research
-
-- Offline analysis of security logs
-- Custom detection rule development
-- Threat intelligence research
-- Security tool development and testing
-
-### 4. Educational & Training
-
-- Cybersecurity education and training
-- SIEM/SOAR concept demonstration
-- MITRE ATT&CK framework learning
-- Security monitoring best practices
-
----
-
 
 
 ## 📝 License
@@ -398,14 +364,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 📧 Contact & Support
-
-For questions, issues, or contributions:
-
-- **GitHub Issues**: [Open an issue](https://github.com/yourusername/LocalShield/issues)
-- **Documentation**: See inline code comments and docstrings
-
----
 
 **Built with ❤️ for the cybersecurity community**
 
