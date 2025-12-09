@@ -1,3 +1,4 @@
+
 # 🛡️ LocalShield - Next-Gen Offline SIEM & Network Monitor
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
@@ -101,20 +102,25 @@
 ### Dashboard Overview (Threat Analysis)
 
 <img width="3839" height="1972" alt="Screenshot 2025-12-09 200938" src="https://github.com/user-attachments/assets/85acfa1e-f8f9-4f48-9151-a5486c2c88e4" />
-*[Screenshot: Dashboard showing high-risk events, MITRE techniques, and AI analysis]*
+
+<img width="3205" height="1837" alt="Screenshot 2025-12-09 201020" src="https://github.com/user-attachments/assets/63396210-5b5a-4a90-b88f-4d661a1d3a38" />
+[Screenshot: Dashboard showing high-risk events, MITRE techniques, and AI analysis]
 
 ### Network Traffic Monitor (Live Sniffing)
 
 <img width="3839" height="1903" alt="Screenshot 2025-12-09 201140" src="https://github.com/user-attachments/assets/1a6b662e-9326-4d3f-8a0a-f7174c37533c" />
-*[Screenshot: Real-time packet capture interface with protocol distribution charts]*
+[Screenshot: Real-time packet capture interface with protocol distribution charts]
 
+### Vulnerability Scan (Open Ports)
+
+<img width="3839" height="1914" alt="Screenshot 2025-12-09 201212" src="https://github.com/user-attachments/assets/237c6353-e1cd-4130-98c4-b6afa8e323ee" />
+[Screenshot: Port scanner showing high-risk open ports with detailed information]
 
 
 ### AI Security Analyst (Interactive Chat)
-*[Screenshot: Chat interface with AI assistant providing security recommendations]*
 
-### Vulnerability Scan (Open Ports)
-*[Screenshot: Port scanner showing high-risk open ports with detailed information]*
+<img width="3825" height="1342" alt="Screenshot 2025-12-09 201233" src="https://github.com/user-attachments/assets/d5f28259-3659-46cf-8ccf-491cd7933255" />
+[Screenshot: Chat interface with AI assistant providing security recommendations]
 
 ---
 
@@ -143,6 +149,7 @@ cd LocalShield
 python -m venv venv
 venv\Scripts\activate  # On Windows<img width="3839" height="1903" alt="Screenshot 2025-12-09 201140" src="https://github.com/user-attachments/assets/a9fbce46-7e1a-449e-be66-b34e8cee96c4" />
 
+<img width="3825" height="1342" alt="Screenshot 2025-12-09 201233" src="https://github.com/user-attachments/assets/db6ca5bc-189d-4043-be17-ee5ce7735407" />
 
 # Install requirements
 pip install -r requirements.txt
