@@ -29,52 +29,11 @@
 
 ## 🏗️ Architecture
 
-```mermaid
-graph TB
-    subgraph "Data Sources"
-        A[Windows Security Logs]
-        B[Sysmon Events]
-        C[Network Packets - Scapy]
-    end
-    
-    subgraph "Core Engine"
-        D[Log Watcher<br/>AsyncIO-based]
-        E[Detection Engine<br/>YAML Rules + MITRE]
-        F[Packet Sniffer<br/>Real-time Capture]
-    end
-    
-    subgraph "Intelligence Layer"
-        G[Threat Intel<br/>CSV-based IP Reputation]
-        H[AI Analyst<br/>Ollama LLM]
-        K[Knowledge Base<br/>Event ID Database]
-    end
-    
-    subgraph "Response & Visualization"
-        I[Firewall Manager<br/>Active Response]
-        J[Streamlit Dashboard<br/>Real-time Analytics]
-    end
-    
-    A --> D
-    B --> D
-    C --> F
-    D --> E
-    F --> E
-    E --> G
-    E --> H
-    E --> K
-    H --> J
-    E --> I
-    E --> J
-    G --> I
-    
-    style A fill:#e1f5ff
-    style B fill:#e1f5ff
-    style C fill:#e1f5ff
-    style E fill:#ff6b6b
-    style H fill:#4ecdc4
-    style I fill:#ffe66d
-    style J fill:#95e1d3
-```
+
+
+<img width="2816" height="1536" alt="Gemini_Generated_Image_yxqkndyxqkndyxqk" src="https://github.com/user-attachments/assets/5fbe8e29-9a24-4043-bbb4-e70158cbb80f" />
+
+
 
 ### System Flow
 
@@ -140,10 +99,16 @@ graph TB
 ## 📸 Screenshots
 
 ### Dashboard Overview (Threat Analysis)
+
+<img width="3839" height="1972" alt="Screenshot 2025-12-09 200938" src="https://github.com/user-attachments/assets/85acfa1e-f8f9-4f48-9151-a5486c2c88e4" />
 *[Screenshot: Dashboard showing high-risk events, MITRE techniques, and AI analysis]*
 
 ### Network Traffic Monitor (Live Sniffing)
+
+<img width="3839" height="1903" alt="Screenshot 2025-12-09 201140" src="https://github.com/user-attachments/assets/1a6b662e-9326-4d3f-8a0a-f7174c37533c" />
 *[Screenshot: Real-time packet capture interface with protocol distribution charts]*
+
+
 
 ### AI Security Analyst (Interactive Chat)
 *[Screenshot: Chat interface with AI assistant providing security recommendations]*
@@ -171,10 +136,13 @@ cd LocalShield
 
 ### Step 2: Install Dependencies
 
-```bash
-# Create virtual environment (recommended)
+```bash<img width="3205" height="1837" alt="Screenshot 2025-12-09 201020" src="https://github.com/user-attachments/assets/d432c901-6742-404d-afbd-c0776df08b3f" />
+
+# Create virtual environment (recommended)<img width="3839" height="1903" alt="Screenshot 2025-12-09 201140" src="https://github.com/user-attachments/assets/e30fc4d2-1e2d-4e28-bdc4-dc4821cec874" />
+
 python -m venv venv
-venv\Scripts\activate  # On Windows
+venv\Scripts\activate  # On Windows<img width="3839" height="1903" alt="Screenshot 2025-12-09 201140" src="https://github.com/user-attachments/assets/a9fbce46-7e1a-449e-be66-b34e8cee96c4" />
+
 
 # Install requirements
 pip install -r requirements.txt
@@ -402,17 +370,7 @@ python test_sniffer.py
 
 ---
 
-## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
 
 ## 📝 License
 
@@ -420,19 +378,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## ⚠️ Disclaimer
 
-**This project is for educational and portfolio purposes.**
 
-- Use at your own risk in production environments
-- Always test thoroughly before deploying
-- Ensure proper security measures are in place
-- Review and customize detection rules for your environment
-- This tool is not a replacement for enterprise-grade SIEM solutions
-
-**The author is not responsible for any misuse or damage caused by this software.**
-
----
 
 ## 🙏 Acknowledgments
 
