@@ -1,568 +1,458 @@
-# 🛡️ LocalShield
+# 🛡️ LocalShield - Next-Gen Offline SIEM & Network Monitor
 
-> **Privacy-First, AI-Powered SIEM & Detection Engineering Platform.**
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
+[![Scapy](https://img.shields.io/badge/Scapy-Network%20Analysis-green.svg)](https://scapy.net/)
+[![Ollama](https://img.shields.io/badge/Ollama-AI%20LLM-purple.svg)](https://ollama.ai/)
+[![MITRE ATT&CK](https://img.shields.io/badge/MITRE-ATT%26CK-orange.svg)](https://attack.mitre.org/)
+[![AsyncIO](https://img.shields.io/badge/AsyncIO-Asynchronous-yellow.svg)](https://docs.python.org/3/library/asyncio.html)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
-LocalShield turns your personal computer into a cybersecurity fortress. With an **AsyncIO** architecture it monitors Windows logs in real time, detects attacks instantly via a **Rule Engine (Detection Engine)**, and explains incidents using **Local AI (Ollama)**.
-
-Your data is never sent to the cloud. It runs 100% locally and offline.
-
----
-
-
-## ⚡ Why LocalShield?
-
-| Feature                          | Description                                                                                         |
-| :------------------------------- | :-------------------------------------------------------------------------------------------------- |
-| **🧠 Hybrid Intelligence**       | Combines both **AI (Gemma/Llama)** and **Rule-Based (YAML)** detection mechanisms.                  |
-| **🚀 Asynchronous Architecture** | Processes logs within milliseconds using `AsyncIO` and `ThreadPool` without overloading the system. |
-| **🎯 MITRE ATT&CK**              | Labels attacks with industry-standard codes (e.g., `T1110 - Brute Force`).                          |
-| **🛡️ Privacy-First**            | No internet required. Logs and AI analysis stay entirely on your machine (`localhost`).             |
-| **📊 SOC Dashboard**             | Professional SIEM-style UI to visualize risks, timelines, and open ports.                           |
+> **A privacy-focused, offline cybersecurity platform that combines Windows security logs and live network traffic analysis with local AI-powered threat detection and automated response capabilities.**
 
 ---
 
+## 📋 TL;DR
+
+**LocalShield** is an enterprise-grade Security Information and Event Management (SIEM) system that runs entirely offline on Windows. It integrates:
+
+- **Windows Event Log Analysis** (Security + Sysmon) with real-time monitoring
+- **Live Network Packet Capture** (Wireshark-like functionality) using Scapy
+- **AI-Powered Threat Analysis** via local LLM (Ollama) - no cloud dependencies
+- **YAML-Based Detection Rules** with MITRE ATT&CK framework integration
+- **Automated Response (SOAR)** through Windows Firewall integration
+- **Professional Dashboard** built with Streamlit for real-time visualization
+
+**Perfect for:** Security researchers, SOC analysts, penetration testers, and cybersecurity professionals who need a powerful, privacy-respecting security monitoring solution.
+
+---
 
 ## 🏗️ Architecture
 
-LocalShield uses a modern **pipeline** architecture:
+```mermaid
+graph TB
+    subgraph "Data Sources"
+        A[Windows Security Logs]
+        B[Sysmon Events]
+        C[Network Packets - Scapy]
+    end
+    
+    subgraph "Core Engine"
+        D[Log Watcher<br/>AsyncIO-based]
+        E[Detection Engine<br/>YAML Rules + MITRE]
+        F[Packet Sniffer<br/>Real-time Capture]
+    end
+    
+    subgraph "Intelligence Layer"
+        G[Threat Intel<br/>CSV-based IP Reputation]
+        H[AI Analyst<br/>Ollama LLM]
+        K[Knowledge Base<br/>Event ID Database]
+    end
+    
+    subgraph "Response & Visualization"
+        I[Firewall Manager<br/>Active Response]
+        J[Streamlit Dashboard<br/>Real-time Analytics]
+    end
+    
+    A --> D
+    B --> D
+    C --> F
+    D --> E
+    F --> E
+    E --> G
+    E --> H
+    E --> K
+    H --> J
+    E --> I
+    E --> J
+    G --> I
+    
+    style A fill:#e1f5ff
+    style B fill:#e1f5ff
+    style C fill:#e1f5ff
+    style E fill:#ff6b6b
+    style H fill:#4ecdc4
+    style I fill:#ffe66d
+    style J fill:#95e1d3
+```
 
-1. **Ingestion:** Windows Event Logs are read asynchronously.
-2. **Detection:**
+### System Flow
 
-   * **Reflex:** Known attacks (e.g., brute force) are instantly caught with YAML rules.
-   * **Brain:** Unknown or complex events are analyzed by a local LLM.
-3. **Storage:** High-performance logging with SQLite (WAL mode).
-4. **Visualization:** Streamlit-based interactive dashboard and AI assistant.
+1. **Data Collection**: Windows Event Logs (Security/Sysmon) and network packets are captured in real-time
+2. **Detection Engine**: YAML-based rules check events against MITRE ATT&CK techniques
+3. **AI Analysis**: Local LLM (Ollama) provides contextual threat analysis without cloud dependency
+4. **Threat Intelligence**: CSV-based IP reputation database for known malicious IPs
+5. **Active Response**: High-risk IPs are automatically blocked via Windows Firewall
+6. **Visualization**: Streamlit dashboard provides real-time monitoring and analytics
 
 ---
 
-<img width="2816" height="1536" alt="Gemini_Generated_Image_rmjc5mrmjc5mrmjc" src="https://github.com/user-attachments/assets/3398cb0e-07d8-4d3b-9fe4-e71dcea6518a" />
+## 🔥 Key Features
 
+### 🧠 Hybrid Intelligence System
 
-## 🚀 Quick Start
+- **Signature-Based Detection**: Fast, rule-based detection using YAML configuration files
+- **Behavioral Analysis**: AI-powered anomaly detection using local LLM (Ollama)
+- **MITRE ATT&CK Integration**: All detections mapped to MITRE ATT&CK framework techniques
+- **Knowledge Base (RAG)**: Event ID explanations and security protocols retrieved from local database
 
-### 1. Requirements
+### 🌐 Real-Time Network Monitoring
 
-* **Ollama** installed (`ollama pull gemma2:2b` or `llama3.2`)
-* **Python 3.10+**
-* **Windows 10/11** (for Event Log reading)
-* **Administrator privileges** (to read Security logs)
+- **Live Packet Capture**: Wireshark-like functionality using Scapy
+- **Protocol Analysis**: TCP, UDP, ICMP traffic analysis with protocol distribution charts
+- **IP Reputation**: Automatic detection of traffic from known malicious IP ranges
+- **PCAP Export**: Capture network traffic to `.pcap` files for forensic analysis
+- **Traffic Statistics**: Top source/destination IPs, port analysis, and protocol breakdown
 
+### 🛡️ Automated Response (SOAR)
 
-### 2. Installation
+- **Active Defense**: Automatic Windows Firewall blocking of high-risk IP addresses
+- **Risk-Based Actions**: Configurable response thresholds (High/Critical events)
+- **IP Extraction**: Intelligent IP address extraction from log messages and network traffic
+- **Private IP Filtering**: Automatic exclusion of internal network IPs from blocking
+
+### 📊 Professional Security Dashboard
+
+- **Real-Time Log Analysis**: Live event monitoring with risk level visualization
+- **Network Traffic Monitor**: Interactive packet capture interface with live charts
+- **AI Security Assistant**: Chat-based interface for security queries and analysis
+- **Vulnerability Scanner**: Open port detection with risk assessment
+- **MITRE Technique Mapping**: Visual representation of detected attack techniques
+- **Export Capabilities**: CSV export for log analysis and reporting
+
+### 🕵️‍♂️ Advanced Detection Rules
+
+- **YAML-Based Configuration**: Easy-to-write detection rules with flexible conditions
+- **Regex Pattern Matching**: Support for complex pattern matching in log messages
+- **Threshold-Based Alerts**: Time-window and count-based detection (e.g., brute force)
+- **Parent-Child Process Detection**: Identify suspicious process relationships
+- **Multi-Event Correlation**: Track events across time windows for advanced threat detection
+
+### 🔒 Privacy & Security
+
+- **100% Offline**: No cloud dependencies, all processing happens locally
+- **No Data Leakage**: Logs and network data never leave your machine
+- **Local AI**: Uses Ollama for AI analysis - no API keys or external services required
+- **Encrypted Storage**: SQLite database with WAL mode for secure data persistence
+
+---
+
+## 📸 Screenshots
+
+### Dashboard Overview (Threat Analysis)
+*[Screenshot: Dashboard showing high-risk events, MITRE techniques, and AI analysis]*
+
+### Network Traffic Monitor (Live Sniffing)
+*[Screenshot: Real-time packet capture interface with protocol distribution charts]*
+
+### AI Security Analyst (Interactive Chat)
+*[Screenshot: Chat interface with AI assistant providing security recommendations]*
+
+### Vulnerability Scan (Open Ports)
+*[Screenshot: Port scanner showing high-risk open ports with detailed information]*
+
+---
+
+## 🚀 Installation & Usage
+
+### Prerequisites
+
+- **Windows 10/11** (Administrator privileges required)
+- **Python 3.10+**
+- **Npcap** ([Download here](https://npcap.com/)) - Required for packet capture on Windows
+- **Ollama** ([Download here](https://ollama.ai/)) - Required for AI analysis
+
+### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/LocalShield.git
+git clone https://github.com/yourusername/LocalShield.git
 cd LocalShield
+```
 
-# Optional: the startup .bat script can do this automatically,
-# but you can also install dependencies manually:
+### Step 2: Install Dependencies
+
+```bash
+# Create virtual environment (recommended)
+python -m venv venv
+venv\Scripts\activate  # On Windows
+
+# Install requirements
 pip install -r requirements.txt
 ```
 
+### Step 3: Install Npcap (Windows)
 
-### 3. One-Click Start (Windows)
+1. Download Npcap from [https://npcap.com/](https://npcap.com/)
+2. Install with default settings
+3. **Important**: Run as Administrator when using packet capture features
 
-You can start the entire system at once by running **`run_localshield.bat`**:
+### Step 4: Setup Ollama (AI Analysis)
 
+1. Download and install Ollama from [https://ollama.ai/](https://ollama.ai/)
+2. Pull a compatible model (recommended: `gemma3:4b` or `llama3:8b`):
+   ```bash
+   ollama pull gemma3:4b
+   ```
+3. Update `config.py` or set environment variable:
+   ```bash
+   set OLLAMA_MODEL_NAME=gemma3:4b
+   ```
+
+### Step 5: Generate Demo Data (Optional)
+
+To see the system in action with sample attack data:
+
+```bash
+python generate_demo_data.py
+```
+
+This will populate the database with realistic security events including:
+- APT29-style PowerShell attacks
+- Brute force attempts from known threat actor IPs
+- Privilege escalation attempts
+- Normal system activity
+
+### Step 6: Launch LocalShield
+
+**Option A: Using the launcher script (Recommended)**
 ```bash
 run_localshield.bat
 ```
 
 This script will:
+- Activate virtual environment
+- Start Log Watcher in background (requires Admin)
+- Launch Streamlit Dashboard
 
-* ✅ Check/activate the virtual environment
-* ✅ Install dependencies
-* ✅ Start the Log Watcher in the background (with admin rights)
-* ✅ Open the dashboard
-
-
-### 4. Manual Start
-
-#### Start the Log Watcher
-
+**Option B: Manual start**
 ```bash
+# Terminal 1: Start Log Watcher (as Administrator)
 python log_watcher.py
-```
 
-> ⚠️ **Note**: You must run the Log Watcher **with administrator privileges**.
-
-
-#### Start the Dashboard
-
-In a new terminal window:
-
-```bash
+# Terminal 2: Start Dashboard
 streamlit run dashboard.py
 ```
 
-The dashboard will automatically open in your browser (default: `http://localhost:8501`).
+The dashboard will be available at: `http://localhost:8501`
 
 ---
 
+## 🛠️ Tech Stack
 
-## 🧪 Attack Simulation (For Testing)
+### Core Technologies
 
-To test if the system works correctly:
+- **Python 3.10+**: Modern Python with type hints and async/await support
+- **Streamlit**: Interactive web dashboard framework
+- **Scapy**: Network packet manipulation and capture
+- **SQLite**: Lightweight, embedded database with WAL mode
+- **Ollama**: Local LLM inference engine
+- **Pandas**: Data manipulation and analysis
+- **PyYAML**: YAML-based rule configuration
+- **Altair**: Statistical visualization library
 
-```bash
-python simulate_attack.py
-```
+### Windows Integration
 
-Or with custom parameters:
+- **pywin32**: Windows API access for Event Log reading
+- **psutil**: System and process utilities
+- **Windows Firewall API**: Automated IP blocking
 
-```bash
-python simulate_attack.py -n 10 -t 60 -u ATTACKER
-```
+### Architecture Patterns
 
-**Parameters:**
-
-* `-n, --num-attempts`: Number of simulated attempts (default: 5)
-* `-t, --time-window`: Time window in seconds (default: 60)
-* `-u, --user`: Attacker username (default: ATTACKER)
+- **AsyncIO**: Non-blocking I/O for real-time log monitoring
+- **Thread Pool Executor**: Background processing for blocking operations
+- **Session State Management**: Streamlit state persistence
+- **RAG (Retrieval-Augmented Generation)**: Hybrid AI with knowledge base
 
 ---
-
 
 ## 📁 Project Structure
 
-```text
+```
 LocalShield/
-├── dashboard.py              # Streamlit dashboard
-├── log_watcher.py            # AsyncIO log watcher
-├── db_manager.py             # SQLite database manager
-├── simulate_attack.py        # Attack simulation tool
-├── config.py                 # Configuration file
-├── requirements.txt          # Python dependencies
-├── run_localshield.bat       # Windows startup script
-├── LICENSE                   # MIT License
-├── README.md                 # This file
+├── dashboard.py              # Streamlit dashboard application
+├── log_watcher.py            # Main log monitoring service (AsyncIO)
+├── db_manager.py             # Database operations and management
+├── config.py                 # Configuration and environment variables
+├── generate_demo_data.py     # Demo data generator for testing
+├── run_localshield.bat       # Windows launcher script
 │
-├── modules/                  # Core modules
-│   ├── ai_engine.py          # AI analysis engine
-│   ├── detection_engine.py   # Rule-based detection engine
-│   ├── chat_manager.py       # AI assistant module
-│   ├── network_scanner.py    # Port scanning module
-│   ├── knowledge_base.py     # Hybrid RAG system
-│   └── ai_models.py          # Pydantic models
+├── modules/
+│   ├── detection_engine.py  # YAML-based rule engine with MITRE mapping
+│   ├── ai_engine.py         # Ollama LLM integration for threat analysis
+│   ├── packet_capture.py    # Real-time network packet sniffer (Scapy)
+│   ├── network_scanner.py    # Open port vulnerability scanner
+│   ├── response_engine.py    # Windows Firewall automation (SOAR)
+│   ├── threat_intel.py      # IP reputation and threat intelligence
+│   ├── chat_manager.py      # AI assistant chat interface
+│   └── knowledge_base.py    # Event ID database (RAG)
 │
 ├── rules/                    # YAML detection rules
-│   └── *.yaml                # Rule files
+│   ├── brute_force.yaml
+│   ├── powershell_encoded.yaml
+│   └── parent_child_suspicious.yaml
 │
-├── data/                     # Knowledge base data
-│   ├── local_knowledge.json
-│   └── external_knowledge.json
+├── tests/                    # Unit and integration tests
+│   ├── test_detection_engine.py
+│   └── test_new_rules.py
 │
-└── tests/                    # Test files
-    └── test_*.py
+├── data/                     # Knowledge base and threat intel data
+└── requirements.txt          # Python dependencies
 ```
 
 ---
 
+## 🔧 Configuration
 
-## 🔍 Feature Details
+### Environment Variables
 
-### 1. AsyncIO Architecture
+Create a `.env` file in the project root (optional):
 
-The Log Watcher uses **AsyncIO** for non-blocking, high-performance log processing. This enables:
+```env
+# Ollama Model
+OLLAMA_MODEL_NAME=gemma3:4b
 
-* ✅ Parallel processing of multiple events
-* ✅ Efficient use of system resources
-* ✅ Real-time analysis
+# Database
+DB_PATH=logs.db
 
-### 2. Hybrid Analysis System
+# Event Logs
+EVENT_LOG_NAME=Security
+SYSMON_LOG_NAME=Microsoft-Windows-Sysmon/Operational
 
-Combination of **Rule Engine (Detection Engine)** + **AI Analysis (Brain)**:
+# Dashboard
+DASHBOARD_PORT=8501
 
-* **Rule Engine**: YAML-based rules for fast, deterministic detections
-* **AI Analysis**: Ollama LLM to understand complex or unknown patterns
-* **Override Logic**: If the rule engine marks an event as "High Risk", it overrides the AI score
+# Log Watcher
+CHECK_INTERVAL=5
 
-### 3. MITRE ATT&CK Integration
+# Demo Mode (for screenshots/testing)
+DEMO_MODE=False
+```
 
-Detected events are automatically mapped to MITRE ATT&CK techniques:
+### Detection Rules
 
-* ✅ Rule engine assigns MITRE technique IDs
-* ✅ Techniques are visualized in the dashboard
-* ✅ Included in CSV exports
+Customize detection rules in `rules/*.yaml`:
 
-### 4. Real-Time Dashboard
+```yaml
+id: "custom_rule_001"
+name: "Custom Detection Rule"
+description: "Detects specific attack pattern"
+mitre:
+  - "T1059.001"
+severity: "high"
+tags:
+  - "execution"
+  - "powershell"
+enabled: true
 
-Streamlit-based interactive UI:
-
-* 📊 **Log Analysis**: Filtering, search, CSV export
-* 🌐 **Network Scan**: Open port detection and risk assessment
-* 💬 **AI Assistant**: Q&A about system status and events
-* 📈 **Charts**: Timeline and risk distribution
-
----
-
-
-## ⚙️ Configuration
-
-You can configure LocalShield through the `config.py` file or via a `.env` file:
-
-| Parameter           | Description                    | Default     |
-| ------------------- | ------------------------------ | ----------- |
-| `OLLAMA_MODEL_NAME` | Ollama model name              | `gemma3:4b` |
-| `DB_PATH`           | Database file path             | `logs.db`   |
-| `EVENT_LOG_NAME`    | Windows Event Log name         | `Security`  |
-| `CHECK_INTERVAL`    | Log polling interval (seconds) | `5`         |
-| `LOG_LEVEL`         | Log level                      | `INFO`      |
-
----
-
-
-## 🏗️ Tech Stack
-
-| Category                | Technology                 |
-| ----------------------- | -------------------------- |
-| **Language**            | Python 3.10+               |
-| **Web Framework**       | Streamlit                  |
-| **AI/ML**               | Ollama (Local LLM)         |
-| **Database**            | SQLite (WAL Mode)          |
-| **Async Runtime**       | AsyncIO                    |
-| **Windows Integration** | pywin32                    |
-| **Data Processing**     | Pandas, Altair             |
-| **Testing**             | Pytest                     |
-| **Configuration**       | python-dotenv, Pydantic    |
-| **Rule Engine**         | YAML-based detection rules |
+conditions:
+  event_id: "1"
+  provider: "Sysmon"
+  command_line_regex: "-EncodedCommand"
+  threshold: 1
+```
 
 ---
 
+## 🧪 Testing
 
-## 🧪 Tests
-
-The project is tested with `pytest`:
+Run the test suite:
 
 ```bash
-pytest tests/
+# Run all tests
+pytest
+
+# Run specific test file
+pytest tests/test_new_rules.py -v
+
+# Test packet capture
+python test_sniffer.py
 ```
 
 ---
 
+## 📊 Use Cases
 
-## 📤 Push to GitHub (Force Push)
+### 1. Security Operations Center (SOC)
 
-If you have previously pushed something to GitHub and now your local state conflicts with it, you might get errors. The following commands treat your local state as the **single source of truth** and overwrite GitHub.
+- Real-time monitoring of Windows security events
+- Automated threat detection and response
+- MITRE ATT&CK technique mapping for threat hunting
+- AI-powered incident triage and analysis
 
-Open a terminal, go to the project directory, and run:
+### 2. Penetration Testing
 
-```powershell
-# 1. Stage and commit your changes
-git add .
-git commit -m "Final Release v1.0: Async Architecture, Detection Engine & Dashboard Polish"
+- Network traffic analysis during security assessments
+- Detection rule validation and testing
+- Attack simulation with `generate_demo_data.py`
+- Vulnerability assessment with port scanning
 
-# 2. Make sure the branch is named main
-git branch -M main
+### 3. Security Research
 
-# 3. FORCE PUSH (WARNING: overwrites existing code on GitHub with local state)
-git push -u origin main --force
-```
+- Offline analysis of security logs
+- Custom detection rule development
+- Threat intelligence research
+- Security tool development and testing
 
-> ⚠️ **Warning**: The `--force` flag will completely overwrite the existing code on GitHub. Make sure you really want this before using it!
+### 4. Educational & Training
+
+- Cybersecurity education and training
+- SIEM/SOAR concept demonstration
+- MITRE ATT&CK framework learning
+- Security monitoring best practices
 
 ---
-
-
-## 📝 License
-
-This project is licensed under the **MIT License**. See the `LICENSE` file for details.
-
----
-
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to your branch (`git push origin feature/amazing-feature`)
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
 ---
 
+## 📝 License
 
-## 📧 Contact
-
-If you have questions or suggestions, feel free to open an issue.
-
----
-
-
-## 🙏 Acknowledgements
-
-* **Ollama** – for local LLM support
-* **Streamlit** – for the dashboard framework
-* **MITRE ATT&CK** – for the reference framework
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-<div align="center">
+## ⚠️ Disclaimer
 
-**🛡️ Stay safe with LocalShield! 🛡️**
+**This project is for educational and portfolio purposes.**
 
-Made with ❤️ for the cybersecurity community
+- Use at your own risk in production environments
+- Always test thoroughly before deploying
+- Ensure proper security measures are in place
+- Review and customize detection rules for your environment
+- This tool is not a replacement for enterprise-grade SIEM solutions
 
-</div>
-
-# 🛡️ LocalShield
-
-> **Privacy-First, AI-Powered SIEM & Detection Engineering Platform.**
-
-LocalShield, kişisel bilgisayarınızı bir siber güvenlik kalesine dönüştürür. **AsyncIO** mimarisi ile Windows loglarını gerçek zamanlı izler, **Kural Motoru (Detection Engine)** ile saldırıları anında tespit eder ve **Lokal AI (Ollama)** ile olayları yorumlar.
-
-Verileriniz asla buluta gönderilmez. %100 Yerel ve Çevrimdışı çalışır.
+**The author is not responsible for any misuse or damage caused by this software.**
 
 ---
 
-## ⚡ Neden LocalShield?
+## 🙏 Acknowledgments
 
-| Özellik | Açıklama |
-| :--- | :--- |
-| **🧠 Hibrit Zeka** | Hem **AI (Gemma/Llama)** hem de **Kural Tabanlı (YAML)** tespit mekanizması birlikte çalışır. |
-| **🚀 Asenkron Mimari** | `AsyncIO` ve `ThreadPool` sayesinde logları sistemi yormadan, milisaniyeler içinde işler. |
-| **🎯 MITRE ATT&CK** | Saldırıları endüstri standardı kodlarla (örn: `T1110 - Brute Force`) etiketler. |
-| **🛡️ Privacy-First** | İnternet gerekmez. Loglar ve AI analizi tamamen makinenizde (`localhost`) kalır. |
-| **📊 SOC Dashboard** | Profesyonel bir SIEM arayüzü ile riskleri, zaman çizelgesini ve portları görselleştirir. |
-
-
-
-## 🏗️ Mimari
-
-LocalShield, modern bir **Pipeline** mimarisi kullanır:
-
-1. **Ingestion:** Windows Event Log'ları asenkron olarak okunur.
-2. **Detection:**
-   * **Reflex:** YAML kuralları ile bilinen saldırılar (Brute Force vb.) anında yakalanır.
-   * **Brain:** Bilinmeyen olaylar Local LLM tarafından analiz edilir.
-3. **Storage:** SQLite (WAL Modu) ile yüksek performanslı kayıt.
-4. **Visualization:** Streamlit tabanlı interaktif dashboard ve AI Asistan.
-
-
-
-
-
-
-
-
-
-
-## 🚀 Hızlı Başlangıç (Quick Start)
-
-### 1. Gereksinimler
-
-* **Ollama** kurulu olmalı (`ollama pull gemma2:2b` veya `llama3.2`)
-* **Python 3.10+**
-* **Windows 10/11** (Event Log okuma için)
-* **Yönetici Hakları** (Log okuma için)
-
-### 2. Kurulum
-
-```bash
-git clone https://github.com/YOUR_USERNAME/LocalShield.git
-cd LocalShield
-
-# Gerekli değil, başlatma scripti (bat) bunu otomatik yapar ama manuel isterseniz:
-pip install -r requirements.txt
-```
-
-### 3. Tek Tıkla Başlatma (Windows)
-
-**`run_localshield.bat`** dosyasını çalıştırarak tüm sistemi tek seferde başlatabilirsiniz:
-
-```bash
-run_localshield.bat
-```
-
-Bu script:
-- ✅ Sanal ortamı kontrol eder/aktif eder
-- ✅ Bağımlılıkları yükler
-- ✅ Log Watcher'ı arka planda başlatır (Yönetici haklarıyla)
-- ✅ Dashboard'ı açar
-
-### 4. Manuel Başlatma
-
-#### Log Watcher'ı Başlatın
-
-```bash
-python log_watcher.py
-```
-
-> ⚠️ **Not**: Log Watcher'ı **yönetici haklarıyla** çalıştırmanız gerekir.
-
-#### Dashboard'ı Açın
-
-Yeni bir terminal penceresinde:
-
-```bash
-streamlit run dashboard.py
-```
-
-Dashboard otomatik olarak tarayıcıda açılacaktır (varsayılan: `http://localhost:8501`).
+- **MITRE ATT&CK Framework** for threat classification
+- **Ollama** for providing local LLM capabilities
+- **Scapy** for network packet manipulation
+- **Streamlit** for the excellent dashboard framework
+- **Windows Security Community** for event log documentation
 
 ---
 
-## 🧪 Saldırı Simülasyonu (Test İçin)
+## 📧 Contact & Support
 
-Sistemin çalışıp çalışmadığını test etmek için:
+For questions, issues, or contributions:
 
-```bash
-python simulate_attack.py
-```
-
-Veya özelleştirilmiş parametrelerle:
-
-```bash
-python simulate_attack.py -n 10 -t 60 -u ATTACKER
-```
-
-**Parametreler:**
-- `-n, --num-attempts`: Simüle edilecek deneme sayısı (varsayılan: 5)
-- `-t, --time-window`: Zaman penceresi saniye cinsinden (varsayılan: 60)
-- `-u, --user`: Saldırgan kullanıcı adı (varsayılan: ATTACKER)
+- **GitHub Issues**: [Open an issue](https://github.com/yourusername/LocalShield/issues)
+- **Documentation**: See inline code comments and docstrings
 
 ---
 
-## 📁 Proje Yapısı
+**Built with ❤️ for the cybersecurity community**
 
-```
-LocalShield/
-├── dashboard.py              # Streamlit dashboard
-├── log_watcher.py            # AsyncIO log watcher
-├── db_manager.py             # SQLite veritabanı yönetimi
-├── simulate_attack.py        # Saldırı simülasyon aracı
-├── config.py                 # Yapılandırma dosyası
-├── requirements.txt          # Python bağımlılıkları
-├── run_localshield.bat       # Windows başlatma scripti
-├── LICENSE                   # MIT License
-├── README.md                 # Bu dosya
-│
-├── modules/                  # Ana modüller
-│   ├── ai_engine.py         # AI analiz motoru
-│   ├── detection_engine.py  # Kural tabanlı tespit motoru
-│   ├── chat_manager.py      # AI asistan modülü
-│   ├── network_scanner.py   # Port tarama modülü
-│   ├── knowledge_base.py    # Hibrit RAG sistemi
-│   └── ai_models.py         # Pydantic modelleri
-│
-├── rules/                    # YAML detection rules
-│   └── *.yaml               # Kural dosyaları
-│
-├── data/                     # Knowledge base verileri
-│   ├── local_knowledge.json
-│   └── external_knowledge.json
-│
-└── tests/                    # Test dosyaları
-    └── test_*.py
-```
-
----
-
-## 🔍 Özellikler Detayı
-
-### 1. AsyncIO Mimarisi
-
-Log Watcher, **AsyncIO** kullanarak non-blocking, yüksek performanslı log işleme gerçekleştirir. Bu sayede:
-- ✅ Çoklu event'ler paralel işlenir
-- ✅ Sistem kaynakları verimli kullanılır
-- ✅ Gerçek zamanlı analiz mümkün olur
-
-### 2. Hibrit Analiz Sistemi
-
-**Kural Motoru (Detection Engine)** + **AI Analizi (Brain)** kombinasyonu:
-
-- **Kural Motoru**: Hızlı, kesin tespitler için YAML tabanlı kurallar
-- **AI Analizi**: Karmaşık pattern'leri anlamak için Ollama LLM
-- **Override Mantığı**: Kural motoru "Yüksek Risk" derse, AI skorunu override eder
-
-### 3. MITRE ATT&CK Entegrasyonu
-
-Tespit edilen olaylar otomatik olarak MITRE ATT&CK teknikleriyle eşleştirilir:
-- ✅ Kural motoru MITRE tekniklerini belirler
-- ✅ Dashboard'da görsel olarak gösterilir
-- ✅ CSV export'ta dahil edilir
-
-### 4. Gerçek Zamanlı Dashboard
-
-Streamlit tabanlı interaktif arayüz:
-- 📊 **Log Analizi**: Filtreleme, arama, CSV export
-- 🌐 **Ağ Taraması**: Açık port tespiti ve risk analizi
-- 💬 **AI Asistan**: Sistem durumu hakkında soru-cevap
-- 📈 **Grafikler**: Zaman çizelgesi ve risk dağılımı
-
----
-
-## ⚙️ Yapılandırma
-
-Yapılandırma dosyası (`config.py`) veya `.env` dosyası üzerinden ayarlanabilir:
-
-| Parametre | Açıklama | Varsayılan |
-|-----------|----------|------------|
-| `OLLAMA_MODEL_NAME` | Ollama model adı | `gemma3:4b` |
-| `DB_PATH` | Veritabanı dosya yolu | `logs.db` |
-| `EVENT_LOG_NAME` | Windows Event Log adı | `Security` |
-| `CHECK_INTERVAL` | Log kontrol aralığı (saniye) | `5` |
-| `LOG_LEVEL` | Log seviyesi | `INFO` |
-
----
-
-## 🏗️ Teknoloji Yığını
-
-| Kategori | Teknoloji |
-|----------|-----------|
-| **Dil** | Python 3.10+ |
-| **Web Framework** | Streamlit |
-| **AI/ML** | Ollama (Lokal LLM) |
-| **Veritabanı** | SQLite (WAL Modu) |
-| **Async Runtime** | AsyncIO |
-| **Windows Integration** | pywin32 |
-| **Data Processing** | Pandas, Altair |
-| **Testing** | Pytest |
-| **Configuration** | python-dotenv, Pydantic |
-| **Rule Engine** | YAML-based Detection Rules |
-
----
-
-## 🧪 Test
-
-Proje, pytest ile test edilmiştir:
-
-```bash
-pytest tests/
-```
-
-
-## 📝 Lisans
-
-Bu proje **MIT License** altında lisanslanmıştır. Detaylar için `LICENSE` dosyasına bakın.
-
----
-
-## 🤝 Katkıda Bulunma
-
-Katkılarınızı bekliyoruz! Lütfen:
-1. Fork edin
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Commit edin (`git commit -m 'Add amazing feature'`)
-4. Push edin (`git push origin feature/amazing-feature`)
-5. Pull Request açın
-
----
-
-## 📧 İletişim
-
-Sorularınız veya önerileriniz için issue açabilirsiniz.
-
----
-
-
-<div align="center">
-
-**🛡️ LocalShield ile güvenli kalın! 🛡️**
-
-Made with ❤️ for the cybersecurity community
-
-</div>
+*Last updated: December 2024*
