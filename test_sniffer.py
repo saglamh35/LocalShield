@@ -100,7 +100,7 @@ async def test():
         print("   3. Tekrar test_sniffer.py'yi çalıştır")
         print("\n   VEYA")
         print("   - CMD'yi Yönetici olarak aç")
-        print("   - cd C:\\Users\\sagla\\Desktop\\Localshield")
+        print("   - cd C:\\Path\\To\\LocalShield")
         print("   - python test_sniffer.py")
         
     except Exception as e:

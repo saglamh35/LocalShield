@@ -45,3 +45,7 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# CSV export files (may contain sensitive log data)
+*_export.csv
+*export*.csv

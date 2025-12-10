@@ -1,0 +1,79 @@
+ID,Zaman,Event ID,Mesaj,AI Analiz,Risk Seviyesi
+1,2024-12-01 10:15:23,4672,"Special privileges assigned to new logon.
+
+Subject:
+	Security ID:		S-1-5-18
+	Account Name:		SYSTEM
+	Account Domain:		NT AUTHORITY
+	Logon ID:		0x3e7
+
+Privileges:		SeAssignPrimaryTokenPrivilege
+			SeTcbPrivilege
+			SeSecurityPrivilege
+			SeTakeOwnershipPrivilege
+			SeLoadDriverPrivilege
+			SeBackupPrivilege
+			SeRestorePrivilege
+			SeDebugPrivilege
+			SeAuditPrivilege
+			SeSystemEnvironmentPrivilege
+			SeImpersonatePrivilege
+			SeDelegateSessionUserImpersonatePrivilege
+","Risk Seviyesi: Orta | Özet: Sistem hesabı üzerinden yeni bir oturum açılması ve bu oturuma özel ayrıcalıkların atanması. Bu durum, potansiyel bir güvenlik açığına işaret edebilir.",Orta
+2,2024-12-01 10:20:15,5379,"Credential Manager credentials were read.
+
+Subject:
+	Security ID:		S-1-5-21-1234567890-1234567890-1234567890-1001
+	Account Name:		LOCALUSER
+	Account Domain:		DESKTOP-LOCAL
+	Logon ID:		0x4aae2c1e
+	Read Operation:		%%8100
+
+This event occurs when a user performs a read operation on stored credentials in Credential Manager.
+","Risk Seviyesi: Düşük | Özet: Kullanıcının Credential Manager'daki kaydedilmiş kimlik bilgilerini okuma işlemi yapması, olağan bir kullanım durumudur ve potansiyel bir güvenlik ihlali belirtmez.",Düşük
+3,2024-12-01 10:25:42,4634,"An account was logged off.
+
+Subject:
+	Security ID:		S-1-5-21-1234567890-1234567890-1234567890-1001
+	Account Name:		LABUSER
+	Account Domain:		SECURITY-LAB-HOST
+	Logon ID:		0x520e0547
+
+Logon Type:			2
+
+This event is generated when a logon session is destroyed. It may be positively correlated with a logon event using the Logon ID value. Logon IDs are only unique between reboots on the same computer.
+",Analiz Edilemedi,Orta
+4,2024-12-01 10:30:18,4624,"An account was successfully logged on.
+
+Subject:
+	Security ID:		S-1-5-21-1234567890-1234567890-1234567890-1001
+	Account Name:		LOCALUSER
+	Account Domain:		DESKTOP-LOCAL
+	Logon ID:		0x4aae2c1e
+
+Logon Type:			2
+
+This event is generated when a logon session is created. It may be positively correlated with a logoff event using the Logon ID value.
+","Risk Seviyesi: Düşük | Özet: Normal kullanıcı oturum açma işlemi. Güvenlik açısından şüpheli bir durum tespit edilmedi.",Düşük
+5,2024-12-01 10:35:55,4672,"Special privileges assigned to new logon.
+
+Subject:
+	Security ID:		S-1-5-18
+	Account Name:		SYSTEM
+	Account Domain:		NT AUTHORITY
+	Logon ID:		0x3e7
+
+Privileges:		SeAssignPrimaryTokenPrivilege
+			SeTcbPrivilege
+			SeSecurityPrivilege
+			SeTakeOwnershipPrivilege
+			SeLoadDriverPrivilege
+			SeBackupPrivilege
+			SeRestorePrivilege
+			SeDebugPrivilege
+			SeAuditPrivilege
+			SeSystemEnvironmentPrivilege
+			SeImpersonatePrivilege
+			SeDelegateSessionUserImpersonatePrivilege
+","Risk Seviyesi: Orta | Özet: Sistem hesabı tarafından özel izinlerin atanması, olası kötü amaçlı faaliyetlere işaret edebilir ve güvenlik ihlali potansiyeli taşır. Bu durumun izlenmesi ve nedeninin araştırılması gerekir.",Orta
+
