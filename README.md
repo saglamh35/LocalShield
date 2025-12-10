@@ -1,4 +1,5 @@
-# 🛡️ LocalShield - Next-Gen Offline SIEM & Network Monitor
+
+# 🛡️ LocalShield - Offline SIEM & Network Monitor
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
@@ -14,7 +15,7 @@
 
 ## 📋 TL;DR
 
-**LocalShield** is an enterprise-grade Security Information and Event Management (SIEM) system that runs entirely offline on Windows. It integrates:
+**LocalShield** is an educational prototype Security Information and Event Management (SIEM) system that runs entirely offline on Windows. It integrates:
 
 - **Windows Event Log Analysis** (Security + Sysmon) with real-time monitoring
 - **Live Network Packet Capture** (Wireshark-like functionality) using Scapy
@@ -23,58 +24,17 @@
 - **Automated Response (SOAR)** through Windows Firewall integration
 - **Professional Dashboard** built with Streamlit for real-time visualization
 
-**Perfect for:** Security researchers, SOC analysts, penetration testers, and cybersecurity professionals who need a powerful, privacy-respecting security monitoring solution.
+
 
 ---
 
 ## 🏗️ Architecture
 
-```mermaid
-graph TB
-    subgraph "Data Sources"
-        A[Windows Security Logs]
-        B[Sysmon Events]
-        C[Network Packets - Scapy]
-    end
-    
-    subgraph "Core Engine"
-        D[Log Watcher<br/>AsyncIO-based]
-        E[Detection Engine<br/>YAML Rules + MITRE]
-        F[Packet Sniffer<br/>Real-time Capture]
-    end
-    
-    subgraph "Intelligence Layer"
-        G[Threat Intel<br/>CSV-based IP Reputation]
-        H[AI Analyst<br/>Ollama LLM]
-        K[Knowledge Base<br/>Event ID Database]
-    end
-    
-    subgraph "Response & Visualization"
-        I[Firewall Manager<br/>Active Response]
-        J[Streamlit Dashboard<br/>Real-time Analytics]
-    end
-    
-    A --> D
-    B --> D
-    C --> F
-    D --> E
-    F --> E
-    E --> G
-    E --> H
-    E --> K
-    H --> J
-    E --> I
-    E --> J
-    G --> I
-    
-    style A fill:#e1f5ff
-    style B fill:#e1f5ff
-    style C fill:#e1f5ff
-    style E fill:#ff6b6b
-    style H fill:#4ecdc4
-    style I fill:#ffe66d
-    style J fill:#95e1d3
-```
+
+
+<img width="2816" height="1536" alt="Gemini_Generated_Image_yxqkndyxqkndyxqk" src="https://github.com/user-attachments/assets/5fbe8e29-9a24-4043-bbb4-e70158cbb80f" />
+
+
 
 ### System Flow
 
@@ -111,7 +71,7 @@ graph TB
 - **IP Extraction**: Intelligent IP address extraction from log messages and network traffic
 - **Private IP Filtering**: Automatic exclusion of internal network IPs from blocking
 
-### 📊 Professional Security Dashboard
+### 📊 Security Dashboard
 
 - **Real-Time Log Analysis**: Live event monitoring with risk level visualization
 - **Network Traffic Monitor**: Interactive packet capture interface with live charts
@@ -120,7 +80,7 @@ graph TB
 - **MITRE Technique Mapping**: Visual representation of detected attack techniques
 - **Export Capabilities**: CSV export for log analysis and reporting
 
-### 🕵️‍♂️ Advanced Detection Rules
+### 🕵️‍♂️ Detection Rules
 
 - **YAML-Based Configuration**: Easy-to-write detection rules with flexible conditions
 - **Regex Pattern Matching**: Support for complex pattern matching in log messages
@@ -133,23 +93,34 @@ graph TB
 - **100% Offline**: No cloud dependencies, all processing happens locally
 - **No Data Leakage**: Logs and network data never leave your machine
 - **Local AI**: Uses Ollama for AI analysis - no API keys or external services required
-- **Encrypted Storage**: SQLite database with WAL mode for secure data persistence
+- **Storage**: SQLite with WAL mode for reliable local storage
 
 ---
 
 ## 📸 Screenshots
 
 ### Dashboard Overview (Threat Analysis)
-*[Screenshot: Dashboard showing high-risk events, MITRE techniques, and AI analysis]*
+
+<img width="3839" height="1972" alt="Screenshot 2025-12-09 200938" src="https://github.com/user-attachments/assets/85acfa1e-f8f9-4f48-9151-a5486c2c88e4" />
+
+<img width="3205" height="1837" alt="Screenshot 2025-12-09 201020" src="https://github.com/user-attachments/assets/63396210-5b5a-4a90-b88f-4d661a1d3a38" />
+[Screenshot: Dashboard showing high-risk events, MITRE techniques, and AI analysis]
 
 ### Network Traffic Monitor (Live Sniffing)
-*[Screenshot: Real-time packet capture interface with protocol distribution charts]*
 
-### AI Security Analyst (Interactive Chat)
-*[Screenshot: Chat interface with AI assistant providing security recommendations]*
+<img width="3839" height="1903" alt="Screenshot 2025-12-09 201140" src="https://github.com/user-attachments/assets/1a6b662e-9326-4d3f-8a0a-f7174c37533c" />
+[Screenshot: Real-time packet capture interface with protocol distribution charts]
 
 ### Vulnerability Scan (Open Ports)
-*[Screenshot: Port scanner showing high-risk open ports with detailed information]*
+
+<img width="3839" height="1914" alt="Screenshot 2025-12-09 201212" src="https://github.com/user-attachments/assets/237c6353-e1cd-4130-98c4-b6afa8e323ee" />
+[Screenshot: Port scanner showing high-risk open ports with detailed information]
+
+
+### AI Security Analyst (Interactive Chat)
+
+<img width="3825" height="1342" alt="Screenshot 2025-12-09 201233" src="https://github.com/user-attachments/assets/d5f28259-3659-46cf-8ccf-491cd7933255" />
+[Screenshot: Chat interface with AI assistant providing security recommendations]
 
 ---
 
@@ -171,10 +142,14 @@ cd LocalShield
 
 ### Step 2: Install Dependencies
 
-```bash
-# Create virtual environment (recommended)
+```bash<img width="3205" height="1837" alt="Screenshot 2025-12-09 201020" src="https://github.com/user-attachments/assets/d432c901-6742-404d-afbd-c0776df08b3f" />
+
+# Create virtual environment (recommended)<img width="3839" height="1903" alt="Screenshot 2025-12-09 201140" src="https://github.com/user-attachments/assets/e30fc4d2-1e2d-4e28-bdc4-dc4821cec874" />
+
 python -m venv venv
-venv\Scripts\activate  # On Windows
+venv\Scripts\activate  # On Windows<img width="3839" height="1903" alt="Screenshot 2025-12-09 201140" src="https://github.com/user-attachments/assets/a9fbce46-7e1a-449e-be66-b34e8cee96c4" />
+
+<img width="3825" height="1342" alt="Screenshot 2025-12-09 201233" src="https://github.com/user-attachments/assets/db6ca5bc-189d-4043-be17-ee5ce7735407" />
 
 # Install requirements
 pip install -r requirements.txt
@@ -368,51 +343,7 @@ pytest tests/test_new_rules.py -v
 python test_sniffer.py
 ```
 
----
 
-## 📊 Use Cases
-
-### 1. Security Operations Center (SOC)
-
-- Real-time monitoring of Windows security events
-- Automated threat detection and response
-- MITRE ATT&CK technique mapping for threat hunting
-- AI-powered incident triage and analysis
-
-### 2. Penetration Testing
-
-- Network traffic analysis during security assessments
-- Detection rule validation and testing
-- Attack simulation with `generate_demo_data.py`
-- Vulnerability assessment with port scanning
-
-### 3. Security Research
-
-- Offline analysis of security logs
-- Custom detection rule development
-- Threat intelligence research
-- Security tool development and testing
-
-### 4. Educational & Training
-
-- Cybersecurity education and training
-- SIEM/SOAR concept demonstration
-- MITRE ATT&CK framework learning
-- Security monitoring best practices
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
 
 ## 📝 License
 
@@ -420,19 +351,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## ⚠️ Disclaimer
 
-**This project is for educational and portfolio purposes.**
 
-- Use at your own risk in production environments
-- Always test thoroughly before deploying
-- Ensure proper security measures are in place
-- Review and customize detection rules for your environment
-- This tool is not a replacement for enterprise-grade SIEM solutions
-
-**The author is not responsible for any misuse or damage caused by this software.**
-
----
 
 ## 🙏 Acknowledgments
 
@@ -444,15 +364,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 📧 Contact & Support
-
-For questions, issues, or contributions:
-
-- **GitHub Issues**: [Open an issue](https://github.com/yourusername/LocalShield/issues)
-- **Documentation**: See inline code comments and docstrings
-
----
 
 **Built with ❤️ for the cybersecurity community**
 
-*Last updated: December 2024*
+*Last updated: December 2025*
