@@ -189,7 +189,7 @@ def create_timeline_chart(df):
         return None
     
     try:
-        # Zaman damgasına göre grupla (15 dakikalık aralıklar)
+        # Group by timestamp (15-minute intervals)
         df_chart = df.copy()
         
         # Convert Time column to datetime (if not already)
@@ -362,7 +362,7 @@ def main():
     """Main dashboard function"""
     
     # Header
-    st.title("🛡️ LocalShield - AI-Powered SIEM")
+    st.title(config.DASHBOARD_TITLE)
     st.markdown("---")
     
     # Sidebar - Filters

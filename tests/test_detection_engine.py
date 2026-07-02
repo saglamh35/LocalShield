@@ -28,21 +28,24 @@ class TestDetectionEngine:
     
     @pytest.fixture
     def sample_rule_yaml(self):
-        """Sample YAML rule content"""
+        """Sample YAML rule content (current schema: severity + mitre list)"""
         return """
+id: "brute_force_001"
 name: "Brute Force Attack Detection"
-description: "EventID 4625 (Failed Logon) için brute force saldırısı tespiti"
+description: "Brute force attack detection for EventID 4625 (Failed Logon)"
 enabled: true
-priority: "high"
+severity: "high"
+mitre:
+  - "T1110"
+tags:
+  - "brute_force"
 
 conditions:
   event_id: "4625"
-  time_window: 60  # saniye cinsinden (1 dakika)
-  threshold: 5     # Bu süre içinde kaç tekrar olursa tetiklenir
+  time_window: 60  # seconds (1 minute)
+  threshold: 5     # number of repeats within the window before triggering
 
-risk_level: "Yüksek"
-mitre_technique: "T1110"
-match_message: "Detection Rule Match: Brute Force Attack - EventID 4625 tekrar sayısı eşiği aşıldı"
+match_message: "Detection Rule Match: Brute Force Attack - EventID 4625 threshold exceeded"
 
 filters:
   exclude_users: []
@@ -64,7 +67,7 @@ filters:
         assert engine.rules[0].event_id == "4625", "Event ID yanlış"
         assert engine.rules[0].threshold == 5, "Threshold değeri yanlış"
         assert engine.rules[0].time_window == 60, "Time window değeri yanlış"
-        assert engine.rules[0].mitre_technique == "T1110", "MITRE tekniği yanlış"
+        assert engine.rules[0].mitre == ["T1110"], "MITRE tekniği yanlış"
     
     def test_4_failed_logins_should_not_trigger(self, temp_rules_dir, sample_rule_yaml):
         """Test: 1 dakika içinde 4 başarısız giriş (Event 4625) kuralı TETİKLEMEMELİ"""
@@ -113,7 +116,7 @@ filters:
             else:
                 # 5th should trigger
                 assert result is not None, "5. başarısız girişte tetiklenmeli"
-                assert result['risk_level'] == "Yüksek", "Risk seviyesi 'Yüksek' olmalı"
+                assert result['risk_level'] == "High", "Risk seviyesi 'High' olmalı"
                 assert result['mitre_technique'] == "T1110", "MITRE tekniği 'T1110' olmalı"
                 assert "Brute Force" in result['match_message'], "Match message'da 'Brute Force' olmalı"
                 detection_triggered = True

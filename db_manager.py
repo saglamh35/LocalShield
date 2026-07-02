@@ -10,7 +10,7 @@ from pathlib import Path
 
 import config
 
-# Logging yapılandırması
+# Logging configuration
 logger = logging.getLogger(__name__)
 
 
