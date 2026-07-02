@@ -23,11 +23,9 @@ DB_PATH: str = os.getenv("DB_PATH", "logs.db")
 # Windows Event Log Settings
 EVENT_LOG_NAME: str = os.getenv("EVENT_LOG_NAME", "Security")
 SYSMON_LOG_NAME: str = os.getenv("SYSMON_LOG_NAME", "Microsoft-Windows-Sysmon/Operational")
-MAX_LOGS_TO_READ: int = int(os.getenv("MAX_LOGS_TO_READ", "10"))
 
 # Streamlit Dashboard Settings
-DASHBOARD_TITLE: str = os.getenv("DASHBOARD_TITLE", "🛡️ LocalShield - AI-Powered Offline SIEM")
-DASHBOARD_PORT: int = int(os.getenv("DASHBOARD_PORT", "8501"))
+DASHBOARD_TITLE: str = os.getenv("DASHBOARD_TITLE", "🛡️ LocalShield - AI-Powered SIEM")
 
 # Log Watcher Settings
 CHECK_INTERVAL: int = int(os.getenv("CHECK_INTERVAL", "5"))  # seconds

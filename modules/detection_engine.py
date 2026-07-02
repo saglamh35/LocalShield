@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-# Logging yapılandırması
+# Logging configuration
 logger = logging.getLogger(__name__)
 
 
@@ -381,41 +381,7 @@ class DetectionEngine:
                 return rule.get_result()
         
         return None
-    
-    def check_event_all_rules(
-        self,
-        event_id: str,
-        timestamp: datetime,
-        message: str = "",
-        log_source: str = "Security",
-        sysmon_data: Optional[Dict[str, str]] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Checks an event against all rules and returns ALL matching rules (not just first).
-        Useful for getting a complete list of triggered rules.
-        
-        Args:
-            event_id: Event ID
-            timestamp: Event time
-            message: Event message
-            log_source: Log source name (Security, Sysmon, etc.)
-            sysmon_data: Optional dict with Sysmon fields (Image, CommandLine, ParentImage, etc.)
-        
-        Returns:
-            list: List of all matching rule results
-        """
-        matching_rules = []
-        
-        for rule in self.rules:
-            if rule.enabled and rule.matches(event_id, timestamp, message, log_source, sysmon_data):
-                matching_rules.append(rule.get_result())
-                logger.info(
-                    f"🔴 RULE MATCH: {rule.name} (ID: {rule.id}) - Event ID: {event_id}, "
-                    f"Severity: {rule.severity}"
-                )
-        
-        return matching_rules
-    
+
     def reload_rules(self) -> None:
         """Reloads rules (hot reload)"""
         self.rules.clear()

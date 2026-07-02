@@ -38,7 +38,7 @@ except ImportError:
     print("WARNING: scapy library is not installed. Install it with 'pip install scapy'")
     print("NOTE: On Windows, you may also need to install Npcap: https://npcap.com/")
 
-# Logging yapılandırması
+# Logging configuration
 logger = logging.getLogger(__name__)
 
 
@@ -625,14 +625,7 @@ class PacketSniffer:
             interface: Network interface
         """
         packets_captured = []
-        start_time = datetime.now()
-        
-        def packet_handler(packet):
-            packets_captured.append(packet)
-            # Check if duration exceeded
-            elapsed = (datetime.now() - start_time).total_seconds()
-            return elapsed >= duration
-        
+
         try:
             sniff(
                 iface=interface,

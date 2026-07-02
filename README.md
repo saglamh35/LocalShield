@@ -142,14 +142,10 @@ cd LocalShield
 
 ### Step 2: Install Dependencies
 
-```bash<img width="3205" height="1837" alt="Screenshot 2025-12-09 201020" src="https://github.com/user-attachments/assets/d432c901-6742-404d-afbd-c0776df08b3f" />
-
-# Create virtual environment (recommended)<img width="3839" height="1903" alt="Screenshot 2025-12-09 201140" src="https://github.com/user-attachments/assets/e30fc4d2-1e2d-4e28-bdc4-dc4821cec874" />
-
+```bash
+# Create virtual environment (recommended)
 python -m venv venv
-venv\Scripts\activate  # On Windows<img width="3839" height="1903" alt="Screenshot 2025-12-09 201140" src="https://github.com/user-attachments/assets/a9fbce46-7e1a-449e-be66-b34e8cee96c4" />
-
-<img width="3825" height="1342" alt="Screenshot 2025-12-09 201233" src="https://github.com/user-attachments/assets/db6ca5bc-189d-4043-be17-ee5ce7735407" />
+venv\Scripts\activate  # On Windows
 
 # Install requirements
 pip install -r requirements.txt
@@ -292,9 +288,6 @@ DB_PATH=logs.db
 # Event Logs
 EVENT_LOG_NAME=Security
 SYSMON_LOG_NAME=Microsoft-Windows-Sysmon/Operational
-
-# Dashboard
-DASHBOARD_PORT=8501
 
 # Log Watcher
 CHECK_INTERVAL=5

@@ -1,6 +1,6 @@
 """
-Log Watcher - Windows Security Event Log'larını sürekli dinleyen servis
-Production-Ready: Asenkron yapı ve logging ile güncellendi
+Log Watcher - Service that continuously monitors Windows Security Event Logs.
+Production-Ready: asynchronous structure with logging.
 """
 import asyncio
 import sys
@@ -25,7 +25,7 @@ from modules.detection_engine import DetectionEngine
 from modules.response_engine import FirewallManager
 from modules.threat_intel import ThreatIntel
 
-# Logging yapılandırması
+# Logging configuration
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -46,9 +46,9 @@ class LogWatcher:
     def __init__(self) -> None:
         """Initializes LogWatcher"""
         self.brain = Brain()
-        self.detection_engine = DetectionEngine()  # Kural Motoru
-        self.firewall_manager = FirewallManager()  # Active Response Engine
-        self.threat_intel = ThreatIntel()  # Threat Intelligence Engine
+        self.detection_engine = DetectionEngine()  # Rule engine
+        self.firewall_manager = FirewallManager()  # Active response engine
+        self.threat_intel = ThreatIntel()  # Threat intelligence engine
         self.db_conn = init_db(config.DB_PATH)
         # Dictionary to hold multiple log handles: {log_name: handle}
         self.log_handles: dict[str, Optional[Any]] = {}
@@ -250,15 +250,15 @@ class LogWatcher:
             log_source: Source log channel name (Security or Sysmon)
         """
         try:
-            # Event bilgilerini al
+            # Get event details
             event_id = str(event.EventID)
             event_time = event.TimeGenerated
-            
-                # Get log channel name for message formatting
+
+            # Get log channel name for message formatting
             log_channel = config.SYSMON_LOG_NAME if log_source == "Sysmon" else config.EVENT_LOG_NAME
             message = self.get_event_message(event, log_channel)
-            
-            # Sysmon Event ID 1 (Process Creation) ve Event ID 5 (Process Terminated) için özel parsing
+
+            # Special parsing for Sysmon Event ID 1 (Process Creation) and Event ID 5 (Process Terminated)
             sysmon_details = ""
             sysmon_data = None  # For detection engine
             if log_source == "Sysmon" and event_id == "1":
@@ -303,25 +303,26 @@ Message: {message}{sysmon_details}{additional_info}
 
 Note: Pay special attention to fields like 'Account Name', 'Workstation Name', 'Source Network Address', 'Logon Type' in the message."""
             
-            # THREAT INTELLIGENCE CHECK: Log metninden IP'leri çıkar ve zararlı listede kontrol et
+            # THREAT INTELLIGENCE CHECK: extract IPs from the log text and check them against the malicious list.
+            # These IPs are reused later for the active-response step (extracted only once).
             threat_intel_match = None
             combined_text = f"{message}{sysmon_details}{additional_info}"
             found_ips = self.firewall_manager.extract_ips_from_text(combined_text)
-            
+
             for ip in found_ips:
-                # Private IP kontrolü - sadece public IP'leri kontrol et
+                # Private IP check - only inspect public IPs
                 if not self.firewall_manager.is_private_ip(ip):
                     threat_result = self.threat_intel.check_ip(ip)
                     if threat_result:
                         threat_intel_match = threat_result
-                        # İlk zararlı IP'yi bulduğumuzda döngüden çık
+                        # Stop at the first malicious IP found
                         break
-            
-            # Eğer Threat Intelligence eşleşmesi varsa, risk seviyesini direkt "High" yap
+
+            # If there is a Threat Intelligence match, force the risk level to "High"
             threat_intel_header = ""
             if threat_intel_match:
-                threat_intel_header = f"🚨 [THREAT INTEL MATCH] IP {threat_intel_match['ip']} zararlı listede bulundu! Kategori: {threat_intel_match['category']}, Güven: {threat_intel_match['confidence']}%\n\n"
-                logger.warning(f"🚨 THREAT INTEL: {threat_intel_match['ip']} zararlı listede - Risk seviyesi otomatik olarak 'High' yapıldı")
+                threat_intel_header = f"🚨 [THREAT INTEL MATCH] IP {threat_intel_match['ip']} found on the malicious list! Category: {threat_intel_match['category']}, Confidence: {threat_intel_match['confidence']}%\n\n"
+                logger.warning(f"🚨 THREAT INTEL: {threat_intel_match['ip']} on malicious list - risk level automatically set to 'High'")
             
             # FIRST: Detection Engine check (Fast and Precise)
             logger.info(f"Checking Event ID {event_id} in detection engine...")
@@ -336,7 +337,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                 sysmon_data  # Add sysmon_data parameter
             )
             
-            # Kural Motoru sonucu
+            # Rule engine result
             rule_risk_level: Optional[str] = None
             mitre_technique: Optional[str] = None
             rule_match_message: Optional[str] = None
@@ -355,48 +356,44 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                 log_text
             )
             
-            # Risk seviyesi belirleme mantığı (öncelik sırası):
-            # 1. Threat Intelligence (en yüksek öncelik - zararlı IP varsa direkt High)
-            # 2. Detection Engine (kural eşleşmesi)
-            # 3. AI Analysis (varsayılan)
-            
+            # Risk level decision logic (priority order):
+            # 1. Threat Intelligence (highest priority - malicious IP forces High)
+            # 2. Detection Engine (rule match)
+            # 3. AI Analysis (default)
+
             final_risk_level = ai_risk_level
             final_analysis = analysis
-            
-            # THREAT INTELLIGENCE OVERRIDE: Eğer zararlı IP varsa, risk seviyesini direkt "High" yap
+
+            # THREAT INTELLIGENCE OVERRIDE: if a malicious IP is present, force risk level to "High"
             if threat_intel_match:
                 final_risk_level = "High"
-                # Threat intel bilgisini analiz metninin en başına ekle
+                # Prepend the threat intel note to the analysis text
                 final_analysis = threat_intel_header + analysis
-                logger.warning(f"🚨 Threat Intelligence risk seviyesini override etti: {ai_risk_level} -> High")
-            
-            # Detection Engine override logic: If Detection Engine says "High Risk", override AI's risk score
+                logger.warning(f"🚨 Threat Intelligence overrode risk level: {ai_risk_level} -> High")
+
+            # Detection Engine override logic: if the engine says "High", override the AI's risk score
             elif rule_risk_level:
                 # Add Detection Engine result to AI analysis
                 if rule_match_message:
                     final_analysis = f"{rule_match_message}\n\n---\n\n{analysis}"
-                
-                # If Detection Engine says "High Risk", override AI's risk score
-                if rule_risk_level == "Yüksek" or rule_risk_level == "High":
+
+                # If Detection Engine says "High", override AI's risk score
+                if rule_risk_level == "High":
                     final_risk_level = "High"
                     logger.warning(f"⚠️ Detection Engine overrode risk score: {ai_risk_level} -> {final_risk_level}")
                 else:
-                    # If Detection Engine is not "High", use AI's score but also show rule result
+                    # If Detection Engine is not "High", keep the AI's score but still show the rule result
                     final_risk_level = ai_risk_level
-            
-                # ACTIVE RESPONSE: Yüksek riskli olaylarda IP engelleme
+
+            # ACTIVE RESPONSE: block IPs on high-risk events.
+            # Reuse the IPs already extracted above instead of scanning the text again.
             action_taken = ""
-            if final_risk_level in ["Yüksek", "High"]:
-                # Log mesajından IP adreslerini çıkar
-                combined_text = f"{message}{sysmon_details}{additional_info}"
-                found_ips = self.firewall_manager.extract_ips_from_text(combined_text)
-                
-                # Her IP için engelleme dene
+            if final_risk_level == "High":
                 blocked_ips = []
                 for ip in found_ips:
-                    # Private IP kontrolü (zaten FirewallManager içinde var ama burada da kontrol edelim)
+                    # Private IP check (also enforced inside FirewallManager, kept here as a guard)
                     if not self.firewall_manager.is_private_ip(ip):
-                        # IP'yi engelle (thread pool'da çalıştır - blocking operation)
+                        # Block the IP (run in the thread pool - blocking operation)
                         success = await loop.run_in_executor(
                             self.executor,
                             self.firewall_manager.block_ip,
@@ -404,14 +401,14 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                         )
                         if success:
                             blocked_ips.append(ip)
-                
-                # Eğer IP engellendiyse, analiz metninin başına ekle
+
+                # If any IP was blocked, prepend a note to the analysis text
                 if blocked_ips:
                     blocked_ips_str = ", ".join(blocked_ips)
-                    action_taken = f"🛡️ [ACTION TAKEN]: IP adres(ler)i engellendi: {blocked_ips_str}\n\n"
-                    logger.warning(f"🛡️ ACTIVE RESPONSE: {len(blocked_ips)} IP adresi engellendi: {blocked_ips_str}")
-            
-            # Action taken mesajını analiz metninin başına ekle
+                    action_taken = f"🛡️ [ACTION TAKEN]: Blocked IP address(es): {blocked_ips_str}\n\n"
+                    logger.warning(f"🛡️ ACTIVE RESPONSE: blocked {len(blocked_ips)} IP address(es): {blocked_ips_str}")
+
+            # Prepend the "action taken" message to the analysis text
             if action_taken:
                 final_analysis = action_taken + final_analysis
             
@@ -427,7 +424,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                     ai_analysis=final_analysis,
                     risk_score=final_risk_level,
                     mitre_technique=mitre_technique,
-                    conn=None  # Her thread kendi connection'ını açacak
+                    conn=None  # Each thread opens its own connection
                 )
             )
             

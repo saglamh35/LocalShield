@@ -1,6 +1,6 @@
 """
-Chat Manager Module - AI Chatbot Asistanı
-LocalShield için interaktif AI asistan modülü
+Chat Manager Module - AI Chatbot Assistant
+Interactive AI assistant module for LocalShield.
 """
 import ollama
 import config
@@ -135,7 +135,7 @@ def ask_assistant(user_question: str) -> str:
             "Answer the user's question as a Senior SOC Analyst would:"
         )
         
-        # Ollama'ya gönder
+        # Send to Ollama
         response = ollama.chat(
             model=config.MODEL_NAME,
             messages=[
@@ -150,7 +150,7 @@ def ask_assistant(user_question: str) -> str:
             ]
         )
         
-        # AI'ın cevabını al
+        # Get the AI's answer
         answer = response['message']['content'].strip()
         
         return answer

@@ -1,6 +1,6 @@
 """
-AI Response Models - Pydantic modelleri
-AI çıktılarını type-safe şekilde parse etmek için
+AI Response Models - Pydantic models
+Used to parse AI outputs in a type-safe way.
 """
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
@@ -8,64 +8,64 @@ from pydantic import BaseModel, Field, field_validator
 
 class AIAnalysisResponse(BaseModel):
     """
-    AI analiz çıktısı için Pydantic modeli
+    Pydantic model for the AI analysis output.
     """
     risk_score: str = Field(
         ...,
-        description="Risk seviyesi: Düşük, Orta veya Yüksek (İngilizce: Low, Medium, High da kabul edilir)"
+        description="Risk level: Low, Medium or High"
     )
     user_entity: str = Field(
         ...,
-        description="Tespit edilen kullanıcı adı veya makine adı"
+        description="Detected username or machine name"
     )
     summary: str = Field(
         ...,
-        description="Olayın teknik olmayan, net Türkçe açıklaması"
+        description="Non-technical, clear explanation of the event"
     )
     advice: str = Field(
         ...,
-        description="Bu durumda ne yapılmalı? Pratik tavsiyeler"
+        description="What should be done in this case? Practical recommendations"
     )
     event_id_explanation: Optional[str] = Field(
         default=None,
-        description="Event ID hakkında eğitici açıklama (opsiyonel)"
+        description="Educational explanation about the Event ID (optional)"
     )
-    
+
     @field_validator('risk_score')
     @classmethod
     def validate_risk_score(cls, v: str) -> str:
         """
-        Risk seviyesini normalize et
-        İngilizce ve Türkçe değerleri Türkçe'ye çevirir
+        Normalize the risk level to a canonical English value.
+        Accepts both English and legacy Turkish inputs and always
+        returns one of: "Low", "Medium", "High".
         """
         if not v:
-            return "Orta"  # Boş değer için varsayılan
-        
-        v_clean = str(v).strip()
-        v_lower = v_clean.lower()
-        
-        # Tam eşleşme kontrolü (öncelikli)
-        if v_lower == "low" or v_lower == "düşük":
-            return "Düşük"
-        elif v_lower == "medium" or v_lower == "orta":
-            return "Orta"
-        elif v_lower == "high" or v_lower == "yüksek":
-            return "Yüksek"
-        
-        # İçerik kontrolü (fallback)
+            return "Medium"  # Default for empty value
+
+        v_lower = str(v).strip().lower()
+
+        # Exact match check (takes priority)
+        if v_lower in ("low", "düşük"):
+            return "Low"
+        elif v_lower in ("medium", "orta"):
+            return "Medium"
+        elif v_lower in ("high", "yüksek"):
+            return "High"
+
+        # Substring check (fallback)
         if 'yüksek' in v_lower or 'high' in v_lower:
-            return "Yüksek"
+            return "High"
         elif 'orta' in v_lower or 'medium' in v_lower:
-            return "Orta"
+            return "Medium"
         elif 'düşük' in v_lower or 'low' in v_lower:
-            return "Düşük"
-        
-        # Tanınmayan değer için varsayılan
-        return "Orta"
-    
+            return "Low"
+
+        # Default for unrecognized value
+        return "Medium"
+
     def to_markdown(self) -> str:
         """
-        Markdown formatında çıktı döndürür (Dashboard uyumluluğu için)
+        Returns output in Markdown format (for Dashboard compatibility).
         """
         parts = []
         

@@ -13,7 +13,7 @@ import config
 from modules.knowledge_base import get_event_info
 from modules.ai_models import AIAnalysisResponse
 
-# Logging yapılandırması
+# Logging configuration
 logger = logging.getLogger(__name__)
 
 
