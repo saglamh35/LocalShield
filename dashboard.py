@@ -82,7 +82,7 @@ def load_data():
         # Convert Time column to datetime
         try:
             df['Time'] = pd.to_datetime(df['Time'])
-        except:
+        except Exception:
             pass
         
         return df
@@ -303,13 +303,13 @@ def render_log_card(row):
                 try:
                     dt = pd.to_datetime(row['Time'])
                     time_str = dt.strftime('%Y-%m-%d %H:%M:%S')
-                except:
+                except Exception:
                     time_str = row['Time']
             else:
                 time_str = str(row['Time'])
         else:
             time_str = "Unknown"
-    except:
+    except Exception:
         time_str = str(row.get('Time', 'Unknown'))
     
     event_id = str(row.get('Event ID', 'N/A'))
@@ -449,7 +449,7 @@ def main():
             try:
                 latest_dt = pd.to_datetime(latest)
                 latest_str = latest_dt.strftime('%Y-%m-%d %H:%M:%S')
-            except:
+            except Exception:
                 latest_str = str(latest)
         else:
             latest_str = "None yet"
@@ -597,7 +597,7 @@ def main():
                     from scapy.all import get_if_addr
                     ip = get_if_addr(interface) if interface else 'Unknown'
                     st.success(f"🟢 **Listening on** {interface[:50]}... (IP: {ip})")
-                except:
+                except Exception:
                     st.success(f"🟢 **Listening on** {interface[:50]}...")
             elif st.session_state.sniffer:
                 st.info("⚪ **Stopped** - Click 'Start Sniffer' to begin capturing packets")
