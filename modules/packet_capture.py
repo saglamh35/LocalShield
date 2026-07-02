@@ -151,7 +151,7 @@ class PacketSniffer:
                                     print(f"   IP: {addr}")
                                     logger.info(f"Selected interface (get_if_list match): {iface} - IP: {addr}")
                                     return iface
-                            except:
+                            except Exception:
                                 continue
                 except Exception as e:
                     logger.debug(f"get_if_list() IP matching failed: {e}")
@@ -598,7 +598,7 @@ class PacketSniffer:
         logger.info(f"Starting PCAP capture to {filepath} for {duration} seconds...")
         
         # Run blocking capture in thread pool
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             self._capture_to_file_sync,

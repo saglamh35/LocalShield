@@ -36,7 +36,7 @@ LOG_FILE: str = os.getenv("LOG_FILE", "localshield.log")
 
 # Demo Mode Settings
 # Set to True to enable demo mode (generates fake data for screenshots)
-DEMO_MODE: bool = os.getenv("DEMO_MODE", "True").lower() in ("true", "1", "yes")
+DEMO_MODE: bool = os.getenv("DEMO_MODE", "False").lower() in ("true", "1", "yes")
 
 # Safe User List (Will be evaluated as Low Risk)
 # System users and current user are automatically added

@@ -142,21 +142,28 @@ def get_all_logs(
         list: List of log entries (tuple list: id, timestamp, event_id, message, ai_analysis, risk_score, mitre_technique)
     """
     db_path = db_path or config.DB_PATH
+
+    # Validate untrusted-ish inputs before interpolating them into SQL.
+    # ORDER BY direction must be an exact keyword; LIMIT must be a positive int.
+    direction = 'DESC' if str(order_by).strip().upper() != 'ASC' else 'ASC'
+
     conn = sqlite3.connect(db_path)
-    
+
     try:
         cursor = conn.cursor()
-        
+
         query = f'''
             SELECT id, timestamp, event_id, message, ai_analysis, risk_score, mitre_technique
             FROM security_logs
-            ORDER BY timestamp {order_by}
+            ORDER BY timestamp {direction}
         '''
-        
-        if limit:
-            query += f' LIMIT {limit}'
-        
-        cursor.execute(query)
+
+        params: Tuple = ()
+        if limit is not None:
+            query += ' LIMIT ?'
+            params = (int(limit),)
+
+        cursor.execute(query, params)
         results: List[Tuple[int, str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]] = cursor.fetchall()
         
         logger.debug(f"{len(results)} log entries retrieved (limit: {limit})")

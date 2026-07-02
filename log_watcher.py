@@ -5,6 +5,7 @@ Production-Ready: asynchronous structure with logging.
 import asyncio
 import sys
 import logging
+from logging.handlers import RotatingFileHandler
 from datetime import datetime, timedelta
 from typing import Optional, List, Any
 from concurrent.futures import ThreadPoolExecutor
@@ -26,11 +27,17 @@ from modules.response_engine import FirewallManager
 from modules.threat_intel import ThreatIntel
 
 # Logging configuration
+# Rotate the log file at 5 MB and keep 3 backups so it never grows unbounded.
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(config.LOG_FILE, encoding='utf-8'),
+        RotatingFileHandler(
+            config.LOG_FILE,
+            maxBytes=5 * 1024 * 1024,
+            backupCount=3,
+            encoding='utf-8'
+        ),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -326,7 +333,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             
             # FIRST: Detection Engine check (Fast and Precise)
             logger.info(f"Checking Event ID {event_id} in detection engine...")
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             detection_result = await loop.run_in_executor(
                 self.executor,
                 self.detection_engine.check_event,
@@ -437,7 +444,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
         """Checks and processes new events asynchronously from all log channels"""
         try:
             # Run event log reading in thread pool (blocking operation)
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             all_events = await loop.run_in_executor(
                 self.executor,
                 self._read_events_sync
@@ -557,7 +564,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
         
         try:
             # Open Event Log (synchronous operation, run in thread pool)
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             await loop.run_in_executor(self.executor, self.open_event_log)
             
             logger.info(f"⏰ Checking for new logs every {self.check_interval} seconds...")
