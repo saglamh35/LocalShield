@@ -1,6 +1,7 @@
 
 # 🛡️ LocalShield - Offline SIEM & Network Monitor
 
+[![CI](https://github.com/saglamh35/LocalShield/actions/workflows/ci.yml/badge.svg)](https://github.com/saglamh35/LocalShield/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
 [![Scapy](https://img.shields.io/badge/Scapy-Network%20Analysis-green.svg)](https://scapy.net/)
@@ -336,7 +337,22 @@ pytest tests/test_new_rules.py -v
 python test_sniffer.py
 ```
 
+Tests run automatically on every push and pull request via GitHub Actions
+(Python 3.10 / 3.11 / 3.12) — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
+## 🐧 Cross-Platform Log Import (Linux)
+
+Although the live Windows Event Log watcher is Windows-only, the detection
+engine is platform-independent. You can import Linux SSH authentication logs
+and run them through the same rules (SSH failures map to Event ID 4625, so the
+brute-force rule applies):
+
+```bash
+python -m modules.log_importer /var/log/auth.log
+```
+
+Parsed events are scored by the detection engine and stored in the same
+database the dashboard reads from.
 
 ## 📝 License
 
