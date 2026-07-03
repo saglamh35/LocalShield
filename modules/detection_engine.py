@@ -62,6 +62,9 @@ class DetectionRule:
         # Threshold and time window (for counting-based rules)
         self.time_window: int = self.conditions.get('time_window', 60)  # seconds
         self.threshold: int = self.conditions.get('threshold', 0)  # 0 means no threshold check
+        # Optional threshold grouping: 'source_ip' counts per attacker address
+        # (extracted from the message) instead of one global counter per event_id.
+        self.group_by: Optional[str] = self.conditions.get('group_by')
         
         # Backward compatibility: if old format has risk_level, map to severity
         if 'risk_level' in rule_data and not rule_data.get('severity'):
@@ -220,7 +223,6 @@ class DetectionRule:
         Returns:
             str: Unique key for event grouping
         """
-        # For brute force: group by event_id (all failed logons count together)
         # For parent-child: group by parent+child combination
         if self.parent_image_regex and sysmon_data:
             parent = sysmon_data.get('ParentImage', 'UNKNOWN')
@@ -229,9 +231,35 @@ class DetectionRule:
         elif self.image_regex and sysmon_data:
             image = sysmon_data.get('Image', 'UNKNOWN')
             return f"{event_id}:{image}"
-        else:
-            # Default: group by event_id
-            return str(event_id)
+
+        # Per-source grouping: count separately per attacker address so five
+        # unrelated single failures (five different hosts) do not add up to one
+        # false brute-force alert. Falls back to event_id if no IP is found.
+        if self.group_by == 'source_ip':
+            source_ip = self._extract_source_ip_from_message(message)
+            if source_ip:
+                return f"{event_id}:{source_ip}"
+
+        # Default: group by event_id (one global counter)
+        return str(event_id)
+
+    @staticmethod
+    def _extract_source_ip_from_message(message: str) -> Optional[str]:
+        """
+        Extracts the source/attacker IP from known log field shapes:
+        Windows 'Source Network Address:', PAM 'rhost=', SSH 'from <ip>'.
+        """
+        if not message:
+            return None
+        for pattern in (
+            r'Source Network Address:\s*(\d{1,3}(?:\.\d{1,3}){3})',
+            r'rhost=(\d{1,3}(?:\.\d{1,3}){3})',
+            r'\bfrom\s+(\d{1,3}(?:\.\d{1,3}){3})',
+        ):
+            match = re.search(pattern, message, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        return None
     
     def _extract_user_from_message(self, message: str) -> Optional[str]:
         """

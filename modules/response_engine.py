@@ -102,6 +102,36 @@ class FirewallManager:
 
         return valid_ips
 
+    def extract_source_ips_from_text(self, text: str) -> List[str]:
+        """
+        Extract only IPs that appear in structured SOURCE-ADDRESS fields
+        (Windows 'Source Network Address:', PAM 'rhost=', SSH 'from <ip>').
+
+        Use this — not extract_ips_from_text — to pick blocking targets.
+        A generic scan would also pick up IPs embedded in attacker-controlled
+        strings (usernames, workstation names), letting an attacker trick the
+        auto-response into blocking arbitrary third-party addresses.
+
+        Args:
+            text: Log text to search
+
+        Returns:
+            List[str]: Ordered, de-duplicated list of valid source IPs
+        """
+        patterns = [
+            r'Source Network Address:\s*(\d{1,3}(?:\.\d{1,3}){3})',
+            r'rhost=(\d{1,3}(?:\.\d{1,3}){3})',
+            r'\bfrom\s+(\d{1,3}(?:\.\d{1,3}){3})',
+        ]
+
+        found: List[str] = []
+        for pattern in patterns:
+            for match in re.findall(pattern, text, re.IGNORECASE):
+                if self.is_valid_ipv4(match) and match not in found:
+                    found.append(match)
+
+        return found
+
     def block_ip(self, ip_address: str) -> bool:
         """
         Block an IP address in the Windows Firewall.

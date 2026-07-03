@@ -16,6 +16,7 @@ conditions:
   provider: "Security"
   time_window: 60  # seconds (1 minute)
   threshold: 5     # Trigger if 5+ failed logons in time window
+  group_by: "source_ip"  # Count per attacker address, not one global counter
 
 match_message: "🔴 Brute Force Attack Detected: Multiple failed logon attempts (Event ID 4625) detected within time window. Threshold exceeded."
 

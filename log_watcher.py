@@ -36,7 +36,8 @@ logging.basicConfig(
             config.LOG_FILE,
             maxBytes=5 * 1024 * 1024,
             backupCount=3,
-            encoding='utf-8'
+            encoding='utf-8',
+            delay=True  # Open the file on first write, not at import time
         ),
         logging.StreamHandler(sys.stdout)
     ]
@@ -67,6 +68,8 @@ class LogWatcher:
             logger.warning(f"Could not load persisted blocked IPs: {e}")
         # Dictionary to hold multiple log handles: {log_name: handle}
         self.log_handles: dict[str, Optional[Any]] = {}
+        # Highest RecordNumber processed per channel (event deduplication)
+        self._last_record: dict[str, int] = {}
         self.last_check_time = datetime.now()
         self.check_interval: int = config.CHECK_INTERVAL
         self.executor = ThreadPoolExecutor(max_workers=3)  # Thread pool for blocking operations
@@ -401,11 +404,19 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                     final_risk_level = ai_risk_level
 
             # ACTIVE RESPONSE: block IPs on high-risk events.
-            # Reuse the IPs already extracted above instead of scanning the text again.
+            # SAFETY: blocking candidates come only from structured source-address
+            # fields (plus a confirmed threat-intel match) — never from a blanket
+            # scan of the message. A generic scan would let an attacker embed an
+            # arbitrary IP in a controlled string (e.g. a username) and trick the
+            # SIEM into blocking innocent third-party addresses.
             action_taken = ""
             if final_risk_level == "High":
+                block_candidates = self.firewall_manager.extract_source_ips_from_text(combined_text)
+                if threat_intel_match and threat_intel_match['ip'] not in block_candidates:
+                    block_candidates.append(threat_intel_match['ip'])
+
                 blocked_ips = []
-                for ip in found_ips:
+                for ip in block_candidates:
                     # Private IP check (also enforced inside FirewallManager, kept here as a guard)
                     if not self.firewall_manager.is_private_ip(ip):
                         # Block the IP (run in the thread pool - blocking operation)
@@ -502,10 +513,50 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                 except Exception:
                     pass
     
+    def _select_new_events(self, log_name: str, events: List[Any], time_threshold: datetime) -> List[Any]:
+        """
+        Selects genuinely new events from a channel read.
+
+        The 5-second overlap buffer in the time filter means the same event can
+        be returned on consecutive reads; without deduplication it would be
+        processed (and stored) twice and would inflate threshold counters.
+        Windows assigns each log entry a monotonically increasing RecordNumber,
+        so we remember the highest one seen per channel and skip anything at or
+        below it. Events without a RecordNumber fall back to the time filter.
+
+        Args:
+            log_name: Log channel name (dedup state is kept per channel)
+            events: Raw events from ReadEventLog
+            time_threshold: Only events newer than this are considered
+
+        Returns:
+            list: New (not previously processed) events
+        """
+        last_record = self._last_record.get(log_name, 0)
+        max_record = last_record
+        selected = []
+
+        for event in events:
+            if event.TimeGenerated <= time_threshold:
+                continue
+
+            record_number = getattr(event, 'RecordNumber', None)
+            if record_number is not None:
+                if record_number <= last_record:
+                    continue  # Already processed on a previous read
+                max_record = max(max_record, record_number)
+
+            selected.append(event)
+
+        if max_record > last_record:
+            self._last_record[log_name] = max_record
+
+        return selected
+
     def _read_events_sync(self) -> List[tuple]:
         """
         Reads events synchronously from all log channels (to be run in thread pool)
-        
+
         Returns:
             list: List of tuples (event, log_source) for new events
         """
@@ -542,10 +593,8 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                         # Filter events by timestamp with 5 second buffer to catch events that might have been missed
                         # due to millisecond-level timing differences
                         time_threshold = self.last_check_time - timedelta(seconds=5)
-                        for event in events:
-                            event_time = event.TimeGenerated
-                            if event_time > time_threshold:
-                                all_new_events.append((event, log_source))
+                        for event in self._select_new_events(log_name, events, time_threshold):
+                            all_new_events.append((event, log_source))
                 
                 except Exception as e:
                     error_code = getattr(e, 'winerror', None)
