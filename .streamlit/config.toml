@@ -1,0 +1,10 @@
+# LocalShield is a single-user, local tool. Bind the dashboard to localhost so
+# it is not reachable from the network: it has no authentication, exposes the
+# full security-log history, and includes a "Clear Database" button.
+# If you deliberately want LAN access, change the address and put a reverse
+# proxy with authentication in front.
+[server]
+address = "localhost"
+
+[browser]
+gatherUsageStats = false
