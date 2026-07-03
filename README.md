@@ -53,48 +53,56 @@
 ### 🧠 Hybrid Intelligence System
 
 - **Signature-Based Detection**: Fast, rule-based detection using YAML configuration files
-- **Behavioral Analysis**: AI-powered anomaly detection using local LLM (Ollama)
-- **MITRE ATT&CK Integration**: All detections mapped to MITRE ATT&CK framework techniques
-- **Knowledge Base (RAG)**: Event ID explanations and security protocols retrieved from local database
+- **AI-Assisted Analysis**: Local LLM (Ollama) explains each event in plain language — "what happened, should I worry, what do I do?" — with strict JSON output and a repeat-event cache to avoid redundant model calls
+- **MITRE ATT&CK Integration**: Every detection is mapped to MITRE ATT&CK techniques, with an in-dashboard coverage view
+- **Knowledge Base (RAG)**: Event ID explanations and response guidance retrieved from a local knowledge base
 
-### 🌐 Real-Time Network Monitoring
+### 🕵️‍♂️ Detection Engine
 
-- **Live Packet Capture**: Wireshark-like functionality using Scapy
-- **Protocol Analysis**: TCP, UDP, ICMP traffic analysis with protocol distribution charts
-- **IP Reputation**: Automatic detection of traffic from known malicious IP ranges
-- **PCAP Export**: Capture network traffic to `.pcap` files for forensic analysis
-- **Traffic Statistics**: Top source/destination IPs, port analysis, and protocol breakdown
+- **Curated Rule Set**: Ships with rules for brute force, encoded PowerShell, suspicious parent-child chains, LOLBin downloads (certutil/bitsadmin), new services (7045), new accounts (4720), privileged-group changes (4732), account lockouts (4740) and WMIC process creation
+- **Per-Source Correlation**: Threshold rules (e.g. brute force) count **per attacker IP**, so unrelated failures across hosts don't raise false alerts
+- **Flexible Conditions**: Event ID, provider, regex on message / command line / image / parent image, time-window thresholds, and per-source grouping
+- **MITRE-Mapped**: Each rule declares its techniques, severity and tags
 
 ### 🛡️ Automated Response (SOAR)
 
-- **Active Defense**: Automatic Windows Firewall blocking of high-risk IP addresses
-- **Risk-Based Actions**: Configurable response thresholds (High/Critical events)
-- **IP Extraction**: Intelligent IP address extraction from log messages and network traffic
-- **Private IP Filtering**: Automatic exclusion of internal network IPs from blocking
+- **Active Defense**: Automatic Windows Firewall blocking of high-risk source IPs
+- **Safe Targeting**: Block candidates are taken only from structured source-address fields and confirmed threat-intel hits — never a blanket scan of message text (prevents block-list poisoning)
+- **Critical-IP Allowlist**: DNS/gateway and other critical IPs are never blocked
+- **Private-IP Filtering** and a **persisted audit trail** of every automated action
+
+### 🌐 Threat Intelligence & Network Monitoring
+
+- **IP Reputation**: CSV-based feed supporting both single IPs and **CIDR ranges**
+- **Live Packet Capture**: Wireshark-like capture using Scapy, with protocol analysis and PCAP export
+- **Traffic Statistics**: Top source/destination IPs, port analysis, and protocol breakdown
+- **Vulnerability Scanner**: Open-port detection with risk assessment
 
 ### 📊 Security Dashboard
 
-- **Real-Time Log Analysis**: Live event monitoring with risk level visualization
-- **Network Traffic Monitor**: Interactive packet capture interface with live charts
-- **AI Security Assistant**: Chat-based interface for security queries and analysis
-- **Vulnerability Scanner**: Open port detection with risk assessment
-- **MITRE Technique Mapping**: Visual representation of detected attack techniques
-- **Export Capabilities**: CSV export for log analysis and reporting
+- **Log Analysis**: Risk-level visualization, timeline and risk-distribution charts
+- **MITRE ATT&CK Coverage**: Techniques detected, grouped and coloured by tactic
+- **Filtering & Pagination**: Risk / Event ID / full-text / date-range filters with paginated log cards
+- **Opt-In Live View**: Auto-refresh is a toggle (default off) so reading and the AI chat aren't interrupted
+- **AI Security Assistant**: Chat interface grounded in your current logs and open ports
+- **Export**: CSV export for reporting
 
-### 🕵️‍♂️ Detection Rules
+### 🗄️ Data & Persistence
 
-- **YAML-Based Configuration**: Easy-to-write detection rules with flexible conditions
-- **Regex Pattern Matching**: Support for complex pattern matching in log messages
-- **Threshold-Based Alerts**: Time-window and count-based detection (e.g., brute force)
-- **Parent-Child Process Detection**: Identify suspicious process relationships
-- **Multi-Event Correlation**: Track events across time windows for advanced threat detection
+- **SQLite (WAL mode)** with indexes on timestamp and risk score
+- **Audit tables**: automated `actions` and persisted `blocked_ips` survive restarts
 
-### 🔒 Privacy & Security
+### 🔒 Privacy & Security Posture
 
-- **100% Offline**: No cloud dependencies, all processing happens locally
-- **No Data Leakage**: Logs and network data never leave your machine
-- **Local AI**: Uses Ollama for AI analysis - no API keys or external services required
-- **Storage**: SQLite with WAL mode for reliable local storage
+- **100% Offline**: No cloud dependencies; logs and network data never leave your machine
+- **Local AI**: Ollama only — no API keys or external services
+- **Localhost-Bound Dashboard**: Ships bound to `localhost` (no built-in auth) — expose to a network only behind an authenticating reverse proxy
+- **Prompt Hardening**: Log content is treated as untrusted data by the AI
+
+### ✅ Quality
+
+- **120+ unit tests** and **GitHub Actions CI** across Python 3.10 / 3.11 / 3.12
+- **Cross-platform detection core**: import Linux SSH `auth.log` and run it through the same rules (see below)
 
 ---
 
@@ -219,14 +227,20 @@ The dashboard will be available at: `http://localhost:8501`
 - **SQLite**: Lightweight, embedded database with WAL mode
 - **Ollama**: Local LLM inference engine
 - **Pandas**: Data manipulation and analysis
+- **Pydantic**: Type-safe validation of AI output
 - **PyYAML**: YAML-based rule configuration
 - **Altair**: Statistical visualization library
 
 ### Windows Integration
 
-- **pywin32**: Windows API access for Event Log reading
+- **pywin32**: Windows API access for Event Log reading (Windows-only, installed via an environment marker)
 - **psutil**: System and process utilities
 - **Windows Firewall API**: Automated IP blocking
+
+### Tooling
+
+- **pytest**: 120+ unit & integration tests
+- **GitHub Actions**: CI matrix across Python 3.10 / 3.11 / 3.12
 
 ### Architecture Patterns
 
@@ -243,31 +257,40 @@ The dashboard will be available at: `http://localhost:8501`
 LocalShield/
 ├── dashboard.py              # Streamlit dashboard application
 ├── log_watcher.py            # Main log monitoring service (AsyncIO)
-├── db_manager.py             # Database operations and management
+├── db_manager.py             # Database, indexes, audit & blocked-IP tables
 ├── config.py                 # Configuration and environment variables
 ├── generate_demo_data.py     # Demo data generator for testing
 ├── run_localshield.bat       # Windows launcher script
+├── pyproject.toml            # Pytest configuration
 │
 ├── modules/
-│   ├── detection_engine.py  # YAML-based rule engine with MITRE mapping
-│   ├── ai_engine.py         # Ollama LLM integration for threat analysis
-│   ├── packet_capture.py    # Real-time network packet sniffer (Scapy)
+│   ├── detection_engine.py   # YAML rule engine (per-source thresholds, MITRE)
+│   ├── ai_engine.py          # Ollama LLM analysis (JSON mode + cache)
+│   ├── ai_models.py          # Pydantic model for AI output
+│   ├── mitre.py              # Offline MITRE ATT&CK technique/tactic lookup
+│   ├── log_importer.py       # Cross-platform SSH auth.log importer
+│   ├── packet_capture.py     # Real-time network packet sniffer (Scapy)
 │   ├── network_scanner.py    # Open port vulnerability scanner
-│   ├── response_engine.py    # Windows Firewall automation (SOAR)
-│   ├── threat_intel.py      # IP reputation and threat intelligence
-│   ├── chat_manager.py      # AI assistant chat interface
-│   └── knowledge_base.py    # Event ID database (RAG)
+│   ├── response_engine.py    # Windows Firewall automation + IP allowlist
+│   ├── threat_intel.py       # IP reputation (single IPs + CIDR ranges)
+│   ├── chat_manager.py       # AI assistant chat interface
+│   └── knowledge_base.py     # Event ID knowledge base (RAG)
 │
-├── rules/                    # YAML detection rules
-│   ├── brute_force.yaml
-│   ├── powershell_encoded.yaml
-│   └── parent_child_suspicious.yaml
+├── rules/                    # YAML detection rules (MITRE-mapped)
+│   ├── brute_force.yaml            #  T1110  (per-source)
+│   ├── powershell_encoded.yaml     #  T1059.001 / T1027
+│   ├── parent_child_suspicious.yaml#  T1059.001 / T1204.002
+│   ├── lolbin_download.yaml        #  T1105 / T1140 / T1197
+│   ├── new_service_install.yaml    #  T1543.003
+│   ├── new_user_account.yaml       #  T1136.001
+│   ├── added_to_admin_group.yaml   #  T1098 / T1078.003
+│   ├── account_lockout.yaml        #  T1110
+│   └── wmic_process_call.yaml      #  T1047
 │
-├── tests/                    # Unit and integration tests
-│   ├── test_detection_engine.py
-│   └── test_new_rules.py
-│
+├── tests/                    # 120+ unit & integration tests
 ├── data/                     # Knowledge base and threat intel data
+├── .streamlit/config.toml    # Binds the dashboard to localhost
+├── .github/workflows/ci.yml  # GitHub Actions CI (pytest, Py 3.10–3.12)
 └── requirements.txt          # Python dependencies
 ```
 
@@ -295,6 +318,10 @@ CHECK_INTERVAL=5
 
 # Demo Mode (for screenshots/testing)
 DEMO_MODE=False
+
+# Extra IPs the auto-response must never block (comma-separated).
+# Common DNS resolvers are already allowlisted by default.
+SAFE_IPS=192.168.1.1
 ```
 
 ### Detection Rules
@@ -317,7 +344,9 @@ conditions:
   event_id: "1"
   provider: "Sysmon"
   command_line_regex: "-EncodedCommand"
-  threshold: 1
+  threshold: 1          # count-based trigger
+  time_window: 60       # seconds
+  group_by: "source_ip" # optional: count per attacker IP instead of globally
 ```
 
 ---
@@ -354,6 +383,26 @@ python -m modules.log_importer /var/log/auth.log
 Parsed events are scored by the detection engine and stored in the same
 database the dashboard reads from.
 
+---
+
+## ⚠️ Scope & Limitations
+
+LocalShield is an **educational project**, not a production security product.
+Please use it with that in mind:
+
+- **Local & single-user by design.** The dashboard has no built-in authentication
+  and ships bound to `localhost`. Do not expose it to a network without an
+  authenticating reverse proxy in front.
+- **Live event capture is Windows-only** (it relies on the Windows Event Log and
+  requires Administrator privileges). The detection engine itself is
+  cross-platform and can be exercised via the Linux `auth.log` importer above.
+- **Automated blocking is powerful.** The SOAR component modifies the Windows
+  Firewall. It only targets IPs from structured source-address fields, keeps a
+  critical-IP allowlist, and records an audit trail — but you should understand
+  what it does before enabling it in a live environment.
+- **AI output is assistive.** The local LLM adds context and recommendations; it
+  is not a substitute for professional incident response.
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -374,6 +423,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 
-**Built with ❤️ for the cybersecurity community**
+**Built with ❤️ as a cybersecurity learning project**
 
-*Last updated: December 2025*
+*Last updated: July 2026*
