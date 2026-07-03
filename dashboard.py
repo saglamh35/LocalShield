@@ -12,6 +12,7 @@ from db_manager import get_all_logs, get_high_risk_count, get_total_log_count, g
 from modules.network_scanner import scan_open_ports, get_port_summary
 from modules.chat_manager import ask_assistant
 from modules.packet_capture import PacketSniffer
+from modules.mitre import summarize as mitre_summarize
 
 
 # Page configuration
@@ -154,10 +155,22 @@ def translate_risk_level(risk_level):
     return risk_str  # Return as-is if unknown
 
 
-def filter_data(df, risk_filters, event_id_filter, text_search=None):
+def filter_data(df, risk_filters, event_id_filter, text_search=None, date_range=None):
     """Filters data"""
     filtered_df = df.copy()
-    
+
+    # Date-range filter (inclusive). date_range is (start_date, end_date) or None.
+    if date_range and 'Time' in filtered_df.columns:
+        try:
+            start, end = date_range
+            if start is not None and end is not None:
+                times = pd.to_datetime(filtered_df['Time'], errors='coerce')
+                start_ts = pd.Timestamp(start)
+                end_ts = pd.Timestamp(end) + pd.Timedelta(days=1)  # inclusive end day
+                filtered_df = filtered_df[(times >= start_ts) & (times < end_ts)]
+        except Exception:
+            pass
+
     # Risk level filter
     if risk_filters:
         filtered_df = filtered_df[
@@ -286,6 +299,41 @@ def create_risk_distribution_chart(df):
         return None
 
 
+def create_mitre_chart(df):
+    """
+    MITRE ATT&CK coverage: detected techniques as a horizontal bar chart,
+    coloured by tactic. Returns (chart, summary_rows) or (None, []).
+    """
+    if df.empty or 'MITRE Technique' not in df.columns:
+        return None, []
+
+    try:
+        rows = mitre_summarize(df['MITRE Technique'].tolist())
+        if not rows:
+            return None, []
+
+        chart_df = pd.DataFrame(rows)
+        chart_df['label'] = chart_df['id'] + " – " + chart_df['name']
+
+        chart = alt.Chart(chart_df).mark_bar().encode(
+            x=alt.X('count:Q', title='Detections'),
+            y=alt.Y('label:N', title='Technique', sort='-x'),
+            color=alt.Color('tactic:N', title='Tactic'),
+            tooltip=[
+                alt.Tooltip('id:N', title='Technique'),
+                alt.Tooltip('name:N', title='Name'),
+                alt.Tooltip('tactic:N', title='Tactic'),
+                alt.Tooltip('count:Q', title='Detections'),
+            ],
+        ).properties(
+            height=max(200, 32 * len(chart_df)),
+            title='MITRE ATT&CK Techniques Detected',
+        )
+        return chart, rows
+    except Exception:
+        return None, []
+
+
 def render_log_card(row):
     """Renders a log entry as a card"""
     risk_level_raw = str(row.get('Risk Level', 'Unspecified'))
@@ -388,10 +436,39 @@ def main():
             "🔎 Advanced Search",
             placeholder="Search in Message, AI Analysis or MITRE Technique..."
         )
-        
+
+        # Date-range filter (optional)
+        use_date_filter = st.checkbox("📅 Filter by date range", value=False)
+        date_range = None
+        if use_date_filter:
+            date_range = st.date_input(
+                "Date range",
+                value=(),
+                help="Pick a start and end date to narrow the logs."
+            )
+            # st.date_input returns a tuple only once both ends are chosen
+            if not (isinstance(date_range, (tuple, list)) and len(date_range) == 2):
+                date_range = None
+
+        # Log page size (pagination)
+        page_size = st.selectbox(
+            "Logs per page",
+            options=[10, 25, 50, 100],
+            index=1
+        )
+
         st.markdown("---")
         st.caption("💡 Clear selections to reset filters.")
-        
+
+        # Live view
+        st.markdown("---")
+        st.header("🔄 Live View")
+        auto_refresh = st.checkbox(
+            "Auto-refresh (5s)",
+            value=False,
+            help="Periodically reload the Log and Network tabs. Leave off while reading or using the AI chat."
+        )
+
         # Clear Database Button
         st.markdown("---")
         st.header("⚙️ Management")
@@ -495,11 +572,25 @@ def main():
                     st.altair_chart(risk_chart, use_container_width=True)
                 else:
                     st.info("Could not create risk distribution chart.")
-            
+
+            # MITRE ATT&CK coverage
+            mitre_chart, mitre_rows = create_mitre_chart(df)
+            if mitre_chart is not None:
+                st.markdown("---")
+                st.subheader("🎯 MITRE ATT&CK Coverage")
+                tactics = sorted({r['tactic'] for r in mitre_rows})
+                mc1, mc2 = st.columns([3, 1])
+                with mc1:
+                    st.altair_chart(mitre_chart, use_container_width=True)
+                with mc2:
+                    st.metric("Techniques", len(mitre_rows))
+                    st.metric("Tactics", len(tactics))
+                    st.caption("Tactics observed: " + ", ".join(tactics))
+
             st.markdown("---")
-            
+
             # Filtering
-            filtered_df = filter_data(df, selected_risks, event_id_filter, text_search)
+            filtered_df = filter_data(df, selected_risks, event_id_filter, text_search, date_range)
             
             # Add Severity column (map from Risk Level)
             if not filtered_df.empty and 'Risk Level' in filtered_df.columns:
@@ -560,10 +651,25 @@ def main():
                     )
                 
                 st.markdown("---")
-                
-                # Create card for each log
+
+                # Create card for each log (paginated to keep the page responsive)
                 st.subheader("📋 Log Entries")
-                for idx, row in filtered_df.iterrows():
+                total = len(filtered_df)
+                total_pages = max(1, (total + page_size - 1) // page_size)
+
+                page = 1
+                if total_pages > 1:
+                    page = st.number_input(
+                        f"Page (1–{total_pages}, {page_size}/page)",
+                        min_value=1, max_value=total_pages, value=1, step=1
+                    )
+
+                start_idx = (int(page) - 1) * page_size
+                end_idx = start_idx + page_size
+                page_df = filtered_df.iloc[start_idx:end_idx]
+                st.caption(f"Showing {start_idx + 1}–{min(end_idx, total)} of {total} entries")
+
+                for idx, row in page_df.iterrows():
                     render_log_card(row)
         else:
             st.info("📭 No log entries found yet. Make sure the log watcher is running.")
@@ -901,36 +1007,28 @@ def main():
                     st.session_state.messages = []
                     st.rerun()
     
-    # Bottom section - Auto refresh info (only shown on log tab)
-    # Chat tab should not auto-refresh (user might be typing)
+    # Bottom section - refresh status + opt-in auto-refresh
     st.markdown("---")
     col_refresh1, col_refresh2, col_refresh3 = st.columns([1, 2, 1])
     with col_refresh2:
         current_time = datetime.now().strftime("%H:%M:%S")
-        st.caption(f"🔄 Last update: {current_time}")
-    
-    # Auto refresh should work on log and traffic tabs (not on chat tab)
-    # We check with JavaScript - no refresh if chat tab is active
-    auto_refresh_script = """
-    <script>
-        // Auto refresh on log and traffic tabs (not on chat tab)
-        var currentTab = window.location.hash || '';
-        var isChatTab = currentTab.includes('chat');
-        var isTrafficTab = currentTab.includes('traffic') || currentTab.includes('network');
-        var isLogTab = currentTab === '' || currentTab.includes('log');
-        
-        if (!isChatTab && (isLogTab || isTrafficTab)) {
+        status = "on" if auto_refresh else "off"
+        st.caption(f"🔄 Last update: {current_time}  ·  Auto-refresh: {status}")
+
+    # Auto-refresh is opt-in (sidebar toggle). When enabled, reload after 5s,
+    # but never while the user is typing in the AI chat input.
+    if auto_refresh:
+        auto_refresh_script = """
+        <script>
             setTimeout(function(){
-                // Refresh if chat input is not active
                 var chatInput = document.querySelector('[data-testid="stChatInput"] textarea');
                 if (!chatInput || document.activeElement !== chatInput) {
                     location.reload();
                 }
             }, 5000);
-        }
-    </script>
-    """
-    st.markdown(auto_refresh_script, unsafe_allow_html=True)
+        </script>
+        """
+        st.markdown(auto_refresh_script, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
