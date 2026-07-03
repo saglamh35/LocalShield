@@ -32,7 +32,12 @@ class Brain:
             model_name: Ollama model name (default: from config.py)
         """
         self.model_name: str = model_name or config.MODEL_NAME
-        
+
+        # Small in-memory cache so identical events are not re-sent to the LLM.
+        # Keyed on the event content with volatile timestamps stripped out.
+        self._cache: Dict[str, Tuple[str, str]] = {}
+        self._cache_max: int = 256
+
         # System prompt for JSON output format
         self.system_prompt: str = """You are a Senior SOC Analyst (Cyber Security Expert).
 Analyze the Windows Log provided to you and respond in the following JSON format:
@@ -62,7 +67,17 @@ IMPORTANT:
         """
         match = re.search(r'Event ID\s*[:#]?\s*(\d+)', log_text, re.IGNORECASE)
         return match.group(1) if match else None
-    
+
+    def _cache_key(self, log_text: str) -> str:
+        """
+        Builds a cache key from the log text with volatile timestamps removed,
+        so two occurrences of the same event (differing only in time) collide.
+        """
+        # Drop date/time substrings and the dedicated "Time:" line
+        key = re.sub(r'\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?', '', log_text)
+        key = re.sub(r'(?im)^\s*Time:.*$', '', key)
+        return key.strip()
+
     def analyze(self, log_text: str) -> Tuple[str, str]:
         """
         Analyzes Windows log text and returns response in JSON format.
@@ -75,9 +90,16 @@ IMPORTANT:
             tuple[str, str]: (markdown_analysis, risk_score) - Markdown and risk level for Dashboard
         """
         try:
+            # Return a cached analysis for an identical event, if present
+            cache_key = self._cache_key(log_text)
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                logger.debug("AI analysis served from cache")
+                return cached
+
             # Try to extract Event ID from log text
             event_id: Optional[str] = self.extract_event_id(log_text)
-            
+
             # Retrieve information from knowledge base (RAG)
             kb_info: Optional[Dict[str, Any]] = None
             if event_id:
@@ -108,10 +130,12 @@ Also write this in the "risk_score" field: "{kb_info.get('risk_level', 'Medium')
 """
                 enhanced_prompt += extra_instruction
             
-            # Send to AI
+            # Send to AI. format='json' makes Ollama constrain the output to
+            # valid JSON, which makes the parsing below far more reliable.
             logger.debug(f"Starting AI analysis (Event ID: {event_id})")
             response = ollama.chat(
                 model=self.model_name,
+                format='json',
                 messages=[
                     {
                         'role': 'system',
@@ -143,10 +167,17 @@ Also write this in the "risk_score" field: "{kb_info.get('risk_level', 'Medium')
                 analysis_response = AIAnalysisResponse(**json_data)
                 
                 logger.info(f"AI analysis successfully parsed (Risk: {analysis_response.risk_score})")
-                
+
                 # Convert to markdown format and return with risk_score
                 markdown_analysis = analysis_response.to_markdown()
-                return markdown_analysis, analysis_response.risk_score
+                result = (markdown_analysis, analysis_response.risk_score)
+
+                # Cache only successful analyses (bounded, FIFO eviction)
+                if len(self._cache) >= self._cache_max:
+                    self._cache.pop(next(iter(self._cache)))
+                self._cache[cache_key] = result
+
+                return result
                 
             except (json.JSONDecodeError, ValidationError) as e:
                 logger.error(f"JSON parse error: {e}, Raw response: {raw_response[:200]}")

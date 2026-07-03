@@ -38,6 +38,17 @@ LOG_FILE: str = os.getenv("LOG_FILE", "localshield.log")
 # Set to True to enable demo mode (generates fake data for screenshots)
 DEMO_MODE: bool = os.getenv("DEMO_MODE", "False").lower() in ("true", "1", "yes")
 
+# Firewall allowlist - critical IPs that must NEVER be auto-blocked.
+# Prevents the active-response engine from cutting off DNS/gateway and locking
+# you out. Extra IPs can be added via SAFE_IPS="a,b,c" (comma-separated).
+SAFE_IPS: List[str] = [
+    "8.8.8.8", "8.8.4.4",      # Google DNS
+    "1.1.1.1", "1.0.0.1",      # Cloudflare DNS
+]
+_extra_safe_ips = os.getenv("SAFE_IPS", "")
+if _extra_safe_ips:
+    SAFE_IPS.extend(ip.strip() for ip in _extra_safe_ips.split(",") if ip.strip())
+
 # Safe User List (Will be evaluated as Low Risk)
 # System users and current user are automatically added
 SAFE_USERS: List[str] = [
