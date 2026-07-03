@@ -1,0 +1,20 @@
+id: "lolbin_download_001"
+name: "LOLBin File Download (certutil / bitsadmin)"
+description: "Detects living-off-the-land binaries (certutil, bitsadmin) being used to download or decode payloads, a common attacker tradecraft for staging tools."
+mitre:
+  - "T1105"      # Ingress Tool Transfer
+  - "T1140"      # Deobfuscate/Decode Files or Information
+  - "T1197"      # BITS Jobs
+severity: "high"
+tags:
+  - "execution"
+  - "defense_evasion"
+  - "lolbin"
+enabled: true
+
+conditions:
+  provider: "Sysmon"
+  event_id: "1"  # Process Creation
+  command_line_regex: "(?i)(certutil(\\.exe)?.*(-urlcache|-decode|-f\\s+-decode)|bitsadmin(\\.exe)?.*(/transfer|/addfile))"
+
+match_message: "🔴 LOLBin Download Detected: certutil/bitsadmin used with download or decode flags. Frequently abused to fetch or unpack malicious payloads while blending in with legitimate tooling."

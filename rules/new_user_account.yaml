@@ -1,0 +1,16 @@
+id: "new_user_account_001"
+name: "New User Account Created"
+description: "Detects creation of a new local user account (Event ID 4720). Attackers create accounts to establish persistent access."
+mitre:
+  - "T1136.001"  # Create Account: Local Account
+severity: "medium"
+tags:
+  - "persistence"
+  - "account_management"
+enabled: true
+
+conditions:
+  provider: "Security"
+  event_id: "4720"
+
+match_message: "🟠 New User Account Created: A user account was created (Event ID 4720). Confirm this matches an authorized provisioning request; rogue accounts are a common persistence technique."
