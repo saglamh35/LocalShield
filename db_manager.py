@@ -54,11 +54,37 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
         except sqlite3.OperationalError:
             # Don't error if column already exists
             pass
-        
+
+        # Indexes speed up the dashboard's time-ordered and risk-filtered queries
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON security_logs(timestamp)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_logs_risk ON security_logs(risk_score)')
+
+        # Audit trail of automated actions (e.g. firewall blocks)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME NOT NULL,
+                action_type TEXT NOT NULL,
+                target TEXT,
+                details TEXT
+            )
+        ''')
+
+        # Current set of IP addresses blocked by the response engine (persisted
+        # so a restart knows what is already blocked)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS blocked_ips (
+                ip TEXT PRIMARY KEY,
+                rule_name TEXT,
+                blocked_at DATETIME NOT NULL,
+                reason TEXT
+            )
+        ''')
+
         conn.commit()
         logger.info(f"Database '{db_path}' successfully created/connected")
         logger.debug("'security_logs' table ready")
-        
+
         return conn
     except Exception as e:
         logger.error(f"Database initialization error: {e}", exc_info=True)
@@ -289,6 +315,108 @@ def clear_all_logs(db_path: Optional[str] = None) -> bool:
         logger.error(f"Error deleting log entries: {e}", exc_info=True)
         conn.rollback()
         return False
+    finally:
+        conn.close()
+
+
+def record_action(
+    action_type: str,
+    target: Optional[str] = None,
+    details: Optional[str] = None,
+    timestamp: Optional[datetime] = None,
+    db_path: Optional[str] = None,
+) -> int:
+    """
+    Record an automated action in the audit trail (e.g. a firewall block).
+
+    Args:
+        action_type: Short action identifier (e.g. 'block_ip')
+        target: Subject of the action (e.g. the IP address)
+        details: Optional free-text context
+        timestamp: Action time (defaults to now)
+        db_path: Database file path (default: config.DB_PATH)
+
+    Returns:
+        int: ID of the inserted audit row
+    """
+    db_path = db_path or config.DB_PATH
+    ts = (timestamp or datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
+    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO actions (timestamp, action_type, target, details) VALUES (?, ?, ?, ?)',
+            (ts, action_type, target, details),
+        )
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        logger.error(f"Error recording action: {e}", exc_info=True)
+        return -1
+    finally:
+        conn.close()
+
+
+def record_blocked_ip(
+    ip: str,
+    rule_name: Optional[str] = None,
+    reason: Optional[str] = None,
+    timestamp: Optional[datetime] = None,
+    db_path: Optional[str] = None,
+) -> None:
+    """
+    Persist a blocked IP so a restart knows it is already blocked.
+    Uses INSERT OR REPLACE so re-blocking the same IP is idempotent.
+    """
+    db_path = db_path or config.DB_PATH
+    ts = (timestamp or datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
+    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT OR REPLACE INTO blocked_ips (ip, rule_name, blocked_at, reason) VALUES (?, ?, ?, ?)',
+            (ip, rule_name, ts, reason),
+        )
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error recording blocked IP: {e}", exc_info=True)
+    finally:
+        conn.close()
+
+
+def get_blocked_ips(db_path: Optional[str] = None) -> List[Tuple[str, Optional[str], str, Optional[str]]]:
+    """Return all persisted blocked IPs as (ip, rule_name, blocked_at, reason)."""
+    db_path = db_path or config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute('SELECT ip, rule_name, blocked_at, reason FROM blocked_ips ORDER BY blocked_at DESC')
+        return cursor.fetchall()
+    except Exception as e:
+        logger.error(f"Error reading blocked IPs: {e}", exc_info=True)
+        return []
+    finally:
+        conn.close()
+
+
+def get_recent_actions(
+    limit: int = 50,
+    db_path: Optional[str] = None,
+) -> List[Tuple[int, str, str, Optional[str], Optional[str]]]:
+    """Return recent audit actions as (id, timestamp, action_type, target, details)."""
+    db_path = db_path or config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT id, timestamp, action_type, target, details FROM actions '
+            'ORDER BY timestamp DESC LIMIT ?',
+            (int(limit),),
+        )
+        return cursor.fetchall()
+    except Exception as e:
+        logger.error(f"Error reading actions: {e}", exc_info=True)
+        return []
     finally:
         conn.close()
 

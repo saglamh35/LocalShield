@@ -20,7 +20,7 @@ except ImportError:
 
 import config
 import re
-from db_manager import init_db, insert_log
+from db_manager import init_db, insert_log, record_action, record_blocked_ip, get_blocked_ips
 from modules.ai_engine import Brain
 from modules.detection_engine import DetectionEngine
 from modules.response_engine import FirewallManager
@@ -57,6 +57,14 @@ class LogWatcher:
         self.firewall_manager = FirewallManager()  # Active response engine
         self.threat_intel = ThreatIntel()  # Threat intelligence engine
         self.db_conn = init_db(config.DB_PATH)
+        # Reload persisted blocked IPs so a restart knows what is already blocked
+        try:
+            persisted = [row[0] for row in get_blocked_ips(config.DB_PATH)]
+            self.firewall_manager.blocked_ips.update(persisted)
+            if persisted:
+                logger.info(f"Loaded {len(persisted)} previously blocked IP(s) from the database")
+        except Exception as e:
+            logger.warning(f"Could not load persisted blocked IPs: {e}")
         # Dictionary to hold multiple log handles: {log_name: handle}
         self.log_handles: dict[str, Optional[Any]] = {}
         self.last_check_time = datetime.now()
@@ -408,6 +416,17 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                         )
                         if success:
                             blocked_ips.append(ip)
+                            # Persist the block and record it in the audit trail
+                            reason = f"Event ID {event_id}"
+                            if threat_intel_match:
+                                reason += f" / threat intel: {threat_intel_match['category']}"
+                            await loop.run_in_executor(
+                                self.executor,
+                                lambda ip=ip, reason=reason: (
+                                    record_blocked_ip(ip, rule_name=mitre_technique, reason=reason),
+                                    record_action("block_ip", target=ip, details=reason),
+                                )
+                            )
 
                 # If any IP was blocked, prepend a note to the analysis text
                 if blocked_ips:

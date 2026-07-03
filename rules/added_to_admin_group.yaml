@@ -1,0 +1,19 @@
+id: "added_to_admin_group_001"
+name: "Member Added to Privileged Group"
+description: "Detects a member being added to a security-enabled local group whose name indicates high privilege (Administrators, Remote Desktop Users, etc.) via Event ID 4732 — a common privilege-escalation and persistence step."
+mitre:
+  - "T1098"      # Account Manipulation
+  - "T1078.003"  # Valid Accounts: Local Accounts
+severity: "high"
+tags:
+  - "privilege_escalation"
+  - "persistence"
+  - "account_management"
+enabled: true
+
+conditions:
+  provider: "Security"
+  event_id: "4732"
+  message_regex: "(?i)Group Name:\\s*(Administrators|Admins|Remote Desktop Users|Backup Operators)"
+
+match_message: "🔴 Privileged Group Membership Change: An account was added to a privileged local group (Event ID 4732). Verify the change was authorized — this is a frequent privilege-escalation and persistence technique."

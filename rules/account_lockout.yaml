@@ -1,0 +1,16 @@
+id: "account_lockout_001"
+name: "User Account Locked Out"
+description: "Detects an account being locked out (Event ID 4740), typically the aftermath of a brute-force or password-spray attempt against a valid account."
+mitre:
+  - "T1110"      # Brute Force
+severity: "medium"
+tags:
+  - "credential_access"
+  - "authentication"
+enabled: true
+
+conditions:
+  provider: "Security"
+  event_id: "4740"
+
+match_message: "🟠 Account Lockout: An account was locked out (Event ID 4740). Repeated lockouts often indicate a brute-force or password-spray attack — correlate with failed logons (4625)."

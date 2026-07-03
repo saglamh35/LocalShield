@@ -24,7 +24,9 @@ class FakeResult:
 
 @pytest.fixture
 def fw():
-    return FirewallManager()
+    # Empty allowlist so the block/unblock tests can use a public IP freely;
+    # the allowlist behaviour is covered by its own test.
+    return FirewallManager(allowlist=[])
 
 
 class TestValidation:
@@ -73,6 +75,17 @@ class TestBlocking:
         assert "8.8.8.8" in fw.blocked_ips
         # The firewall rule must target the right IP
         assert "remoteip=8.8.8.8" in calls["cmd"]
+
+    def test_allowlisted_ip_is_refused(self, monkeypatch):
+        # A critical IP on the allowlist must never be blocked
+        fw = FirewallManager(allowlist=["8.8.8.8"])
+
+        def fail(*a, **k):
+            raise AssertionError("subprocess must not run for an allowlisted IP")
+
+        monkeypatch.setattr(response_engine.subprocess, "run", fail)
+        assert fw.block_ip("8.8.8.8") is False
+        assert "8.8.8.8" not in fw.blocked_ips
 
     def test_block_private_ip_is_refused(self, fw, monkeypatch):
         def fail(*a, **k):

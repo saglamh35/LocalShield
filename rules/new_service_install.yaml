@@ -1,0 +1,17 @@
+id: "new_service_install_001"
+name: "New Windows Service Installed"
+description: "Detects installation of a new Windows service (Event ID 7045). Attackers commonly install services for persistence or to run payloads with SYSTEM privileges."
+mitre:
+  - "T1543.003"  # Create or Modify System Process: Windows Service
+severity: "medium"
+tags:
+  - "persistence"
+  - "privilege_escalation"
+  - "service"
+enabled: true
+
+conditions:
+  provider: "Security"
+  event_id: "7045"
+
+match_message: "🟠 New Service Installed: A new Windows service was registered (Event ID 7045). Verify the service binary and publisher — unexpected services are a common persistence mechanism."

@@ -4,9 +4,10 @@ Checks IPs against a list of known attacker addresses and reports their risk.
 Production-Ready: CSV-based threat intelligence feed.
 """
 import csv
+import ipaddress
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Logging configuration
 logger = logging.getLogger(__name__)
@@ -15,6 +16,10 @@ logger = logging.getLogger(__name__)
 class ThreatIntel:
     """
     Manages the threat intelligence database and performs IP lookups.
+
+    The CSV 'ip' column accepts either a single address (e.g. 1.2.3.4) or a
+    CIDR range (e.g. 185.220.0.0/16). Single addresses are matched in O(1);
+    ranges are checked against the queried address.
     """
 
     def __init__(self, csv_path: str = "data/threat_intel.csv"):
@@ -27,8 +32,10 @@ class ThreatIntel:
         self.csv_path = Path(csv_path)
         # Dictionary mapping IP -> (category, confidence)
         self.threat_db: Dict[str, Tuple[str, int]] = {}
-        # Set of IPs for fast lookups
+        # Set of exact IPs for fast lookups
         self.threat_ips: set[str] = set()
+        # CIDR ranges: (network, entry_string, category, confidence)
+        self.threat_networks: List[Tuple[ipaddress.IPv4Network, str, str, int]] = []
 
         self._load_threat_intel()
 
@@ -55,12 +62,27 @@ class ThreatIntel:
                     if category.lower() == 'benign' or confidence == 0:
                         continue
 
-                    if ip:
+                    if not ip:
+                        continue
+
+                    if '/' in ip:
+                        # CIDR range entry
+                        try:
+                            network = ipaddress.IPv4Network(ip, strict=False)
+                            self.threat_networks.append((network, ip, category, confidence))
+                            count += 1
+                        except (ValueError, ipaddress.AddressValueError):
+                            logger.warning(f"⚠️  Skipping invalid CIDR in threat feed: {ip}")
+                    else:
+                        # Single address entry
                         self.threat_db[ip] = (category, confidence)
                         self.threat_ips.add(ip)
                         count += 1
 
-                logger.info(f"✅ Threat Intelligence loaded: {count} malicious IPs")
+                logger.info(
+                    f"✅ Threat Intelligence loaded: {count} entries "
+                    f"({len(self.threat_ips)} IPs, {len(self.threat_networks)} ranges)"
+                )
 
         except Exception as e:
             logger.error(f"❌ Error loading threat intelligence: {e}", exc_info=True)
@@ -81,7 +103,7 @@ class ThreatIntel:
 
         ip_clean = ip_address.strip()
 
-        # Use the set for an O(1) lookup
+        # 1. Exact IP match (O(1))
         if ip_clean in self.threat_ips:
             category, confidence = self.threat_db[ip_clean]
             logger.warning(f"🚨 THREAT INTEL MATCH: {ip_clean} - Category: {category}, Confidence: {confidence}%")
@@ -90,6 +112,26 @@ class ThreatIntel:
                 'category': category,
                 'confidence': confidence
             }
+
+        # 2. CIDR range match
+        if self.threat_networks:
+            try:
+                addr = ipaddress.IPv4Address(ip_clean)
+            except (ValueError, ipaddress.AddressValueError):
+                return None
+
+            for network, entry, category, confidence in self.threat_networks:
+                if addr in network:
+                    logger.warning(
+                        f"🚨 THREAT INTEL MATCH: {ip_clean} in {entry} - "
+                        f"Category: {category}, Confidence: {confidence}%"
+                    )
+                    return {
+                        'ip': ip_clean,
+                        'category': category,
+                        'confidence': confidence,
+                        'matched_range': entry
+                    }
 
         return None
 
@@ -100,13 +142,14 @@ class ThreatIntel:
         """
         self.threat_db.clear()
         self.threat_ips.clear()
+        self.threat_networks.clear()
         self._load_threat_intel()
 
     def get_threat_count(self) -> int:
         """
-        Return the number of loaded malicious IPs.
+        Return the number of loaded threat entries (single IPs + CIDR ranges).
 
         Returns:
-            int: Number of malicious IPs
+            int: Number of malicious entries
         """
-        return len(self.threat_ips)
+        return len(self.threat_ips) + len(self.threat_networks)

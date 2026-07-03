@@ -7,7 +7,13 @@ import subprocess
 import re
 import logging
 import ipaddress
-from typing import List
+from typing import Iterable, List, Optional
+
+try:
+    import config
+    _DEFAULT_ALLOWLIST = list(getattr(config, "SAFE_IPS", []))
+except Exception:  # config import should never fail, but stay defensive
+    _DEFAULT_ALLOWLIST = []
 
 # Logging configuration
 logger = logging.getLogger(__name__)
@@ -18,9 +24,17 @@ class FirewallManager:
     Manages IP-blocking operations through the Windows Firewall.
     """
 
-    def __init__(self):
-        """Initialize the FirewallManager."""
+    def __init__(self, allowlist: Optional[Iterable[str]] = None):
+        """
+        Initialize the FirewallManager.
+
+        Args:
+            allowlist: Critical IPs that must never be blocked
+                       (defaults to config.SAFE_IPS)
+        """
         self.blocked_ips: set[str] = set()  # Track blocked IPs
+        # Critical IPs that must never be blocked (e.g. DNS, gateway)
+        self.allowlist: set[str] = set(allowlist if allowlist is not None else _DEFAULT_ALLOWLIST)
 
     def is_valid_ipv4(self, ip_str: str) -> bool:
         """
@@ -106,6 +120,11 @@ class FirewallManager:
         # Private IP check
         if self.is_private_ip(ip_address):
             logger.warning(f"⚠️  Private IP address not blocked (safety): {ip_address}")
+            return False
+
+        # Allowlist check - never block critical infrastructure (DNS, gateway, ...)
+        if ip_address in self.allowlist:
+            logger.warning(f"⚠️  Allowlisted IP not blocked (safety): {ip_address}")
             return False
 
         # Check whether it is already blocked

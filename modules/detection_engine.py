@@ -176,28 +176,35 @@ class DetectionRule:
             # Create a unique key for this event pattern
             # For threshold counting, we need to group similar events
             event_key = self._get_event_key(event_id, message, sysmon_data)
-            
-            # Clear old records (older than time_window)
+
             cutoff_time = timestamp - timedelta(seconds=self.time_window)
-            self.event_history[event_key] = [
-                (ts, ctx) for ts, ctx in self.event_history[event_key]
-                if ts > cutoff_time
-            ]
-            
+
+            # Prune expired entries across ALL keys and drop keys that become
+            # empty. Pruning only the current key would let stale keys (e.g. a
+            # parent->child combo that never reappears) accumulate forever,
+            # leaking memory over a long-running session.
+            for key in list(self.event_history.keys()):
+                self.event_history[key] = [
+                    (ts, ctx) for ts, ctx in self.event_history[key]
+                    if ts > cutoff_time
+                ]
+                if not self.event_history[key]:
+                    del self.event_history[key]
+
             # Add new event with context
             context = {
                 'message': message,
                 'sysmon_data': sysmon_data or {}
             }
             self.event_history[event_key].append((timestamp, context))
-            
+
             # Threshold check
             if len(self.event_history[event_key]) >= self.threshold:
                 return True
-            
+
             # If threshold not met, return False
             return False
-        
+
         # If no threshold, this is a single-event match rule
         return True
     

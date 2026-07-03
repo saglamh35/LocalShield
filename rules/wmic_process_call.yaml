@@ -1,0 +1,18 @@
+id: "wmic_process_call_001"
+name: "WMIC Process Call Create"
+description: "Detects use of wmic.exe to spawn processes (process call create). WMI is frequently abused for stealthy execution and lateral movement."
+mitre:
+  - "T1047"      # Windows Management Instrumentation
+severity: "high"
+tags:
+  - "execution"
+  - "lateral_movement"
+  - "lolbin"
+enabled: true
+
+conditions:
+  provider: "Sysmon"
+  event_id: "1"  # Process Creation
+  command_line_regex: "(?i)wmic(\\.exe)?.*process.*call.*create"
+
+match_message: "🔴 WMIC Process Creation: wmic.exe was used to launch a process via 'process call create'. This WMI technique is commonly used for stealthy execution and lateral movement."

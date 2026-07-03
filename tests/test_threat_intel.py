@@ -69,5 +69,45 @@ class TestThreatIntel:
         assert feed.check_ip("1.2.3.4") is None
 
 
+CIDR_CONTENT = """ip,category,confidence
+1.2.3.4,Botnet,100
+185.220.0.0/16,TorExit,85
+10.10.0.0/24,Internal-Bad,70
+bad-cidr/33,Broken,50
+"""
+
+
+@pytest.fixture
+def cidr_feed(tmp_path):
+    csv_file = tmp_path / "threat_intel.csv"
+    csv_file.write_text(CIDR_CONTENT, encoding="utf-8")
+    return ThreatIntel(csv_path=str(csv_file))
+
+
+class TestCIDRRanges:
+    def test_counts_ips_and_ranges(self, cidr_feed):
+        # 1 exact IP + 2 valid ranges (the /33 is invalid and skipped)
+        assert cidr_feed.get_threat_count() == 3
+
+    def test_ip_inside_range_matches(self, cidr_feed):
+        result = cidr_feed.check_ip("185.220.101.42")
+        assert result is not None
+        assert result["category"] == "TorExit"
+        assert result["matched_range"] == "185.220.0.0/16"
+
+    def test_ip_outside_range_no_match(self, cidr_feed):
+        assert cidr_feed.check_ip("185.221.0.1") is None
+
+    def test_exact_ip_still_matches_alongside_ranges(self, cidr_feed):
+        assert cidr_feed.check_ip("1.2.3.4") is not None
+
+    def test_second_range_boundaries(self, cidr_feed):
+        assert cidr_feed.check_ip("10.10.0.255") is not None   # inside /24
+        assert cidr_feed.check_ip("10.10.1.0") is None          # just outside /24
+
+    def test_garbage_input_is_safe(self, cidr_feed):
+        assert cidr_feed.check_ip("not-an-ip") is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
