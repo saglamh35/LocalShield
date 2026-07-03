@@ -7,8 +7,12 @@ import altair as alt
 from datetime import datetime
 import asyncio
 import time
+from pathlib import Path
 import config
-from db_manager import get_all_logs, get_high_risk_count, get_total_log_count, get_latest_detection, clear_all_logs
+from db_manager import (
+    get_all_logs, get_high_risk_count, get_total_log_count, get_latest_detection,
+    clear_all_logs, get_blocked_ips, get_recent_actions,
+)
 from modules.network_scanner import scan_open_ports, get_port_summary
 from modules.chat_manager import ask_assistant
 from modules.packet_capture import PacketSniffer
@@ -23,45 +27,148 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS - Professional SIEM design
+# Custom CSS - Professional SOC console design
 st.markdown("""
 <style>
-    .main > div {
-        padding-top: 2rem;
+    :root {
+        --ls-accent: #2dd4bf;
+        --ls-bg: #0d1117;
+        --ls-surface: #161b22;
+        --ls-surface-2: #1c2230;
+        --ls-line: #2a323d;
+        --ls-text: #e6edf3;
+        --ls-muted: #8b949e;
+        --ls-high: #f85149;
+        --ls-med: #e3a008;
+        --ls-low: #3fb950;
+        --ls-info: #58a6ff;
     }
-    .stExpander {
-        border: 1px solid rgba(250, 250, 250, 0.2);
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
+
+    /* Base */
+    .stApp { background: var(--ls-bg); }
+    .block-container { padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1400px; }
+    h1, h2, h3, h4 { letter-spacing: -0.01em; }
+    hr { border-color: var(--ls-line) !important; }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: var(--ls-surface);
+        border-right: 1px solid var(--ls-line);
     }
-    .risk-high {
-        color: #ff4444;
-        font-weight: bold;
+    [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { font-size: 0.95rem; }
+
+    /* Tabs -> pill/underline bar */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 4px;
+        background: var(--ls-surface);
+        padding: 5px;
+        border-radius: 12px;
+        border: 1px solid var(--ls-line);
     }
-    .risk-medium {
-        color: #ffaa00;
-        font-weight: bold;
+    .stTabs [data-baseweb="tab"] {
+        height: 40px;
+        border-radius: 8px;
+        padding: 0 16px;
+        color: var(--ls-muted);
+        font-weight: 600;
     }
-    .risk-low {
-        color: #44ff44;
-        font-weight: bold;
+    .stTabs [aria-selected="true"] {
+        background: var(--ls-surface-2) !important;
+        color: var(--ls-accent) !important;
     }
-    h1 {
-        color: #1f77b4;
+
+    /* Native metric cards */
+    [data-testid="stMetric"] {
+        background: var(--ls-surface);
+        border: 1px solid var(--ls-line);
+        border-radius: 12px;
+        padding: 14px 18px;
     }
-    .metric-card {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        background-color: rgba(255, 255, 255, 0.05);
+    [data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; }
+
+    /* Expanders / log cards */
+    [data-testid="stExpander"] {
+        border: 1px solid var(--ls-line);
+        border-radius: 10px;
+        margin-bottom: 8px;
+        background: var(--ls-surface);
     }
-    .high-risk-port {
-        background-color: #ff4444 !important;
-        color: white !important;
-        font-weight: bold;
+    [data-testid="stExpander"] summary:hover { color: var(--ls-accent); }
+
+    /* Buttons */
+    .stButton > button {
+        border-radius: 9px;
+        border: 1px solid var(--ls-line);
+        font-weight: 600;
     }
-    .port-table {
-        border-radius: 0.5rem;
+    .stButton > button:hover { border-color: var(--ls-accent); color: var(--ls-accent); }
+
+    /* Risk text helpers */
+    .risk-high { color: var(--ls-high); font-weight: 700; }
+    .risk-medium { color: var(--ls-med); font-weight: 700; }
+    .risk-low { color: var(--ls-low); font-weight: 700; }
+
+    /* ---- Custom LocalShield components ---- */
+    .ls-header {
+        display: flex; align-items: center; gap: 16px;
+        padding: 18px 22px; margin-bottom: 6px;
+        background: linear-gradient(120deg, var(--ls-surface) 0%, #10202a 100%);
+        border: 1px solid var(--ls-line); border-radius: 16px;
+        position: relative; overflow: hidden;
     }
+    .ls-header::before {
+        content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
+        background: var(--ls-accent);
+    }
+    .ls-badge-shield { font-size: 2.1rem; line-height: 1; }
+    .ls-header h1 { margin: 0; font-size: 1.7rem; color: var(--ls-text); }
+    .ls-header .sub { color: var(--ls-muted); font-size: 0.9rem; margin-top: 2px; }
+    .ls-status {
+        margin-left: auto; display: flex; align-items: center; gap: 8px;
+        font-size: 0.82rem; color: var(--ls-low); font-weight: 600;
+        background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.3);
+        padding: 6px 12px; border-radius: 20px; white-space: nowrap;
+    }
+    .ls-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ls-low);
+        box-shadow: 0 0 0 0 rgba(63,185,80,.6); animation: lspulse 2s infinite; }
+    @keyframes lspulse {
+        0% { box-shadow: 0 0 0 0 rgba(63,185,80,.5); }
+        70% { box-shadow: 0 0 0 7px rgba(63,185,80,0); }
+        100% { box-shadow: 0 0 0 0 rgba(63,185,80,0); }
+    }
+    @media (prefers-reduced-motion: reduce) { .ls-dot { animation: none; } }
+
+    .ls-kpi {
+        background: var(--ls-surface); border: 1px solid var(--ls-line);
+        border-radius: 13px; padding: 15px 17px; height: 100%;
+        border-top: 3px solid var(--kpi-accent, var(--ls-accent));
+    }
+    .ls-kpi .k-top { display:flex; align-items:center; justify-content:space-between; }
+    .ls-kpi .k-ico { font-size: 1.15rem; opacity: .9; }
+    .ls-kpi .k-label { color: var(--ls-muted); font-size: .74rem; text-transform: uppercase;
+        letter-spacing: .06em; font-weight: 600; }
+    .ls-kpi .k-val { font-size: 1.9rem; font-weight: 750; line-height: 1.1; margin-top: 6px;
+        font-variant-numeric: tabular-nums; color: var(--ls-text); }
+    .ls-kpi .k-foot { color: var(--ls-muted); font-size: .76rem; margin-top: 3px; }
+
+    .ls-chip {
+        display:inline-block; font-size:.72rem; font-weight:700; padding:3px 9px;
+        border-radius: 6px; letter-spacing:.03em;
+    }
+    .chip-high { color: var(--ls-high); background: rgba(248,81,73,.13); }
+    .chip-med  { color: var(--ls-med);  background: rgba(227,160,8,.13); }
+    .chip-low  { color: var(--ls-low);  background: rgba(63,185,80,.13); }
+
+    .ls-ip-card {
+        display:flex; align-items:center; gap:12px;
+        background: var(--ls-surface); border:1px solid var(--ls-line);
+        border-left: 3px solid var(--ls-high); border-radius: 10px;
+        padding: 12px 15px; margin-bottom: 8px;
+    }
+    .ls-ip-card .ip { font-family: ui-monospace, Menlo, monospace; font-weight:700; font-size:.98rem; }
+    .ls-ip-card .meta { color: var(--ls-muted); font-size:.8rem; }
+    .ls-ip-card .tag { margin-left:auto; font-size:.72rem; color: var(--ls-high);
+        background: rgba(248,81,73,.12); padding:3px 9px; border-radius:6px; font-weight:700; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -90,6 +197,54 @@ def load_data():
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return pd.DataFrame()
+
+
+@st.cache_data(ttl=10)
+def get_active_rule_count():
+    """Counts enabled YAML detection rules on disk (cheap, cached)."""
+    try:
+        import yaml
+        rules_dir = Path(__file__).parent / "rules"
+        count = 0
+        for f in list(rules_dir.glob("*.yaml")) + list(rules_dir.glob("*.yml")):
+            try:
+                data = yaml.safe_load(f.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            items = data if isinstance(data, list) else [data]
+            for item in items:
+                if isinstance(item, dict) and item.get("enabled", True):
+                    count += 1
+        return count
+    except Exception:
+        return 0
+
+
+@st.cache_data(ttl=10)
+def get_threat_feed_count():
+    """Counts entries in the threat-intel feed (single IPs + CIDR ranges)."""
+    try:
+        from modules.threat_intel import ThreatIntel
+        return ThreatIntel().get_threat_count()
+    except Exception:
+        return 0
+
+
+def render_kpi(column, icon, label, value, foot="", accent="var(--ls-accent)"):
+    """Renders a single professional KPI card into the given column."""
+    column.markdown(
+        f"""
+        <div class="ls-kpi" style="--kpi-accent:{accent}">
+            <div class="k-top">
+                <span class="k-label">{label}</span>
+                <span class="k-ico">{icon}</span>
+            </div>
+            <div class="k-val">{value}</div>
+            <div class="k-foot">{foot}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def get_risk_icon(risk_level):
@@ -408,11 +563,57 @@ def render_log_card(row):
 
 def main():
     """Main dashboard function"""
-    
-    # Header
-    st.title(config.DASHBOARD_TITLE)
-    st.markdown("---")
-    
+
+    # Pull the headline numbers once
+    try:
+        total_logs = get_total_log_count(config.DB_PATH)
+        high_risk = get_high_risk_count(config.DB_PATH)
+        latest = get_latest_detection(config.DB_PATH)
+        blocked = get_blocked_ips(config.DB_PATH)
+        rule_count = get_active_rule_count()
+        feed_count = get_threat_feed_count()
+    except Exception:
+        total_logs = high_risk = rule_count = feed_count = 0
+        latest = None
+        blocked = []
+
+    # Latest-detection label
+    if latest:
+        try:
+            latest_str = pd.to_datetime(latest).strftime('%b %d, %H:%M')
+        except Exception:
+            latest_str = str(latest)
+    else:
+        latest_str = "No events yet"
+
+    # --- Professional header with live status ---
+    st.markdown(
+        f"""
+        <div class="ls-header">
+            <span class="ls-badge-shield">🛡️</span>
+            <div>
+                <h1>LocalShield</h1>
+                <div class="sub">AI-Powered Offline SIEM · Windows Event &amp; Network Threat Detection</div>
+            </div>
+            <div class="ls-status"><span class="ls-dot"></span> Monitoring Active</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --- KPI row (all core capabilities at a glance) ---
+    df_techniques = mitre_summarize(load_data()['MITRE Technique'].tolist()) if total_logs else []
+    k1, k2, k3, k4, k5 = st.columns(5)
+    render_kpi(k1, "📊", "Total Events", f"{total_logs:,}", "ingested & analyzed", "var(--ls-info)")
+    render_kpi(k2, "🚨", "High Risk", f"{high_risk:,}",
+               f"{(high_risk/total_logs*100):.0f}% of events" if total_logs else "none", "var(--ls-high)")
+    render_kpi(k3, "🎯", "ATT&CK Techniques", f"{len(df_techniques)}", "detected", "var(--ls-accent)")
+    render_kpi(k4, "⛔", "Blocked IPs", f"{len(blocked)}", "auto-response", "var(--ls-med)")
+    render_kpi(k5, "🧠", "Active Rules", f"{rule_count}", f"{feed_count} threat-intel entries", "var(--ls-low)")
+
+    st.caption(f"⏱️ Latest detection: **{latest_str}**  ·  🔒 Offline · local LLM · no data leaves this machine")
+    st.markdown("")
+
     # Sidebar - Filters
     with st.sidebar:
         st.header("🔍 Filters")
@@ -497,59 +698,17 @@ def main():
                     st.session_state.confirm_reset = False
                     st.rerun()
     
-    # Metrics
-    col1, col2, col3 = st.columns(3)
-    
-    try:
-        # Metric 1: Total Logs
-        total_logs = get_total_log_count(config.DB_PATH)
-        with col1:
-            st.metric(
-                label="📊 Total Logs",
-                value=total_logs,
-                delta=None
-            )
-        
-        # Metric 2: High Risk Events
-        high_risk = get_high_risk_count(config.DB_PATH)
-        with col2:
-            st.metric(
-                label="🚨 High Risk Events",
-                value=high_risk,
-                delta=None,
-                delta_color="inverse"
-            )
-        
-        # Metric 3: Latest Detection
-        latest = get_latest_detection(config.DB_PATH)
-        if latest:
-            try:
-                latest_dt = pd.to_datetime(latest)
-                latest_str = latest_dt.strftime('%Y-%m-%d %H:%M:%S')
-            except Exception:
-                latest_str = str(latest)
-        else:
-            latest_str = "None yet"
-        
-        with col3:
-            st.metric(
-                label="⏰ Latest Detection",
-                value=latest_str,
-                delta=None
-            )
-    except Exception as e:
-        st.error(f"Error loading metrics: {e}")
-    
-    st.markdown("---")
-    
-    # 3 Tab structure
-    tab_logs, tab_traffic, tab_network, tab_chat = st.tabs([
-        "📋 Log Analysis", 
-        "🌐 Network Traffic", 
-        "🔍 Network Scan", 
-        "💬 AI Assistant"
+    st.markdown("")
+
+    # Tab structure
+    tab_logs, tab_response, tab_traffic, tab_network, tab_chat = st.tabs([
+        "📋 Log Analysis",
+        "🛡️ Active Response",
+        "🌐 Network Traffic",
+        "🔍 Network Scan",
+        "💬 AI Assistant",
     ])
-    
+
     with tab_logs:
         # Log Analysis tab
         # Charts
@@ -673,8 +832,64 @@ def main():
                     render_log_card(row)
         else:
             st.info("📭 No log entries found yet. Make sure the log watcher is running.")
-    
-    # --- TAB 2: NETWORK TRAFFIC (NEW) ---
+
+    # --- ACTIVE RESPONSE (SOAR) ---
+    with tab_response:
+        st.subheader("🛡️ Active Response (SOAR)")
+        st.caption("Automated Windows Firewall actions — IPs blocked in response to high-risk events, with a full audit trail.")
+
+        try:
+            blocked_ips = get_blocked_ips(config.DB_PATH)
+            actions = get_recent_actions(limit=100, db_path=config.DB_PATH)
+        except Exception as e:
+            blocked_ips, actions = [], []
+            st.error(f"Could not load response data: {e}")
+
+        r1, r2, r3 = st.columns(3)
+        render_kpi(r1, "⛔", "Currently Blocked", f"{len(blocked_ips)}", "firewall rules active", "var(--ls-high)")
+        render_kpi(r2, "📜", "Logged Actions", f"{len(actions)}", "audit-trail entries", "var(--ls-info)")
+        render_kpi(r3, "🔐", "Allowlisted IPs", f"{len(getattr(config, 'SAFE_IPS', []))}", "never auto-blocked", "var(--ls-low)")
+        st.markdown("")
+
+        col_block, col_audit = st.columns([1, 1])
+
+        with col_block:
+            st.markdown("##### ⛔ Blocked IP Addresses")
+            if blocked_ips:
+                for ip, rule_name, blocked_at, reason in blocked_ips:
+                    when = str(blocked_at or "")
+                    st.markdown(
+                        f"""
+                        <div class="ls-ip-card">
+                            <div>
+                                <div class="ip">{ip}</div>
+                                <div class="meta">{reason or 'Blocked'} · {when}</div>
+                            </div>
+                            <span class="tag">{rule_name or 'BLOCKED'}</span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+            else:
+                st.info("✅ No IPs are currently blocked. High-risk events with a hostile source IP will appear here.")
+
+        with col_audit:
+            st.markdown("##### 📜 Response Audit Trail")
+            if actions:
+                audit_df = pd.DataFrame(actions, columns=["ID", "Time", "Action", "Target", "Details"])
+                audit_df = audit_df[["Time", "Action", "Target", "Details"]]
+                st.dataframe(audit_df, use_container_width=True, hide_index=True, height=360)
+            else:
+                st.info("No automated actions recorded yet.")
+
+        st.markdown("---")
+        st.caption(
+            "🔒 **Safety by design:** block targets are taken only from structured source-address fields "
+            "(never a blanket text scan), private IPs and an allowlist of critical addresses (DNS/gateway) "
+            "are never blocked, and every action is persisted for audit."
+        )
+
+    # --- NETWORK TRAFFIC ---
     with tab_traffic:
         st.subheader("🌐 Network Traffic Monitor")
         st.caption("Real-time packet capture and analysis (Wireshark-like view)")

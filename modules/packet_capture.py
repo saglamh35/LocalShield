@@ -31,11 +31,15 @@ try:
     except ImportError:
         WORKING_IFACES_AVAILABLE = False
     SCAPY_AVAILABLE = True
-except ImportError:
+except Exception:
+    # Broad on purpose: a broken scapy/cryptography install can raise things
+    # other than ImportError at import time (e.g. a native-binding panic).
+    # Packet capture is an optional feature — degrade gracefully instead of
+    # taking the whole dashboard down with it.
     SCAPY_AVAILABLE = False
     WINDOWS_IF_LIST_AVAILABLE = False
     WORKING_IFACES_AVAILABLE = False
-    print("WARNING: scapy library is not installed. Install it with 'pip install scapy'")
+    print("WARNING: scapy is not installed or failed to load. Install it with 'pip install scapy'")
     print("NOTE: On Windows, you may also need to install Npcap: https://npcap.com/")
 
 # Logging configuration

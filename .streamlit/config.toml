@@ -8,3 +8,13 @@ address = "localhost"
 
 [browser]
 gatherUsageStats = false
+
+# Professional SOC-console theme (dark, teal accent). Keeps the dashboard's
+# colors consistent instead of relying on Streamlit's defaults.
+[theme]
+base = "dark"
+primaryColor = "#2dd4bf"
+backgroundColor = "#0d1117"
+secondaryBackgroundColor = "#161b22"
+textColor = "#e6edf3"
+font = "sans serif"
