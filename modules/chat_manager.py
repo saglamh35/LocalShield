@@ -3,6 +3,8 @@ Chat Manager Module - AI Chatbot Assistant
 Interactive AI assistant module for LocalShield.
 """
 
+from typing import Any
+
 import ollama
 
 import config
@@ -11,6 +13,7 @@ from modules.network_scanner import scan_open_ports
 
 # Dedicated client with a hard timeout so a hung/slow model cannot block the
 # assistant indefinitely. Falls back to module-level ollama on old versions.
+_client: Any
 try:
     _client = ollama.Client(timeout=config.OLLAMA_TIMEOUT)
 except Exception:  # pragma: no cover - very old ollama clients

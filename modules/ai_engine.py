@@ -38,6 +38,7 @@ class Brain:
         # Dedicated client with a hard timeout so a hung/slow model cannot block
         # an analysis worker thread forever. Falls back to the module-level
         # ollama on older client versions that don't accept a timeout.
+        self._client: Any
         try:
             self._client = ollama.Client(timeout=config.OLLAMA_TIMEOUT)
         except Exception:  # pragma: no cover - very old ollama clients

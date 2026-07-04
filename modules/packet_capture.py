@@ -214,7 +214,9 @@ class PacketSniffer:
                 try:
                     working_ifaces = get_working_ifaces()
                     if working_ifaces:
-                        best_iface = list(working_ifaces)[0]
+                        # get_working_ifaces() yields NetworkInterface objects; the
+                        # rest of the sniffer works with interface names (str).
+                        best_iface = str(list(working_ifaces)[0])
                         print(f"✅ Found working interface using get_working_ifaces(): {best_iface}")
                         logger.info(f"Selected interface (get_working_ifaces fallback): {best_iface}")
                         return best_iface
