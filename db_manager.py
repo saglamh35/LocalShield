@@ -81,6 +81,21 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
             )
         ''')
 
+        # Incidents: related high-risk detections grouped by a key (source IP or
+        # rule) within a rolling window, so the analyst sees incidents, not noise.
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS incidents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                key TEXT NOT NULL,
+                title TEXT,
+                first_seen DATETIME NOT NULL,
+                last_seen DATETIME NOT NULL,
+                event_count INTEGER NOT NULL DEFAULT 1,
+                max_severity TEXT,
+                status TEXT NOT NULL DEFAULT 'open'
+            )
+        ''')
+
         conn.commit()
         logger.info(f"Database '{db_path}' successfully created/connected")
         logger.debug("'security_logs' table ready")
@@ -417,6 +432,116 @@ def get_recent_actions(
     except Exception as e:
         logger.error(f"Error reading actions: {e}", exc_info=True)
         return []
+    finally:
+        conn.close()
+
+
+_SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+
+
+def upsert_incident(
+    key: str,
+    title: str,
+    severity: str,
+    timestamp: Optional[datetime] = None,
+    window_seconds: int = 1800,
+    db_path: Optional[str] = None,
+) -> int:
+    """
+    Attach a detection to an OPEN incident for `key` seen within `window_seconds`,
+    or open a new incident. Groups related high-risk events instead of emitting a
+    flat stream. Returns the incident id.
+    """
+    db_path = db_path or config.DB_PATH
+    ts = timestamp or datetime.now()
+    ts_str = ts.strftime('%Y-%m-%d %H:%M:%S')
+    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
+    try:
+        cursor = conn.cursor()
+        # Most recent open incident for this key
+        cursor.execute(
+            "SELECT id, last_seen, event_count, max_severity FROM incidents "
+            "WHERE key = ? AND status = 'open' ORDER BY last_seen DESC LIMIT 1",
+            (key,),
+        )
+        row = cursor.fetchone()
+
+        fresh = False
+        if row:
+            inc_id, last_seen, count, max_sev = row
+            try:
+                last_dt = datetime.strptime(str(last_seen), '%Y-%m-%d %H:%M:%S')
+                fresh = (ts - last_dt).total_seconds() <= window_seconds
+            except Exception:
+                fresh = False
+
+        if row and fresh:
+            new_sev = max_sev
+            if _SEVERITY_RANK.get(str(severity).lower(), 0) > _SEVERITY_RANK.get(str(max_sev).lower(), 0):
+                new_sev = severity
+            cursor.execute(
+                "UPDATE incidents SET last_seen = ?, event_count = event_count + 1, "
+                "max_severity = ? WHERE id = ?",
+                (ts_str, new_sev, inc_id),
+            )
+            conn.commit()
+            return inc_id
+
+        cursor.execute(
+            "INSERT INTO incidents (key, title, first_seen, last_seen, event_count, "
+            "max_severity, status) VALUES (?, ?, ?, ?, 1, ?, 'open')",
+            (key, title, ts_str, ts_str, severity),
+        )
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        logger.error(f"Error upserting incident: {e}", exc_info=True)
+        return -1
+    finally:
+        conn.close()
+
+
+def get_incidents(
+    status: Optional[str] = None,
+    limit: int = 100,
+    db_path: Optional[str] = None,
+) -> List[Tuple[int, str, Optional[str], str, str, int, Optional[str], str]]:
+    """
+    Return incidents as (id, key, title, first_seen, last_seen, event_count,
+    max_severity, status), newest activity first. Optionally filter by status.
+    """
+    db_path = db_path or config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        query = ("SELECT id, key, title, first_seen, last_seen, event_count, "
+                 "max_severity, status FROM incidents")
+        params: Tuple = ()
+        if status:
+            query += " WHERE status = ?"
+            params = (status,)
+        query += " ORDER BY last_seen DESC LIMIT ?"
+        params = params + (int(limit),)
+        cursor.execute(query, params)
+        return cursor.fetchall()
+    except Exception as e:
+        logger.error(f"Error reading incidents: {e}", exc_info=True)
+        return []
+    finally:
+        conn.close()
+
+
+def get_open_incident_count(db_path: Optional[str] = None) -> int:
+    """Return the number of currently-open incidents."""
+    db_path = db_path or config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM incidents WHERE status = 'open'")
+        return cursor.fetchone()[0]
+    except Exception as e:
+        logger.error(f"Error counting incidents: {e}", exc_info=True)
+        return 0
     finally:
         conn.close()
 

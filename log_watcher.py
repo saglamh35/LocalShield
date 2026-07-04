@@ -20,11 +20,15 @@ except ImportError:
 
 import config
 import re
-from db_manager import init_db, insert_log, record_action, record_blocked_ip, get_blocked_ips
+from db_manager import (
+    init_db, insert_log, record_action, record_blocked_ip, get_blocked_ips,
+    upsert_incident,
+)
 from modules.ai_engine import Brain
 from modules.detection_engine import DetectionEngine
 from modules.response_engine import FirewallManager
 from modules.threat_intel import ThreatIntel
+from modules.notifier import Notifier
 
 # Logging configuration
 # Rotate the log file at 5 MB and keep 3 backups so it never grows unbounded.
@@ -57,6 +61,7 @@ class LogWatcher:
         self.detection_engine = DetectionEngine()  # Rule engine
         self.firewall_manager = FirewallManager()  # Active response engine
         self.threat_intel = ThreatIntel()  # Threat intelligence engine
+        self.notifier = Notifier()  # Offline-first alerting
         self.db_conn = init_db(config.DB_PATH)
         # Reload persisted blocked IPs so a restart knows what is already blocked
         try:
@@ -458,7 +463,39 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             )
             
             logger.info(f"Log processed: Event ID {event_id} - Risk: {final_risk_level} - MITRE: {mitre_technique or 'N/A'}")
-            
+
+            # NOTIFY + INCIDENT: for events meeting the notify threshold, raise an
+            # (offline-first) alert and group into an incident. Best-effort — a
+            # notification/grouping failure must never disrupt processing.
+            if self.notifier.should_notify(final_risk_level):
+                # Prefer the structured source IP for grouping; else rule/event.
+                src_ips = self.firewall_manager.extract_source_ips_from_text(combined_text)
+                source_ip = src_ips[0] if src_ips else None
+                incident_key = source_ip or (mitre_technique or event_id)
+                title = rule_match_message or f"High-risk Event ID {event_id}"
+
+                def _notify_and_group():
+                    try:
+                        self.notifier.notify(
+                            severity=final_risk_level,
+                            title=title[:120],
+                            detail=(mitre_technique or ""),
+                            event_id=event_id,
+                            source_ip=source_ip,
+                        )
+                        upsert_incident(
+                            key=str(incident_key),
+                            title=title[:120],
+                            severity=final_risk_level,
+                            timestamp=event_time,
+                            window_seconds=config.INCIDENT_WINDOW,
+                            db_path=None,
+                        )
+                    except Exception as e:
+                        logger.debug(f"notify/incident failed (ignored): {e}")
+
+                await loop.run_in_executor(self.executor, _notify_and_group)
+
         except Exception as e:
             logger.error(f"Error processing event: {e}", exc_info=True)
     

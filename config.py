@@ -37,6 +37,20 @@ CHECK_INTERVAL: int = int(os.getenv("CHECK_INTERVAL", "5"))  # seconds
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 LOG_FILE: str = os.getenv("LOG_FILE", "localshield.log")
 
+# Notification Settings (offline-first)
+# Minimum severity that triggers a notification: Low | Medium | High
+NOTIFY_MIN_SEVERITY: str = os.getenv("NOTIFY_MIN_SEVERITY", "High")
+# Alert-log file: the always-on, fully-offline notification channel
+ALERT_LOG_FILE: str = os.getenv("ALERT_LOG_FILE", "alerts.log")
+# Desktop toast (opt-in, best-effort on Windows, offline)
+NOTIFY_DESKTOP: bool = os.getenv("NOTIFY_DESKTOP", "False").lower() in ("true", "1", "yes")
+# Webhook URL (opt-in, the ONLY networked channel; empty = disabled)
+NOTIFY_WEBHOOK_URL: str = os.getenv("NOTIFY_WEBHOOK_URL", "")
+
+# Incident grouping: window (seconds) within which same-key detections are
+# rolled into one open incident instead of separate alerts.
+INCIDENT_WINDOW: int = int(os.getenv("INCIDENT_WINDOW", "1800"))  # 30 minutes
+
 # Demo Mode Settings
 # Set to True to enable demo mode (generates fake data for screenshots)
 DEMO_MODE: bool = os.getenv("DEMO_MODE", "False").lower() in ("true", "1", "yes")

@@ -12,6 +12,7 @@ import config
 from db_manager import (
     get_all_logs, get_high_risk_count, get_total_log_count, get_latest_detection,
     clear_all_logs, get_blocked_ips, get_recent_actions,
+    get_incidents, get_open_incident_count,
 )
 from modules.network_scanner import scan_open_ports, get_port_summary
 from modules.chat_manager import ask_assistant
@@ -572,8 +573,9 @@ def main():
         blocked = get_blocked_ips(config.DB_PATH)
         rule_count = get_active_rule_count()
         feed_count = get_threat_feed_count()
+        open_incidents = get_open_incident_count(config.DB_PATH)
     except Exception:
-        total_logs = high_risk = rule_count = feed_count = 0
+        total_logs = high_risk = rule_count = feed_count = open_incidents = 0
         latest = None
         blocked = []
 
@@ -603,13 +605,14 @@ def main():
 
     # --- KPI row (all core capabilities at a glance) ---
     df_techniques = mitre_summarize(load_data()['MITRE Technique'].tolist()) if total_logs else []
-    k1, k2, k3, k4, k5 = st.columns(5)
+    k1, k2, k3, k4, k5, k6 = st.columns(6)
     render_kpi(k1, "📊", "Total Events", f"{total_logs:,}", "ingested & analyzed", "var(--ls-info)")
     render_kpi(k2, "🚨", "High Risk", f"{high_risk:,}",
                f"{(high_risk/total_logs*100):.0f}% of events" if total_logs else "none", "var(--ls-high)")
-    render_kpi(k3, "🎯", "ATT&CK Techniques", f"{len(df_techniques)}", "detected", "var(--ls-accent)")
-    render_kpi(k4, "⛔", "Blocked IPs", f"{len(blocked)}", "auto-response", "var(--ls-med)")
-    render_kpi(k5, "🧠", "Active Rules", f"{rule_count}", f"{feed_count} threat-intel entries", "var(--ls-low)")
+    render_kpi(k3, "🔥", "Open Incidents", f"{open_incidents}", "need triage", "var(--ls-high)")
+    render_kpi(k4, "🎯", "ATT&CK Techniques", f"{len(df_techniques)}", "detected", "var(--ls-accent)")
+    render_kpi(k5, "⛔", "Blocked IPs", f"{len(blocked)}", "auto-response", "var(--ls-med)")
+    render_kpi(k6, "🧠", "Active Rules", f"{rule_count}", f"{feed_count} threat-intel entries", "var(--ls-low)")
 
     st.caption(f"⏱️ Latest detection: **{latest_str}**  ·  🔒 Offline · local LLM · no data leaves this machine")
     st.markdown("")
@@ -701,8 +704,9 @@ def main():
     st.markdown("")
 
     # Tab structure
-    tab_logs, tab_response, tab_traffic, tab_network, tab_chat = st.tabs([
+    tab_logs, tab_incidents, tab_response, tab_traffic, tab_network, tab_chat = st.tabs([
         "📋 Log Analysis",
+        "🔥 Incidents",
         "🛡️ Active Response",
         "🌐 Network Traffic",
         "🔍 Network Scan",
@@ -832,6 +836,49 @@ def main():
                     render_log_card(row)
         else:
             st.info("📭 No log entries found yet. Make sure the log watcher is running.")
+
+    # --- INCIDENTS ---
+    with tab_incidents:
+        st.subheader("🔥 Incidents")
+        st.caption("Related high-risk detections grouped by source IP (or rule) within a time window — triage incidents, not a flat stream of events.")
+
+        try:
+            all_incidents = get_incidents(limit=200, db_path=config.DB_PATH)
+        except Exception as e:
+            all_incidents = []
+            st.error(f"Could not load incidents: {e}")
+
+        open_inc = [i for i in all_incidents if i[7] == "open"]
+        i1, i2, i3 = st.columns(3)
+        render_kpi(i1, "🔥", "Open Incidents", f"{len(open_inc)}", "need triage", "var(--ls-high)")
+        render_kpi(i2, "📁", "Total Incidents", f"{len(all_incidents)}", "all time", "var(--ls-info)")
+        total_grouped = sum(i[5] for i in all_incidents)
+        render_kpi(i3, "🧩", "Events Grouped", f"{total_grouped}", "into incidents", "var(--ls-accent)")
+        st.markdown("")
+
+        if all_incidents:
+            sev_chip = {"critical": "chip-high", "high": "chip-high",
+                        "medium": "chip-med", "low": "chip-low"}
+            for (inc_id, key, title, first_seen, last_seen, count, max_sev, status) in all_incidents:
+                sev = str(max_sev or "medium").lower()
+                chip = sev_chip.get(sev, "chip-med")
+                border = "var(--ls-high)" if sev in ("high", "critical") else "var(--ls-med)"
+                status_badge = "🟢 open" if status == "open" else "⚪ closed"
+                st.markdown(
+                    f"""
+                    <div class="ls-ip-card" style="border-left-color:{border}">
+                        <div>
+                            <div class="ip">#{inc_id} · {key}</div>
+                            <div class="meta">{(title or 'Incident')[:90]}</div>
+                            <div class="meta">{count} event(s) · {first_seen} → {last_seen} · {status_badge}</div>
+                        </div>
+                        <span class="ls-chip {chip}" style="margin-left:auto">{sev.upper()}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.info("✅ No incidents yet. High-risk detections will be grouped here as they occur.")
 
     # --- ACTIVE RESPONSE (SOAR) ---
     with tab_response:
