@@ -7,6 +7,13 @@ import config
 from db_manager import get_all_logs
 from modules.network_scanner import scan_open_ports
 
+# Dedicated client with a hard timeout so a hung/slow model cannot block the
+# assistant indefinitely. Falls back to module-level ollama on old versions.
+try:
+    _client = ollama.Client(timeout=config.OLLAMA_TIMEOUT)
+except Exception:  # pragma: no cover - very old ollama clients
+    _client = ollama
+
 
 def get_system_summary() -> str:
     """
@@ -136,7 +143,7 @@ def ask_assistant(user_question: str) -> str:
         )
         
         # Send to Ollama
-        response = ollama.chat(
+        response = _client.chat(
             model=config.MODEL_NAME,
             messages=[
                 {

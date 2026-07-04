@@ -33,6 +33,14 @@ class Brain:
         """
         self.model_name: str = model_name or config.MODEL_NAME
 
+        # Dedicated client with a hard timeout so a hung/slow model cannot block
+        # an analysis worker thread forever. Falls back to the module-level
+        # ollama on older client versions that don't accept a timeout.
+        try:
+            self._client = ollama.Client(timeout=config.OLLAMA_TIMEOUT)
+        except Exception:  # pragma: no cover - very old ollama clients
+            self._client = ollama
+
         # Small in-memory cache so identical events are not re-sent to the LLM.
         # Keyed on the event content with volatile timestamps stripped out.
         self._cache: Dict[str, Tuple[str, str]] = {}
@@ -160,7 +168,7 @@ Also write this in the "risk_score" field: "{kb_info.get('risk_level', 'Medium')
             # Send to AI. format='json' makes Ollama constrain the output to
             # valid JSON, which makes the parsing below far more reliable.
             logger.debug(f"Starting AI analysis (Event ID: {event_id})")
-            response = ollama.chat(
+            response = self._client.chat(
                 model=self.model_name,
                 format='json',
                 messages=[

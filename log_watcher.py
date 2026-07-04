@@ -140,125 +140,117 @@ class LogWatcher:
                 return " | ".join(str(insert) for insert in event.StringInserts)
             return f"Event ID {event.EventID} (Message could not be parsed: {e})"
     
-    def parse_sysmon_event_1(self, event: Any) -> dict:
+    @staticmethod
+    def _parse_eventdata_xml(event: Any, wanted_fields: List[str]) -> Optional[dict]:
         """
-        Parses Sysmon Event ID 1 (Process Creation) and extracts critical fields
-        
+        Extracts named fields from a Sysmon event's <EventData> XML.
+
+        This is the RELIABLE parsing path: Sysmon fields are read by name, so
+        they cannot be misaligned by version differences or empty optional
+        fields (unlike positional StringInserts indexing).
+
         Args:
             event: win32evtlog event object
-        
+            wanted_fields: EventData field names to extract (e.g. ['Image'])
+
+        Returns:
+            dict of {field: value} for fields found, or None if XML is absent/unparseable.
+        """
+        xml = getattr(event, 'XML', None)
+        if not xml:
+            return None
+        try:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(xml)
+            # Windows event XML carries a default namespace, so match by local
+            # tag name (ignoring the {namespace} prefix) rather than a plain path.
+            def local(tag: str) -> str:
+                return tag.rsplit('}', 1)[-1]
+
+            event_data = next((el for el in root.iter() if local(el.tag) == 'EventData'), None)
+            if event_data is None:
+                return None
+            found = {}
+            for data in event_data:
+                if local(data.tag) != 'Data':
+                    continue
+                name = data.get('Name', '')
+                if name in wanted_fields:
+                    found[name] = data.text or ''
+            return found or None
+        except Exception:
+            return None
+
+    def parse_sysmon_event_1(self, event: Any) -> dict:
+        """
+        Parses Sysmon Event ID 1 (Process Creation) and extracts critical fields.
+        Prefers named <EventData> XML fields; falls back to positional
+        StringInserts indexing only when XML is unavailable.
+
         Returns:
             dict: Parsed fields (Image, CommandLine, User, ParentImage)
         """
-        parsed_data = {
-            'Image': 'N/A',
-            'CommandLine': 'N/A',
-            'User': 'N/A',
-            'ParentImage': 'N/A'
-        }
-        
+        parsed_data = {'Image': 'N/A', 'CommandLine': 'N/A', 'User': 'N/A', 'ParentImage': 'N/A'}
+
         try:
-            # Sysmon Event ID 1 uses XML data in StringInserts
-            # Format: EventData contains Image, CommandLine, User, ParentImage, etc.
+            # 1) PRIMARY: named XML fields (order-independent, version-safe)
+            xml_fields = self._parse_eventdata_xml(
+                event, ['Image', 'CommandLine', 'User', 'ParentImage']
+            )
+            if xml_fields:
+                for key, value in xml_fields.items():
+                    if value:
+                        parsed_data[key] = value
+                return parsed_data
+
+            # 2) FALLBACK: positional StringInserts (may drift by Sysmon version)
             if event.StringInserts:
-                # StringInserts typically contains: [Image, CommandLine, User, LogonGuid, ProcessGuid, ParentImage, ...]
                 inserts = [str(insert) for insert in event.StringInserts if insert]
-                
-                # Typical order for Event ID 1:
-                # [0] RuleName, [1] UtcTime, [2] ProcessGuid, [3] ProcessId, [4] Image, 
-                # [5] FileVersion, [6] Description, [7] Product, [8] Company, [9] OriginalFileName,
-                # [10] CommandLine, [11] CurrentDirectory, [12] User, [13] LogonGuid, 
-                # [14] LogonId, [15] TerminalSessionId, [16] IntegrityLevel, [17] Hashes,
-                # [18] ParentProcessGuid, [19] ParentImage, [20] ParentCommandLine, ...
-                
-                # Try to find fields by position (may vary by Sysmon version)
+                # Typical order: [4] Image, [10] CommandLine, [12] User, [19] ParentImage
                 if len(inserts) > 4:
-                    parsed_data['Image'] = inserts[4] if len(inserts) > 4 else 'N/A'
+                    parsed_data['Image'] = inserts[4]
                 if len(inserts) > 10:
-                    parsed_data['CommandLine'] = inserts[10] if len(inserts) > 10 else 'N/A'
+                    parsed_data['CommandLine'] = inserts[10]
                 if len(inserts) > 12:
-                    parsed_data['User'] = inserts[12] if len(inserts) > 12 else 'N/A'
+                    parsed_data['User'] = inserts[12]
                 if len(inserts) > 19:
-                    parsed_data['ParentImage'] = inserts[19] if len(inserts) > 19 else 'N/A'
-                
-                # Alternative: Try to parse from XML if available
-                # Some Sysmon versions provide XML data
-                if hasattr(event, 'XML') and event.XML:
-                    import xml.etree.ElementTree as ET
-                    try:
-                        root = ET.fromstring(event.XML)
-                        event_data = root.find('.//EventData')
-                        if event_data is not None:
-                            for data in event_data.findall('Data'):
-                                name = data.get('Name', '')
-                                value = data.text or ''
-                                if name == 'Image':
-                                    parsed_data['Image'] = value
-                                elif name == 'CommandLine':
-                                    parsed_data['CommandLine'] = value
-                                elif name == 'User':
-                                    parsed_data['User'] = value
-                                elif name == 'ParentImage':
-                                    parsed_data['ParentImage'] = value
-                    except Exception:
-                        pass  # Fall back to StringInserts method
+                    parsed_data['ParentImage'] = inserts[19]
         except Exception as e:
             logger.warning(f"Error parsing Sysmon Event ID 1: {e}")
-        
+
         return parsed_data
-    
+
     def parse_sysmon_event_5(self, event: Any) -> dict:
         """
-        Parses Sysmon Event ID 5 (Process Terminated) and extracts critical fields
-        
-        Args:
-            event: win32evtlog event object
-        
+        Parses Sysmon Event ID 5 (Process Terminated) and extracts critical fields.
+        Prefers named <EventData> XML fields; falls back to positional indexing.
+
         Returns:
             dict: Parsed fields (Image, ProcessId)
         """
-        parsed_data = {
-            'Image': 'N/A',
-            'ProcessId': 'N/A'
-        }
-        
+        parsed_data = {'Image': 'N/A', 'ProcessId': 'N/A'}
+
         try:
-            # Sysmon Event ID 5 uses StringInserts
-            # Format: EventData contains Image, ProcessId, etc.
+            # 1) PRIMARY: named XML fields
+            xml_fields = self._parse_eventdata_xml(event, ['Image', 'ProcessId'])
+            if xml_fields:
+                for key, value in xml_fields.items():
+                    if value:
+                        parsed_data[key] = value
+                return parsed_data
+
+            # 2) FALLBACK: positional StringInserts. Typical: [3] ProcessId, [4] Image
             if event.StringInserts:
-                # StringInserts typically contains: [RuleName, UtcTime, ProcessGuid, ProcessId, Image, ...]
                 inserts = [str(insert) for insert in event.StringInserts if insert]
-                
-                # Typical order for Event ID 5:
-                # [0] RuleName, [1] UtcTime, [2] ProcessGuid, [3] ProcessId, [4] Image
-                
-                # Try to find fields by position (may vary by Sysmon version)
                 if len(inserts) > 3:
-                    parsed_data['ProcessId'] = inserts[3] if len(inserts) > 3 else 'N/A'
+                    parsed_data['ProcessId'] = inserts[3]
                 if len(inserts) > 4:
-                    parsed_data['Image'] = inserts[4] if len(inserts) > 4 else 'N/A'
-                
-                # Alternative: Try to parse from XML if available
-                if hasattr(event, 'XML') and event.XML:
-                    import xml.etree.ElementTree as ET
-                    try:
-                        root = ET.fromstring(event.XML)
-                        event_data = root.find('.//EventData')
-                        if event_data is not None:
-                            for data in event_data.findall('Data'):
-                                name = data.get('Name', '')
-                                value = data.text or ''
-                                if name == 'Image':
-                                    parsed_data['Image'] = value
-                                elif name == 'ProcessId':
-                                    parsed_data['ProcessId'] = value
-                    except Exception:
-                        pass  # Fall back to StringInserts method
+                    parsed_data['Image'] = inserts[4]
         except Exception as e:
             logger.warning(f"Error parsing Sysmon Event ID 5: {e}")
-        
+
         return parsed_data
-    
+
     async def process_event_async(self, event: Any, log_source: str = "Security") -> None:
         """
         Processes a single event asynchronously: sends to AI, saves to database

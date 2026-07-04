@@ -16,6 +16,9 @@ except ImportError:
 
 # Ollama Model Settings
 MODEL_NAME: str = os.getenv("OLLAMA_MODEL_NAME", "gemma3:4b")
+# Hard timeout (seconds) for a single Ollama request, so a hung/slow model
+# cannot permanently occupy an analysis worker thread.
+OLLAMA_TIMEOUT: int = int(os.getenv("OLLAMA_TIMEOUT", "60"))
 
 # Database Settings
 DB_PATH: str = os.getenv("DB_PATH", "logs.db")

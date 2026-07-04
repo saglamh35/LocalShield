@@ -17,13 +17,19 @@ VALID_JSON = '{"risk_score":"High","user_entity":"ATTACKER","summary":"s","advic
 
 @pytest.fixture
 def counting_chat(monkeypatch):
+    """Patch ollama.Client so Brain's timeout-configured client returns canned JSON."""
     calls = []
 
     def fake_chat(**kwargs):
         calls.append(kwargs)
         return {"message": {"content": VALID_JSON}}
 
-    monkeypatch.setattr(ai_engine.ollama, "chat", fake_chat)
+    class FakeClient:
+        def __init__(self, *a, **k):
+            pass
+        chat = staticmethod(fake_chat)
+
+    monkeypatch.setattr(ai_engine.ollama, "Client", FakeClient)
     return calls
 
 
@@ -53,6 +59,20 @@ class TestBrain:
         for i in range(10):
             brain.analyze(f"Event ID: {1000 + i}\nMessage: unique {i}")
         assert len(brain._cache) <= 3
+
+    def test_timeout_falls_back_to_medium(self, monkeypatch):
+        """A hung/slow model (client raises) must degrade to a Medium fallback, not propagate."""
+        class TimeoutClient:
+            def __init__(self, *a, **k):
+                pass
+            def chat(self, **kwargs):
+                raise TimeoutError("model timed out")
+
+        monkeypatch.setattr(ai_engine.ollama, "Client", TimeoutClient)
+        brain = Brain()
+        md, risk = brain.analyze("Event ID: 4625\nMessage: failed logon")
+        assert risk == "Medium"
+        assert md  # a non-empty fallback explanation is returned
 
 
 if __name__ == "__main__":
