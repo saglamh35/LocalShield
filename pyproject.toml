@@ -1,3 +1,29 @@
+[project]
+name = "localshield"
+version = "1.0.0"
+description = "AI-powered offline SIEM for Windows event logs and live network traffic"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "ollama>=0.1.0",
+    "pywin32>=306; sys_platform == 'win32'",
+    "streamlit>=1.28.0",
+    "altair>=5.0.0",
+    "pandas>=2.0.0",
+    "psutil>=5.9.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0.0",
+    "scapy>=2.5.0",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.5", "mypy>=1.8", "pytest>=7.4.0", "pytest-cov>=4.0"]
+
+[project.scripts]
+localshield-watch = "log_watcher:main"
+
 [tool.pytest.ini_options]
 # Only collect the real unit tests under tests/.
 # The repo root contains ad-hoc helper scripts (beyin_test.py, test_firewall.py,
@@ -8,3 +34,27 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+# Ad-hoc root scripts run code at import time; not part of the linted package.
+extend-exclude = ["beyin_test.py", "test_firewall.py", "test_sniffer.py", "simulate_attack.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]  # pycodestyle, pyflakes, isort
+ignore = ["E501"]  # line length handled by the formatter, not enforced hard
+
+[tool.ruff.lint.per-file-ignores]
+# Tests intentionally stub sys.modules before importing platform modules.
+"tests/*" = ["E402"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+# Start lenient — type the modules package first, tighten over time.
+files = ["modules"]
+check_untyped_defs = false
+warn_unused_ignores = true
+# yaml ships partial stubs; don't fail the build on the untyped import.
+disable_error_code = ["import-untyped"]

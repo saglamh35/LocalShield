@@ -3,10 +3,10 @@ Response Engine Module - Active Response
 Blocks IP addresses via the Windows Firewall.
 Production-Ready: with error handling and logging.
 """
-import subprocess
-import re
-import logging
 import ipaddress
+import logging
+import re
+import subprocess
 from typing import Iterable, List, Optional
 
 try:

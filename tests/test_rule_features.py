@@ -4,8 +4,8 @@ OR event-id matching, negative (not_*) conditions, and load-time schema
 validation that skips malformed rules instead of crashing.
 """
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 

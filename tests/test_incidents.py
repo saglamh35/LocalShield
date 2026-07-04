@@ -4,8 +4,8 @@ same key roll into one open incident within a window; different keys or events
 outside the window open separate incidents.
 """
 import sys
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 

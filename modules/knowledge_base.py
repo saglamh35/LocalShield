@@ -3,8 +3,8 @@ Knowledge Base Module - Hybrid RAG system
 Provides reference information about Windows Event IDs.
 """
 import json
-from typing import Any, Dict, Optional
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 # File paths
 BASE_DIR = Path(__file__).parent.parent

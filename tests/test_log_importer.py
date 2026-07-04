@@ -8,8 +8,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from modules.log_importer import parse_auth_line, import_auth_log
 from modules.detection_engine import DetectionEngine
+from modules.log_importer import import_auth_log, parse_auth_line
 
 
 class TestParseAuthLine:

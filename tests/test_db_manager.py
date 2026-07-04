@@ -4,8 +4,8 @@ persistence. Each test uses an isolated temporary database.
 """
 import sqlite3
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 

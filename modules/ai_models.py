@@ -3,6 +3,7 @@ AI Response Models - Pydantic models
 Used to parse AI outputs in a type-safe way.
 """
 from typing import Optional
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -68,16 +69,16 @@ class AIAnalysisResponse(BaseModel):
         Returns output in Markdown format (for Dashboard compatibility).
         """
         parts = []
-        
+
         if self.event_id_explanation:
             parts.append(f"🆔 Event ID Explained\n{self.event_id_explanation}\n")
-        
+
         parts.append("🕵️‍♂️ Analysis")
         parts.append(f"User/Entity: {self.user_entity}")
         parts.append(f"Summary: {self.summary}")
         parts.append(f"Risk Level: {self.risk_score}\n")
-        
+
         parts.append(f"💡 Recommendation\n{self.advice}")
-        
+
         return "\n".join(parts)
 

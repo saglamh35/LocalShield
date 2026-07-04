@@ -3,8 +3,8 @@ Tests for the extended detection ruleset and the threshold memory-leak fix.
 Loads the real rules/ directory so the shipped YAML is exercised end-to-end.
 """
 import sys
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 

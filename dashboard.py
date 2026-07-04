@@ -1,24 +1,32 @@
 """
 Streamlit Dashboard - LocalShield Professional SIEM Interface
 """
-import streamlit as st
-import pandas as pd
-import altair as alt
-from datetime import datetime
 import asyncio
 import time
+from datetime import datetime
 from pathlib import Path
+from typing import Any
+
+import altair as alt
+import pandas as pd
+import streamlit as st
+
 import config
 from db_manager import (
-    get_all_logs, get_high_risk_count, get_total_log_count, get_latest_detection,
-    clear_all_logs, get_blocked_ips, get_recent_actions,
-    get_incidents, get_open_incident_count,
+    clear_all_logs,
+    get_all_logs,
+    get_blocked_ips,
+    get_high_risk_count,
+    get_incidents,
+    get_latest_detection,
+    get_open_incident_count,
+    get_recent_actions,
+    get_total_log_count,
 )
-from modules.network_scanner import scan_open_ports, get_port_summary
 from modules.chat_manager import ask_assistant
-from modules.packet_capture import PacketSniffer
 from modules.mitre import summarize as mitre_summarize
-
+from modules.network_scanner import get_port_summary, scan_open_ports
+from modules.packet_capture import PacketSniffer
 
 # Page configuration
 st.set_page_config(
@@ -175,25 +183,25 @@ st.markdown("""
 
 
 @st.cache_data(ttl=5)  # 5 second cache
-def load_data():
+def load_data() -> "pd.DataFrame":
     """Loads log data from database"""
     try:
         logs = get_all_logs(config.DB_PATH, limit=1000)
-        
+
         if not logs:
             return pd.DataFrame()
-        
+
         # Create DataFrame (including mitre_technique)
         df = pd.DataFrame(logs, columns=[
             'ID', 'Time', 'Event ID', 'Message', 'AI Analysis', 'Risk Level', 'MITRE Technique'
         ])
-        
+
         # Convert Time column to datetime
         try:
             df['Time'] = pd.to_datetime(df['Time'])
         except Exception:
             pass
-        
+
         return df
     except Exception as e:
         st.error(f"Error loading data: {e}")
@@ -201,7 +209,7 @@ def load_data():
 
 
 @st.cache_data(ttl=10)
-def get_active_rule_count():
+def get_active_rule_count() -> int:
     """Counts enabled YAML detection rules on disk (cheap, cached)."""
     try:
         import yaml
@@ -222,7 +230,7 @@ def get_active_rule_count():
 
 
 @st.cache_data(ttl=10)
-def get_threat_feed_count():
+def get_threat_feed_count() -> int:
     """Counts entries in the threat-intel feed (single IPs + CIDR ranges)."""
     try:
         from modules.threat_intel import ThreatIntel
@@ -231,7 +239,7 @@ def get_threat_feed_count():
         return 0
 
 
-def render_kpi(column, icon, label, value, foot="", accent="var(--ls-accent)"):
+def render_kpi(column, icon, label, value, foot="", accent="var(--ls-accent)") -> None:
     """Renders a single professional KPI card into the given column."""
     column.markdown(
         f"""
@@ -248,11 +256,11 @@ def render_kpi(column, icon, label, value, foot="", accent="var(--ls-accent)"):
     )
 
 
-def get_risk_icon(risk_level):
+def get_risk_icon(risk_level) -> str:
     """Returns icon based on risk level"""
     if pd.isna(risk_level):
         return "❓"
-    
+
     risk_str = str(risk_level).strip().lower()
     if 'high' in risk_str or 'yüksek' in risk_str:
         return "🔴"
@@ -263,11 +271,11 @@ def get_risk_icon(risk_level):
     return "⚪"
 
 
-def get_risk_color_class(risk_level):
+def get_risk_color_class(risk_level) -> str:
     """Returns CSS class based on risk level"""
     if pd.isna(risk_level):
         return ""
-    
+
     risk_str = str(risk_level).strip().lower()
     if 'high' in risk_str or 'yüksek' in risk_str:
         return "risk-high"
@@ -278,22 +286,22 @@ def get_risk_color_class(risk_level):
     return ""
 
 
-def translate_risk_level(risk_level):
+def translate_risk_level(risk_level) -> str:
     """
     Translates Turkish risk levels to English for UI display.
-    
+
     Args:
         risk_level: Risk level string (can be Turkish or English)
-    
+
     Returns:
         str: English risk level
     """
     if pd.isna(risk_level):
         return "Unspecified"
-    
+
     risk_str = str(risk_level).strip()
     risk_lower = risk_str.lower()
-    
+
     # Turkish to English mapping
     if 'yüksek' in risk_lower or 'high' in risk_lower:
         return "High"
@@ -303,15 +311,15 @@ def translate_risk_level(risk_level):
         return "Low"
     elif 'critical' in risk_lower:
         return "Critical"
-    
+
     # If already in English, capitalize properly
     if risk_str.lower() in ['high', 'medium', 'low', 'critical']:
         return risk_str.capitalize()
-    
+
     return risk_str  # Return as-is if unknown
 
 
-def filter_data(df, risk_filters, event_id_filter, text_search=None, date_range=None):
+def filter_data(df, risk_filters, event_id_filter, text_search=None, date_range=None) -> "pd.DataFrame":
     """Filters data"""
     filtered_df = df.copy()
 
@@ -332,13 +340,13 @@ def filter_data(df, risk_filters, event_id_filter, text_search=None, date_range=
         filtered_df = filtered_df[
             filtered_df['Risk Level'].str.contains('|'.join(risk_filters), case=False, na=False)
         ]
-    
+
     # Event ID filter
     if event_id_filter:
         filtered_df = filtered_df[
             filtered_df['Event ID'].astype(str).str.contains(event_id_filter, case=False, na=False)
         ]
-    
+
     # Advanced Search (Text Search) - Search in Message, AI Analysis, MITRE Technique
     if text_search and text_search.strip():
         search_term = text_search.strip().lower()
@@ -348,33 +356,33 @@ def filter_data(df, risk_filters, event_id_filter, text_search=None, date_range=
             filtered_df['MITRE Technique'].astype(str).str.lower().str.contains(search_term, na=False)
         )
         filtered_df = filtered_df[mask]
-    
+
     return filtered_df
 
 
-def create_timeline_chart(df):
+def create_timeline_chart(df) -> Any:
     """Log intensity chart by timeline (Area Chart)"""
     if df.empty or 'Time' not in df.columns:
         return None
-    
+
     try:
         # Group by timestamp (15-minute intervals)
         df_chart = df.copy()
-        
+
         # Convert Time column to datetime (if not already)
         if not pd.api.types.is_datetime64_any_dtype(df_chart['Time']):
             df_chart['Time'] = pd.to_datetime(df_chart['Time'], errors='coerce')
-        
+
         # Filter invalid dates
         df_chart = df_chart[df_chart['Time'].notna()]
-        
+
         if df_chart.empty:
             return None
-        
+
         # Split into 15-minute intervals
         df_chart['Time_Interval'] = df_chart['Time'].dt.floor('15min')
         timeline_data = df_chart.groupby('Time_Interval').size().reset_index(name='Log Count')
-        
+
         chart = alt.Chart(timeline_data).mark_area(
             interpolate='monotone',
             fillOpacity=0.6,
@@ -395,18 +403,18 @@ def create_timeline_chart(df):
         ).configure_view(
             strokeWidth=0
         )
-        
+
         return chart
-    except Exception as e:
+    except Exception:
         # Silently ignore error (show empty chart)
         return None
 
 
-def create_risk_distribution_chart(df):
+def create_risk_distribution_chart(df) -> Any:
     """Risk level distribution chart (Donut Chart)"""
     if df.empty or 'Risk Level' not in df.columns:
         return None
-    
+
     try:
         # Normalize risk levels
         df_chart = df.copy()
@@ -416,10 +424,10 @@ def create_risk_distribution_chart(df):
             else 'Low' if 'low' in str(x).lower() or 'düşük' in str(x).lower()
             else 'Unspecified'
         )
-        
+
         risk_counts = df_chart['Risk_Level_Normal'].value_counts().reset_index()
         risk_counts.columns = ['Risk Level', 'Count']
-        
+
         # Color palette
         color_map = {
             'High': '#ff4444',
@@ -428,7 +436,7 @@ def create_risk_distribution_chart(df):
             'Unspecified': '#888888'
         }
         risk_counts['Color'] = risk_counts['Risk Level'].map(color_map).fillna('#888888')
-        
+
         chart = alt.Chart(risk_counts).mark_arc(
             innerRadius=60,
             outerRadius=120
@@ -448,14 +456,14 @@ def create_risk_distribution_chart(df):
             height=300,
             title='Risk Level Distribution'
         )
-        
+
         return chart
     except Exception as e:
         st.error(f"Error creating risk distribution chart: {e}")
         return None
 
 
-def create_mitre_chart(df):
+def create_mitre_chart(df) -> tuple:
     """
     MITRE ATT&CK coverage: detected techniques as a horizontal bar chart,
     coloured by tactic. Returns (chart, summary_rows) or (None, []).
@@ -490,13 +498,13 @@ def create_mitre_chart(df):
         return None, []
 
 
-def render_log_card(row):
+def render_log_card(row) -> None:
     """Renders a log entry as a card"""
     risk_level_raw = str(row.get('Risk Level', 'Unspecified'))
     risk_level_en = translate_risk_level(risk_level_raw)  # Translate to English
     risk_icon = get_risk_icon(risk_level_raw)  # Icon based on original (works with both)
     risk_class = get_risk_color_class(risk_level_raw)  # CSS class based on original
-    
+
     # Time format
     try:
         if pd.notna(row.get('Time')):
@@ -515,22 +523,22 @@ def render_log_card(row):
             time_str = "Unknown"
     except Exception:
         time_str = str(row.get('Time', 'Unknown'))
-    
+
     event_id = str(row.get('Event ID', 'N/A'))
-    
+
     # Get MITRE technique
     mitre_technique = row.get('MITRE Technique', None)
     mitre_display = ""
     if mitre_technique and pd.notna(mitre_technique) and str(mitre_technique).strip():
         mitre_display = f" 🔴 {mitre_technique}"
-    
+
     # Create header - use English risk level
     header = f"{risk_icon} {time_str} - {risk_level_en}{mitre_display} - Event ID: {event_id}"
-    
+
     # Expander content
     with st.expander(header, expanded=False):
         col1, col2 = st.columns([1, 1])
-        
+
         with col1:
             st.markdown("**📋 Event Details**")
             st.write(f"**ID:** `{row.get('ID', 'N/A')}`")
@@ -538,11 +546,11 @@ def render_log_card(row):
             st.write(f"**Time:** `{time_str}`")
             risk_display = f"<span class='{risk_class}'>**{risk_level_en}** {risk_icon}</span>"
             st.markdown(f"**Risk Level:** {risk_display}", unsafe_allow_html=True)
-            
+
             # Show MITRE Technique
             if mitre_technique and pd.notna(mitre_technique) and str(mitre_technique).strip():
                 st.markdown(f"**🔴 MITRE ATT&CK:** `{mitre_technique}`")
-        
+
         with col2:
             st.markdown("**🤖 AI Analysis**")
             ai_analysis = str(row.get('AI Analysis', 'No analysis'))
@@ -551,7 +559,7 @@ def render_log_card(row):
                 st.info(f"💭 {ai_analysis}")
             else:
                 st.warning("⚠️ Analysis not found")
-        
+
         st.markdown("---")
         st.markdown("**📝 Full Message**")
         message = str(row.get('Message', 'No message'))
@@ -562,7 +570,7 @@ def render_log_card(row):
             st.caption("No message content available.")
 
 
-def main():
+def main() -> None:
     """Main dashboard function"""
 
     # Pull the headline numbers once
@@ -590,7 +598,7 @@ def main():
 
     # --- Professional header with live status ---
     st.markdown(
-        f"""
+        """
         <div class="ls-header">
             <span class="ls-badge-shield">🛡️</span>
             <div>
@@ -620,7 +628,7 @@ def main():
     # Sidebar - Filters
     with st.sidebar:
         st.header("🔍 Filters")
-        
+
         # Risk level filter
         risk_options = ["High", "Medium", "Low"]
         selected_risks = st.multiselect(
@@ -628,13 +636,13 @@ def main():
             options=risk_options,
             default=[]
         )
-        
+
         # Event ID filter
         event_id_filter = st.text_input(
             "Event ID",
             placeholder="E.g.: 4625, 4624..."
         )
-        
+
         # Advanced Search (Text Search)
         text_search = st.text_input(
             "🔎 Advanced Search",
@@ -676,11 +684,11 @@ def main():
         # Clear Database Button
         st.markdown("---")
         st.header("⚙️ Management")
-        
+
         # Session state for confirmation check
         if 'confirm_reset' not in st.session_state:
             st.session_state.confirm_reset = False
-        
+
         if not st.session_state.confirm_reset:
             if st.button("🗑️ Clear Database", type="secondary", use_container_width=True):
                 st.session_state.confirm_reset = True
@@ -700,7 +708,7 @@ def main():
                 if st.button("❌ Cancel", use_container_width=True):
                     st.session_state.confirm_reset = False
                     st.rerun()
-    
+
     st.markdown("")
 
     # Tab structure
@@ -717,18 +725,18 @@ def main():
         # Log Analysis tab
         # Charts
         df = load_data()
-        
+
         if not df.empty:
             # Chart row
             chart_col1, chart_col2 = st.columns(2)
-            
+
             with chart_col1:
                 timeline_chart = create_timeline_chart(df)
                 if timeline_chart:
                     st.altair_chart(timeline_chart, use_container_width=True)
                 else:
                     st.info("Could not create timeline chart.")
-            
+
             with chart_col2:
                 risk_chart = create_risk_distribution_chart(df)
                 if risk_chart:
@@ -754,7 +762,7 @@ def main():
 
             # Filtering
             filtered_df = filter_data(df, selected_risks, event_id_filter, text_search, date_range)
-            
+
             # Add Severity column (map from Risk Level)
             if not filtered_df.empty and 'Risk Level' in filtered_df.columns:
                 filtered_df['Severity'] = filtered_df['Risk Level'].apply(
@@ -764,7 +772,7 @@ def main():
                     else 'Low' if 'low' in str(x).lower() or 'düşük' in str(x).lower()
                     else 'Unspecified'
                 )
-            
+
             # CSV Download Button and Log Header
             col_header1, col_header2 = st.columns([3, 1])
             with col_header1:
@@ -780,7 +788,7 @@ def main():
                         mime="text/csv",
                         use_container_width=True
                     )
-            
+
             if filtered_df.empty:
                 st.info("🔍 No logs found matching filter criteria.")
             else:
@@ -788,13 +796,13 @@ def main():
                 display_columns = ['Time', 'Event ID', 'Severity', 'Risk Level', 'MITRE Technique', 'Message']
                 available_columns = [col for col in display_columns if col in filtered_df.columns]
                 display_df = filtered_df[available_columns].copy()
-                
+
                 # Translate Risk Level and Severity columns to English
                 if 'Risk Level' in display_df.columns:
                     display_df['Risk Level'] = display_df['Risk Level'].apply(translate_risk_level)
                 if 'Severity' in display_df.columns:
                     display_df['Severity'] = display_df['Severity'].apply(translate_risk_level)
-                
+
                 # Highlight high/critical risk rows
                 def highlight_risk(row):
                     risk = str(row.get('Severity', row.get('Risk Level', ''))).lower()
@@ -803,7 +811,7 @@ def main():
                     elif 'medium' in risk:
                         return ['background-color: #ffaa00; color: white;'] * len(row)
                     return [''] * len(row)
-                
+
                 # Display table in expander (collapsed by default)
                 with st.expander("🔍 Show Raw Data / Table View", expanded=False):
                     st.dataframe(
@@ -812,7 +820,7 @@ def main():
                         hide_index=True,
                         height=400
                     )
-                
+
                 st.markdown("---")
 
                 # Create card for each log (paginated to keep the page responsive)
@@ -940,7 +948,7 @@ def main():
     with tab_traffic:
         st.subheader("🌐 Network Traffic Monitor")
         st.caption("Real-time packet capture and analysis (Wireshark-like view)")
-        
+
         # Initialize sniffer in session state
         if 'sniffer' not in st.session_state:
             try:
@@ -951,10 +959,10 @@ def main():
                 st.info("💡 Make sure Npcap is installed and you're running as Administrator.")
                 st.session_state.sniffer = None
                 st.session_state.sniffer_running = False
-        
+
         # Control Panel
         col_control1, col_control2, col_control3 = st.columns([2, 1, 1])
-        
+
         with col_control1:
             # Status display
             if st.session_state.sniffer and st.session_state.sniffer_running:
@@ -971,7 +979,7 @@ def main():
                 st.info("⚪ **Stopped** - Click 'Start Sniffer' to begin capturing packets")
             else:
                 st.error("❌ **Sniffer not available**")
-        
+
         with col_control2:
             if st.session_state.sniffer:
                 if not st.session_state.sniffer_running:
@@ -990,17 +998,17 @@ def main():
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error stopping sniffer: {e}")
-        
+
         with col_control3:
             if st.session_state.sniffer and st.session_state.sniffer_running:
                 # PCAP download button - simplified version
                 if st.button("📥 Capture PCAP (30s)", use_container_width=True):
                     try:
-                        import tempfile
                         import os
+                        import tempfile
                         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pcap')
                         temp_file.close()
-                        
+
                         # Capture for 30 seconds (async)
                         with st.spinner("⏳ Capturing packets for 30 seconds..."):
                             loop = asyncio.new_event_loop()
@@ -1012,12 +1020,12 @@ def main():
                                         duration=30.0
                                     )
                                 )
-                                
+
                                 # Read file and provide download
                                 if os.path.exists(filepath):
                                     with open(filepath, 'rb') as f:
                                         pcap_data = f.read()
-                                    
+
                                     st.download_button(
                                         label="📥 Download PCAP File",
                                         data=pcap_data,
@@ -1030,39 +1038,39 @@ def main():
                                 loop.close()
                     except Exception as e:
                         st.error(f"Error capturing PCAP: {e}")
-        
+
         st.markdown("---")
-        
+
         # Metrics
         if st.session_state.sniffer:
             stats = st.session_state.sniffer.get_traffic_stats()
-            
+
             col_metric1, col_metric2, col_metric3 = st.columns(3)
-            
+
             with col_metric1:
                 total_packets = stats.get('total_packets', 0)
                 st.metric("📦 Total Packets", total_packets)
-            
+
             with col_metric2:
                 active_ips = len(set(
                     [ip['ip'] for ip in stats.get('top_source_ips', [])] +
                     [ip['ip'] for ip in stats.get('top_dest_ips', [])]
                 ))
                 st.metric("🌐 Active IPs", active_ips)
-            
+
             with col_metric3:
                 buffer_usage = stats.get('packets_in_buffer', 0)
                 buffer_max = st.session_state.sniffer.max_packets
                 buffer_pct = (buffer_usage / buffer_max * 100) if buffer_max > 0 else 0
                 st.metric("💾 Buffer Usage", f"{buffer_usage}/{buffer_max} ({buffer_pct:.1f}%)")
-            
+
             st.markdown("---")
-            
+
             # Live Packet Table
             st.subheader("📋 Recent Packets")
             try:
                 recent_packets_df = st.session_state.sniffer.get_recent_packets(count=50)
-                
+
                 if not recent_packets_df.empty:
                     st.dataframe(
                         recent_packets_df,
@@ -1074,12 +1082,12 @@ def main():
                     st.info("📭 No packets captured yet. Start the sniffer and generate some network traffic.")
             except Exception as e:
                 st.error(f"Error loading packets: {e}")
-            
+
             st.markdown("---")
-            
+
             # Charts
             chart_col1, chart_col2 = st.columns(2)
-            
+
             with chart_col1:
                 st.subheader("🔝 Top Source IPs")
                 top_source_ips = stats.get('top_source_ips', [])[:10]
@@ -1096,7 +1104,7 @@ def main():
                     st.altair_chart(source_chart, use_container_width=True)
                 else:
                     st.info("No source IP data available yet.")
-            
+
             with chart_col2:
                 st.subheader("📊 Protocol Distribution")
                 top_protocols = stats.get('top_protocols', [])
@@ -1122,17 +1130,17 @@ def main():
                     st.info("No protocol data available yet.")
         else:
             st.warning("⚠️ Packet sniffer is not available. Make sure Npcap is installed and you're running as Administrator.")
-    
+
     with tab_network:
         # Network Scan tab
         st.subheader("🌐 Network Scan - Open Ports")
         st.markdown("This section shows TCP ports in LISTEN mode on your computer.")
-        
+
         # Port scan button
         col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
         with col_btn2:
             scan_button = st.button("🔍 Scan Ports Now", type="primary", use_container_width=True)
-        
+
         # Show port scan results
         if scan_button or 'port_scan_results' not in st.session_state:
             with st.spinner("Scanning ports, please wait..."):
@@ -1143,59 +1151,59 @@ def main():
                 except Exception as e:
                     st.error(f"❌ Error during port scan: {e}")
                     st.session_state.port_scan_results = []
-        
+
         # Show results
         if 'port_scan_results' in st.session_state and st.session_state.port_scan_results:
             ports = st.session_state.port_scan_results
             scan_time = st.session_state.get('port_scan_time', 'Unknown')
-            
+
             # Summary metrics
             summary = get_port_summary(ports)
             col_sum1, col_sum2, col_sum3 = st.columns(3)
-            
+
             with col_sum1:
                 st.metric("🔌 Total Open Ports", summary["Total"])
             with col_sum2:
                 st.metric("🚨 High Risk Ports", summary["High Risk"], delta_color="inverse")
             with col_sum3:
                 st.metric("✅ Low Risk Ports", summary["Low Risk"])
-            
+
             st.caption(f"📅 Last scan: {scan_time}")
             st.markdown("---")
-            
+
             # Port table
             if ports:
                 # Create DataFrame
                 df_ports = pd.DataFrame(ports)
-                
+
                 # Highlight high risk ports
                 def highlight_high_risk(row):
                     styles = [''] * len(row)
                     if row['Risk'] == 'High' or row['Risk'] == 'Yüksek':
                         return ['background-color: #ff4444; color: white; font-weight: bold;'] * len(row)
                     return styles
-                
+
                 # Add icon to Risk column
                 df_ports_display = df_ports.copy()
                 df_ports_display['Risk'] = df_ports_display['Risk'].apply(
                     lambda x: f"🚨 {x}" if x == "High" or x == "Yüksek" else f"✅ {x}"
                 )
-                
+
                 styled_df = df_ports_display.style.apply(highlight_high_risk, axis=1)
-                
+
                 st.dataframe(
                     styled_df,
                     use_container_width=True,
                     hide_index=True,
                     height=500
                 )
-                
+
                 # Warning for high risk ports
                 high_risk_ports = [p for p in ports if p['Risk'] == 'High' or p['Risk'] == 'Yüksek']
                 if high_risk_ports:
                     st.warning(f"⚠️ **{len(high_risk_ports)} high risk port(s) detected!** "
                               "These ports should be carefully examined from a security perspective.")
-                    
+
                     # High risk port details
                     with st.expander("🚨 High Risk Port Details", expanded=True):
                         for port_info in high_risk_ports:
@@ -1210,12 +1218,12 @@ def main():
                 st.info("✅ No open ports found or scan failed.")
         else:
             st.info("🔍 Click the button above to scan ports.")
-    
+
     # --- TAB 3: AI ASSISTANT (UPDATED UI) ---
     with tab_chat:
         st.header("💬 Cybersecurity Assistant")
         st.caption("You can ask questions about your system. AI will respond based on log and port data.")
-        
+
         # Typewriter effect generator
         def stream_data(text):
             """Generator function for typewriter effect"""
@@ -1223,7 +1231,7 @@ def main():
             for word in words:
                 yield word + " "
                 time.sleep(0.02)  # Small delay between words
-        
+
         # Initialize Session State
         if "messages" not in st.session_state:
             st.session_state.messages = []
@@ -1234,19 +1242,19 @@ def main():
                           "You can ask questions about your system. "
                           "For example: 'Are there any risks in my system?', 'Which ports are open?', 'What are the latest security events?'"
             })
-        
+
         # Display Message History (in bubbles)
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
-        
+
         # New Message Input
         if prompt := st.chat_input("What would you like to know about your system's status?"):
             # Add and show user message
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.markdown(prompt)
-            
+
             # Ask Assistant
             with st.chat_message("assistant"):
                 with st.spinner("Analyzing data..."):
@@ -1259,7 +1267,7 @@ def main():
                         error_msg = f"Sorry, an error occurred: {str(e)}"
                         st.error(error_msg)
                         st.session_state.messages.append({"role": "assistant", "content": error_msg})
-        
+
         # Clear chat history button
         if st.session_state.messages and len(st.session_state.messages) > 1:
             st.markdown("---")
@@ -1268,7 +1276,7 @@ def main():
                 if st.button("🗑️ Clear Chat History", use_container_width=True):
                     st.session_state.messages = []
                     st.rerun()
-    
+
     # Bottom section - refresh status + opt-in auto-refresh
     st.markdown("---")
     col_refresh1, col_refresh2, col_refresh3 = st.columns([1, 2, 1])

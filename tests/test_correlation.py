@@ -3,8 +3,8 @@ Tests for cross-event correlation: a successful logon (4624) after repeated
 failures (4625) from the same source IP fires the 'successful brute force' rule.
 """
 import sys
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 

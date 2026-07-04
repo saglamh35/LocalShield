@@ -3,7 +3,6 @@ LocalShield - Configuration File
 Production-Ready: Updated with .env file support and type hints
 """
 import os
-from pathlib import Path
 from typing import List
 
 try:
@@ -83,7 +82,7 @@ try:
 except Exception:
     # os.getlogin() may not work on some systems, try alternative methods
     try:
-        current_user = os.environ.get('USERNAME') or os.environ.get('USER')
+        current_user = os.environ.get('USERNAME') or os.environ.get('USER') or ""
         if current_user and current_user not in SAFE_USERS:
             SAFE_USERS.append(current_user)
     except Exception:

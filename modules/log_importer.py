@@ -13,7 +13,7 @@ This lets LocalShield run and be tested on non-Windows hosts.
 import logging
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -156,8 +156,8 @@ def import_auth_log(
 
 
 if __name__ == "__main__":
-    import sys
     import logging as _logging
+    import sys
 
     _logging.basicConfig(level=_logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     target = sys.argv[1] if len(sys.argv) > 1 else "/var/log/auth.log"

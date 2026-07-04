@@ -3,6 +3,7 @@ Chat Manager Module - AI Chatbot Assistant
 Interactive AI assistant module for LocalShield.
 """
 import ollama
+
 import config
 from db_manager import get_all_logs
 from modules.network_scanner import scan_open_ports
@@ -18,17 +19,17 @@ except Exception:  # pragma: no cover - very old ollama clients
 def get_system_summary() -> str:
     """
     Creates system summary: Latest high-risk logs and risky ports
-    
+
     Returns:
         str: System summary text
     """
     summary_parts = []
-    
+
     try:
         # Get last 10 high-risk logs from database
         all_logs = get_all_logs(config.DB_PATH, limit=50, order_by='DESC')
         high_risk_logs = []
-        
+
         for log in all_logs:
             if len(log) >= 6:
                 risk_level = str(log[5]).strip().lower()
@@ -36,22 +37,21 @@ def get_system_summary() -> str:
                     high_risk_logs.append(log)
             if len(high_risk_logs) >= 10:  # Maximum 10 entries
                 break
-        
+
         # Log summary
         if high_risk_logs:
             summary_parts.append("=== HIGH RISK LOGS ===\n")
             for log in high_risk_logs:
-                log_id = log[0]
                 timestamp = log[1]
                 event_id = log[2]
                 message = log[3] if len(log) > 3 and log[3] else "No message"
                 ai_analysis = log[4] if len(log) > 4 and log[4] else "No analysis"
                 risk_score = log[5] if len(log) > 5 else "Unknown"
-                
+
                 # Shorten message (if too long)
                 message_short = message[:200] if len(message) > 200 else message
                 ai_analysis_short = ai_analysis[:200] if len(ai_analysis) > 200 else ai_analysis
-                
+
                 summary_parts.append(
                     f"- Event ID {event_id} (Time: {timestamp})\n"
                     f"  Message: {message_short}\n"
@@ -60,17 +60,17 @@ def get_system_summary() -> str:
                 )
         else:
             summary_parts.append("=== HIGH RISK LOGS ===\nNo high-risk logs found.\n")
-        
+
         summary_parts.append("\n")
-        
+
     except Exception as e:
         summary_parts.append(f"=== LOG DATA ===\nCould not read log data: {e}\n\n")
-    
+
     try:
         # Perform port scan
         ports = scan_open_ports()
         high_risk_ports = [p for p in ports if p.get('Risk') == 'Yüksek' or p.get('Risk') == 'High']
-        
+
         # Port summary
         if high_risk_ports:
             summary_parts.append("=== HIGH RISK OPEN PORTS ===\n")
@@ -83,7 +83,7 @@ def get_system_summary() -> str:
                 )
         else:
             summary_parts.append("=== OPEN PORTS ===\nNo high-risk open ports found.\n")
-        
+
         # Total port statistics
         if ports:
             total_ports = len(ports)
@@ -94,35 +94,35 @@ def get_system_summary() -> str:
                 f"High Risk: {high_count}\n"
                 f"Low Risk: {low_count}\n"
             )
-        
+
     except Exception as e:
         summary_parts.append(f"=== PORT DATA ===\nCould not read port data: {e}\n")
-    
+
     return "\n".join(summary_parts)
 
 
 def ask_assistant(user_question: str) -> str:
     """
     Asks the AI assistant a question and gets a response based on system data
-    
+
     Args:
         user_question: User's question
-    
+
     Returns:
         str: AI's response
     """
     try:
         # Get system summary
         system_data = get_system_summary()
-        
+
         # Create system prompt (Enhanced for Senior SOC Analyst persona)
         system_prompt = (
             "You are a Senior SOC (Security Operations Center) Analyst with extensive experience in "
             "cybersecurity threat detection, incident response, and security analysis.\n\n"
-            
+
             "SYSTEM DATA:\n"
             f"{system_data}\n\n"
-            
+
             "RESPONSE GUIDELINES:\n"
             "1. Respond in English, clearly and professionally.\n"
             "2. Base your response ONLY on the information provided in the system data above.\n"
@@ -138,10 +138,10 @@ def ask_assistant(user_question: str) -> str:
             "   • Summary (1-2 sentences)\n"
             "   • Key Findings (bullet points)\n"
             "   • Recommendations (bullet points)\n\n"
-            
+
             "Answer the user's question as a Senior SOC Analyst would:"
         )
-        
+
         # Send to Ollama
         response = _client.chat(
             model=config.MODEL_NAME,
@@ -156,12 +156,12 @@ def ask_assistant(user_question: str) -> str:
                 }
             ]
         )
-        
+
         # Get the AI's answer
         answer = response['message']['content'].strip()
-        
+
         return answer
-        
+
     except Exception as e:
         # Error case
         error_message = f"Sorry, an error occurred: {str(e)}\n"

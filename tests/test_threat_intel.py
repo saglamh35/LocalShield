@@ -11,7 +11,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from modules.threat_intel import ThreatIntel
 
-
 CSV_CONTENT = """ip,category,confidence
 1.2.3.4,Botnet,100
 5.6.7.8,BruteForce,90

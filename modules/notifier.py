@@ -37,7 +37,7 @@ class Notifier:
         webhook_url: Optional[str] = None,
     ):
         self.min_rank = _rank(min_severity or getattr(config, "NOTIFY_MIN_SEVERITY", "High"))
-        self.alert_log_file = alert_log_file or getattr(config, "ALERT_LOG_FILE", "alerts.log")
+        self.alert_log_file: str = str(alert_log_file or getattr(config, "ALERT_LOG_FILE", "alerts.log"))
         self.desktop = getattr(config, "NOTIFY_DESKTOP", False) if desktop is None else desktop
         self.webhook_url = (webhook_url if webhook_url is not None
                             else getattr(config, "NOTIFY_WEBHOOK_URL", "")) or ""
