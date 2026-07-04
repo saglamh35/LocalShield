@@ -3,6 +3,7 @@ Threat Intelligence Module - Malicious IP lookup
 Checks IPs against a list of known attacker addresses and reports their risk.
 Production-Ready: CSV-based threat intelligence feed.
 """
+
 import csv
 import ipaddress
 import logging
@@ -49,23 +50,23 @@ class ThreatIntel:
                 logger.warning("   Threat intelligence checks will be disabled.")
                 return
 
-            with open(self.csv_path, 'r', encoding='utf-8') as f:
+            with open(self.csv_path, "r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 count = 0
 
                 for row in reader:
-                    ip = row.get('ip', '').strip()
-                    category = row.get('category', 'Unknown').strip()
-                    confidence = int(row.get('confidence', 0))
+                    ip = row.get("ip", "").strip()
+                    category = row.get("category", "Unknown").strip()
+                    confidence = int(row.get("confidence", 0))
 
                     # Skip benign IPs (confidence 0 or category "Benign")
-                    if category.lower() == 'benign' or confidence == 0:
+                    if category.lower() == "benign" or confidence == 0:
                         continue
 
                     if not ip:
                         continue
 
-                    if '/' in ip:
+                    if "/" in ip:
                         # CIDR range entry
                         try:
                             network = ipaddress.IPv4Network(ip, strict=False)
@@ -107,11 +108,7 @@ class ThreatIntel:
         if ip_clean in self.threat_ips:
             category, confidence = self.threat_db[ip_clean]
             logger.warning(f"🚨 THREAT INTEL MATCH: {ip_clean} - Category: {category}, Confidence: {confidence}%")
-            return {
-                'ip': ip_clean,
-                'category': category,
-                'confidence': confidence
-            }
+            return {"ip": ip_clean, "category": category, "confidence": confidence}
 
         # 2. CIDR range match
         if self.threat_networks:
@@ -126,12 +123,7 @@ class ThreatIntel:
                         f"🚨 THREAT INTEL MATCH: {ip_clean} in {entry} - "
                         f"Category: {category}, Confidence: {confidence}%"
                     )
-                    return {
-                        'ip': ip_clean,
-                        'category': category,
-                        'confidence': confidence,
-                        'matched_range': entry
-                    }
+                    return {"ip": ip_clean, "category": category, "confidence": confidence, "matched_range": entry}
 
         return None
 

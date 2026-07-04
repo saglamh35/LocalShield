@@ -326,7 +326,8 @@ SAFE_IPS=192.168.1.1
 
 ### Detection Rules
 
-Customize detection rules in `rules/*.yaml`:
+Customize detection rules in `rules/*.yaml`. Full schema and examples (OR,
+negation, thresholds, correlation) are in **[docs/RULES.md](docs/RULES.md)**.
 
 ```yaml
 id: "custom_rule_001"
@@ -402,6 +403,12 @@ Please use it with that in mind:
   what it does before enabling it in a live environment.
 - **AI output is assistive.** The local LLM adds context and recommendations; it
   is not a substitute for professional incident response.
+
+## 📚 Documentation
+
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — component map & data flow
+- **[docs/RULES.md](docs/RULES.md)** — detection-rule authoring guide
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — setup, tooling, adding a rule
 
 ## 📝 License
 

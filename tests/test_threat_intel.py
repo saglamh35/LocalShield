@@ -2,6 +2,7 @@
 Unit tests for the ThreatIntel module.
 Uses a temporary CSV feed so the tests do not depend on data/threat_intel.csv.
 """
+
 import sys
 from pathlib import Path
 
@@ -10,7 +11,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from modules.threat_intel import ThreatIntel
-
 
 CSV_CONTENT = """ip,category,confidence
 1.2.3.4,Botnet,100
@@ -60,9 +60,7 @@ class TestThreatIntel:
 
     def test_reload(self, feed, tmp_path):
         # Overwrite the feed with a single new malicious IP and reload
-        (tmp_path / "threat_intel.csv").write_text(
-            "ip,category,confidence\n10.20.30.40,Malware,80\n", encoding="utf-8"
-        )
+        (tmp_path / "threat_intel.csv").write_text("ip,category,confidence\n10.20.30.40,Malware,80\n", encoding="utf-8")
         feed.reload()
         assert feed.get_threat_count() == 1
         assert feed.check_ip("10.20.30.40") is not None
@@ -102,8 +100,8 @@ class TestCIDRRanges:
         assert cidr_feed.check_ip("1.2.3.4") is not None
 
     def test_second_range_boundaries(self, cidr_feed):
-        assert cidr_feed.check_ip("10.10.0.255") is not None   # inside /24
-        assert cidr_feed.check_ip("10.10.1.0") is None          # just outside /24
+        assert cidr_feed.check_ip("10.10.0.255") is not None  # inside /24
+        assert cidr_feed.check_ip("10.10.1.0") is None  # just outside /24
 
     def test_garbage_input_is_safe(self, cidr_feed):
         assert cidr_feed.check_ip("not-an-ip") is None

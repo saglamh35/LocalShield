@@ -2,11 +2,11 @@
 Database Manager - SQLite database management
 Production-Ready: Updated with type hints and logging
 """
-import sqlite3
+
 import logging
+import sqlite3
 from datetime import datetime
-from typing import Optional, List, Tuple
-from pathlib import Path
+from typing import List, Optional, Tuple
 
 import config
 
@@ -17,24 +17,24 @@ logger = logging.getLogger(__name__)
 def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
     """
     Creates SQLite database and prepares security_logs table.
-    
+
     Args:
         db_path: Database file path (default: config.DB_PATH)
-    
+
     Returns:
         sqlite3.Connection: Database connection
     """
     db_path = db_path or config.DB_PATH
-    
+
     try:
         # Thread-safe connection: with timeout and WAL mode
         conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
         # Enable WAL (Write-Ahead Logging) mode (better performance and thread-safety)
-        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute("PRAGMA journal_mode=WAL")
         cursor = conn.cursor()
-        
+
         # Create security_logs table
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS security_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp DATETIME NOT NULL,
@@ -44,11 +44,11 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
                 risk_score TEXT,
                 mitre_technique TEXT
             )
-        ''')
-        
+        """)
+
         # Add mitre_technique column to existing tables (if not exists)
         try:
-            cursor.execute('ALTER TABLE security_logs ADD COLUMN mitre_technique TEXT')
+            cursor.execute("ALTER TABLE security_logs ADD COLUMN mitre_technique TEXT")
             conn.commit()
             logger.debug("'mitre_technique' column added")
         except sqlite3.OperationalError:
@@ -56,11 +56,11 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
             pass
 
         # Indexes speed up the dashboard's time-ordered and risk-filtered queries
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON security_logs(timestamp)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_logs_risk ON security_logs(risk_score)')
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON security_logs(timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_risk ON security_logs(risk_score)")
 
         # Audit trail of automated actions (e.g. firewall blocks)
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS actions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp DATETIME NOT NULL,
@@ -68,18 +68,33 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
                 target TEXT,
                 details TEXT
             )
-        ''')
+        """)
 
         # Current set of IP addresses blocked by the response engine (persisted
         # so a restart knows what is already blocked)
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS blocked_ips (
                 ip TEXT PRIMARY KEY,
                 rule_name TEXT,
                 blocked_at DATETIME NOT NULL,
                 reason TEXT
             )
-        ''')
+        """)
+
+        # Incidents: related high-risk detections grouped by a key (source IP or
+        # rule) within a rolling window, so the analyst sees incidents, not noise.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS incidents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                key TEXT NOT NULL,
+                title TEXT,
+                first_seen DATETIME NOT NULL,
+                last_seen DATETIME NOT NULL,
+                event_count INTEGER NOT NULL DEFAULT 1,
+                max_severity TEXT,
+                status TEXT NOT NULL DEFAULT 'open'
+            )
+        """)
 
         conn.commit()
         logger.info(f"Database '{db_path}' successfully created/connected")
@@ -99,11 +114,11 @@ def insert_log(
     risk_score: Optional[str] = None,
     mitre_technique: Optional[str] = None,
     db_path: Optional[str] = None,
-    conn: Optional[sqlite3.Connection] = None
+    conn: Optional[sqlite3.Connection] = None,
 ) -> int:
     """
     Adds a new log entry to security_logs table.
-    
+
     Args:
         timestamp: Record time (datetime object)
         event_id: Event ID (optional)
@@ -113,7 +128,7 @@ def insert_log(
         mitre_technique: MITRE ATT&CK technique (optional)
         db_path: Database file path (default: config.DB_PATH)
         conn: Existing database connection (optional, opens new connection if not provided)
-    
+
     Returns:
         int: ID of the inserted record
     """
@@ -123,26 +138,29 @@ def insert_log(
         # Thread-safe connection: with timeout and WAL mode
         conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
         # Enable WAL (Write-Ahead Logging) mode (better performance and thread-safety)
-        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute("PRAGMA journal_mode=WAL")
         should_close = True
-    
+
     try:
         cursor = conn.cursor()
-        
+
         # Convert timestamp to string format
-        timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-        
-        cursor.execute('''
+        timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+
+        cursor.execute(
+            """
             INSERT INTO security_logs (timestamp, event_id, message, ai_analysis, risk_score, mitre_technique)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', (timestamp_str, event_id, message, ai_analysis, risk_score, mitre_technique))
-        
+        """,
+            (timestamp_str, event_id, message, ai_analysis, risk_score, mitre_technique),
+        )
+
         conn.commit()
-        log_id: int = cursor.lastrowid
-        
+        log_id: int = cursor.lastrowid or -1
+
         logger.debug(f"Log entry added. ID: {log_id}, Event ID: {event_id}, Risk: {risk_score}")
         return log_id
-        
+
     except Exception as e:
         logger.error(f"Error adding log: {e}", exc_info=True)
         raise
@@ -152,18 +170,16 @@ def insert_log(
 
 
 def get_all_logs(
-    db_path: Optional[str] = None,
-    limit: Optional[int] = None,
-    order_by: str = 'DESC'
+    db_path: Optional[str] = None, limit: Optional[int] = None, order_by: str = "DESC"
 ) -> List[Tuple[int, str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]]:
     """
     Gets all log entries from security_logs table.
-    
+
     Args:
         db_path: Database file path (default: config.DB_PATH)
         limit: Maximum number of records (optional)
         order_by: Sort direction ('DESC' or 'ASC', default: 'DESC')
-    
+
     Returns:
         list: List of log entries (tuple list: id, timestamp, event_id, message, ai_analysis, risk_score, mitre_technique)
     """
@@ -171,30 +187,32 @@ def get_all_logs(
 
     # Validate untrusted-ish inputs before interpolating them into SQL.
     # ORDER BY direction must be an exact keyword; LIMIT must be a positive int.
-    direction = 'DESC' if str(order_by).strip().upper() != 'ASC' else 'ASC'
+    direction = "DESC" if str(order_by).strip().upper() != "ASC" else "ASC"
 
     conn = sqlite3.connect(db_path)
 
     try:
         cursor = conn.cursor()
 
-        query = f'''
+        query = f"""
             SELECT id, timestamp, event_id, message, ai_analysis, risk_score, mitre_technique
             FROM security_logs
             ORDER BY timestamp {direction}
-        '''
+        """
 
         params: Tuple = ()
         if limit is not None:
-            query += ' LIMIT ?'
+            query += " LIMIT ?"
             params = (int(limit),)
 
         cursor.execute(query, params)
-        results: List[Tuple[int, str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]] = cursor.fetchall()
-        
+        results: List[Tuple[int, str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]] = (
+            cursor.fetchall()
+        )
+
         logger.debug(f"{len(results)} log entries retrieved (limit: {limit})")
         return results
-        
+
     except Exception as e:
         logger.error(f"Log reading error: {e}", exc_info=True)
         return []
@@ -205,26 +223,26 @@ def get_all_logs(
 def get_high_risk_count(db_path: Optional[str] = None) -> int:
     """
     Returns the count of high-risk events.
-    
+
     Args:
         db_path: Database file path (default: config.DB_PATH)
-    
+
     Returns:
         int: Count of high-risk events
     """
     db_path = db_path or config.DB_PATH
     conn = sqlite3.connect(db_path)
-    
+
     try:
         cursor = conn.cursor()
-        
-        cursor.execute('''
+
+        cursor.execute("""
             SELECT COUNT(*) FROM security_logs
             WHERE risk_score = 'Yüksek' OR risk_score = 'High'
-        ''')
+        """)
         count: int = cursor.fetchone()[0]
         return count
-        
+
     except Exception as e:
         logger.error(f"Error calculating high-risk event count: {e}", exc_info=True)
         return 0
@@ -235,22 +253,22 @@ def get_high_risk_count(db_path: Optional[str] = None) -> int:
 def get_total_log_count(db_path: Optional[str] = None) -> int:
     """
     Returns the total log count.
-    
+
     Args:
         db_path: Database file path (default: config.DB_PATH)
-    
+
     Returns:
         int: Total log count
     """
     db_path = db_path or config.DB_PATH
     conn = sqlite3.connect(db_path)
-    
+
     try:
         cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM security_logs')
+        cursor.execute("SELECT COUNT(*) FROM security_logs")
         count: int = cursor.fetchone()[0]
         return count
-        
+
     except Exception as e:
         logger.error(f"Error calculating total log count: {e}", exc_info=True)
         return 0
@@ -261,27 +279,27 @@ def get_total_log_count(db_path: Optional[str] = None) -> int:
 def get_latest_detection(db_path: Optional[str] = None) -> Optional[str]:
     """
     Returns the time of the latest detected event.
-    
+
     Args:
         db_path: Database file path (default: config.DB_PATH)
-    
+
     Returns:
         str: Latest detection time (if exists), otherwise None
     """
     db_path = db_path or config.DB_PATH
     conn = sqlite3.connect(db_path)
-    
+
     try:
         cursor = conn.cursor()
-        
-        cursor.execute('''
+
+        cursor.execute("""
             SELECT timestamp FROM security_logs
             ORDER BY timestamp DESC
             LIMIT 1
-        ''')
+        """)
         result = cursor.fetchone()
         return result[0] if result else None
-        
+
     except Exception as e:
         logger.error(f"Error getting latest detection time: {e}", exc_info=True)
         return None
@@ -292,25 +310,25 @@ def get_latest_detection(db_path: Optional[str] = None) -> Optional[str]:
 def clear_all_logs(db_path: Optional[str] = None) -> bool:
     """
     Deletes all log entries in the database (table structure is preserved).
-    
+
     Args:
         db_path: Database file path (default: config.DB_PATH)
-    
+
     Returns:
         bool: True if successful, False if error occurred
     """
     db_path = db_path or config.DB_PATH
     conn = sqlite3.connect(db_path)
-    
+
     try:
         cursor = conn.cursor()
-        cursor.execute('DELETE FROM security_logs')
+        cursor.execute("DELETE FROM security_logs")
         conn.commit()
-        
+
         deleted_count = cursor.rowcount
         logger.info(f"All log entries deleted. Deleted count: {deleted_count}")
         return True
-        
+
     except Exception as e:
         logger.error(f"Error deleting log entries: {e}", exc_info=True)
         conn.rollback()
@@ -340,16 +358,16 @@ def record_action(
         int: ID of the inserted audit row
     """
     db_path = db_path or config.DB_PATH
-    ts = (timestamp or datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
+    ts = (timestamp or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
     conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
     try:
         cursor = conn.cursor()
         cursor.execute(
-            'INSERT INTO actions (timestamp, action_type, target, details) VALUES (?, ?, ?, ?)',
+            "INSERT INTO actions (timestamp, action_type, target, details) VALUES (?, ?, ?, ?)",
             (ts, action_type, target, details),
         )
         conn.commit()
-        return cursor.lastrowid
+        return cursor.lastrowid or -1
     except Exception as e:
         logger.error(f"Error recording action: {e}", exc_info=True)
         return -1
@@ -369,12 +387,12 @@ def record_blocked_ip(
     Uses INSERT OR REPLACE so re-blocking the same IP is idempotent.
     """
     db_path = db_path or config.DB_PATH
-    ts = (timestamp or datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
+    ts = (timestamp or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
     conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
     try:
         cursor = conn.cursor()
         cursor.execute(
-            'INSERT OR REPLACE INTO blocked_ips (ip, rule_name, blocked_at, reason) VALUES (?, ?, ?, ?)',
+            "INSERT OR REPLACE INTO blocked_ips (ip, rule_name, blocked_at, reason) VALUES (?, ?, ?, ?)",
             (ip, rule_name, ts, reason),
         )
         conn.commit()
@@ -390,7 +408,7 @@ def get_blocked_ips(db_path: Optional[str] = None) -> List[Tuple[str, Optional[s
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
-        cursor.execute('SELECT ip, rule_name, blocked_at, reason FROM blocked_ips ORDER BY blocked_at DESC')
+        cursor.execute("SELECT ip, rule_name, blocked_at, reason FROM blocked_ips ORDER BY blocked_at DESC")
         return cursor.fetchall()
     except Exception as e:
         logger.error(f"Error reading blocked IPs: {e}", exc_info=True)
@@ -409,8 +427,7 @@ def get_recent_actions(
     try:
         cursor = conn.cursor()
         cursor.execute(
-            'SELECT id, timestamp, action_type, target, details FROM actions '
-            'ORDER BY timestamp DESC LIMIT ?',
+            "SELECT id, timestamp, action_type, target, details FROM actions ORDER BY timestamp DESC LIMIT ?",
             (int(limit),),
         )
         return cursor.fetchall()
@@ -421,17 +438,122 @@ def get_recent_actions(
         conn.close()
 
 
+_SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+
+
+def upsert_incident(
+    key: str,
+    title: str,
+    severity: str,
+    timestamp: Optional[datetime] = None,
+    window_seconds: int = 1800,
+    db_path: Optional[str] = None,
+) -> int:
+    """
+    Attach a detection to an OPEN incident for `key` seen within `window_seconds`,
+    or open a new incident. Groups related high-risk events instead of emitting a
+    flat stream. Returns the incident id.
+    """
+    db_path = db_path or config.DB_PATH
+    ts = timestamp or datetime.now()
+    ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
+    try:
+        cursor = conn.cursor()
+        # Most recent open incident for this key
+        cursor.execute(
+            "SELECT id, last_seen, event_count, max_severity FROM incidents "
+            "WHERE key = ? AND status = 'open' ORDER BY last_seen DESC LIMIT 1",
+            (key,),
+        )
+        row = cursor.fetchone()
+
+        fresh = False
+        if row:
+            inc_id, last_seen, count, max_sev = row
+            try:
+                last_dt = datetime.strptime(str(last_seen), "%Y-%m-%d %H:%M:%S")
+                fresh = (ts - last_dt).total_seconds() <= window_seconds
+            except Exception:
+                fresh = False
+
+        if row and fresh:
+            new_sev = max_sev
+            if _SEVERITY_RANK.get(str(severity).lower(), 0) > _SEVERITY_RANK.get(str(max_sev).lower(), 0):
+                new_sev = severity
+            cursor.execute(
+                "UPDATE incidents SET last_seen = ?, event_count = event_count + 1, max_severity = ? WHERE id = ?",
+                (ts_str, new_sev, inc_id),
+            )
+            conn.commit()
+            return inc_id
+
+        cursor.execute(
+            "INSERT INTO incidents (key, title, first_seen, last_seen, event_count, "
+            "max_severity, status) VALUES (?, ?, ?, ?, 1, ?, 'open')",
+            (key, title, ts_str, ts_str, severity),
+        )
+        conn.commit()
+        return cursor.lastrowid or -1
+    except Exception as e:
+        logger.error(f"Error upserting incident: {e}", exc_info=True)
+        return -1
+    finally:
+        conn.close()
+
+
+def get_incidents(
+    status: Optional[str] = None,
+    limit: int = 100,
+    db_path: Optional[str] = None,
+) -> List[Tuple[int, str, Optional[str], str, str, int, Optional[str], str]]:
+    """
+    Return incidents as (id, key, title, first_seen, last_seen, event_count,
+    max_severity, status), newest activity first. Optionally filter by status.
+    """
+    db_path = db_path or config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        query = "SELECT id, key, title, first_seen, last_seen, event_count, max_severity, status FROM incidents"
+        params: Tuple = ()
+        if status:
+            query += " WHERE status = ?"
+            params = (status,)
+        query += " ORDER BY last_seen DESC LIMIT ?"
+        params = params + (int(limit),)
+        cursor.execute(query, params)
+        return cursor.fetchall()
+    except Exception as e:
+        logger.error(f"Error reading incidents: {e}", exc_info=True)
+        return []
+    finally:
+        conn.close()
+
+
+def get_open_incident_count(db_path: Optional[str] = None) -> int:
+    """Return the number of currently-open incidents."""
+    db_path = db_path or config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM incidents WHERE status = 'open'")
+        return cursor.fetchone()[0]
+    except Exception as e:
+        logger.error(f"Error counting incidents: {e}", exc_info=True)
+        return 0
+    finally:
+        conn.close()
+
+
 # Example usage for testing
 if __name__ == "__main__":
     # Logging configuration
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
     # Initialize database
     conn = init_db(config.DB_PATH)
-    
+
     # Add example log entry
     now = datetime.now()
     insert_log(
@@ -440,9 +562,9 @@ if __name__ == "__main__":
         message="Failed login attempt to administrator account",
         ai_analysis="Potential brute-force attack detected.",
         risk_score="High",
-        conn=conn
+        conn=conn,
     )
-    
+
     # Close connection
     conn.close()
     logger.info("Test completed!")

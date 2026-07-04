@@ -6,8 +6,9 @@ common neighbours. Unknown IDs degrade gracefully (sub-techniques fall back to
 their parent, otherwise the ID is returned with an "Unknown" tactic), so the
 dashboard never breaks on an unseen technique.
 """
+
 from collections import Counter
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 # technique id -> (human name, ATT&CK tactic)
 TECHNIQUES: Dict[str, tuple] = {
@@ -36,9 +37,19 @@ TECHNIQUES: Dict[str, tuple] = {
 
 # Stable order for display (roughly the ATT&CK kill-chain progression)
 TACTIC_ORDER: List[str] = [
-    "Initial Access", "Execution", "Persistence", "Privilege Escalation",
-    "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement",
-    "Collection", "Command and Control", "Exfiltration", "Impact", "Unknown",
+    "Initial Access",
+    "Execution",
+    "Persistence",
+    "Privilege Escalation",
+    "Defense Evasion",
+    "Credential Access",
+    "Discovery",
+    "Lateral Movement",
+    "Collection",
+    "Command and Control",
+    "Exfiltration",
+    "Impact",
+    "Unknown",
 ]
 
 
@@ -65,7 +76,7 @@ def technique_info(technique_id: Optional[str]) -> Dict[str, str]:
     return {"id": tid, "name": tid, "tactic": "Unknown"}
 
 
-def summarize(techniques: Iterable[Optional[str]]) -> List[Dict[str, object]]:
+def summarize(techniques: Iterable[Optional[str]]) -> List[Dict[str, Any]]:
     """
     Aggregate an iterable of technique ids into a per-technique summary list:
     [{'id', 'name', 'tactic', 'count'}], sorted by count desc.
@@ -80,15 +91,17 @@ def summarize(techniques: Iterable[Optional[str]]) -> List[Dict[str, object]]:
             continue
         counts[tid.upper()] += 1
 
-    rows: List[Dict[str, object]] = []
+    rows: List[Dict[str, Any]] = []
     for tid, count in counts.items():
         info = technique_info(tid)
-        rows.append({
-            "id": info["id"],
-            "name": info["name"],
-            "tactic": info["tactic"],
-            "count": count,
-        })
+        rows.append(
+            {
+                "id": info["id"],
+                "name": info["name"],
+                "tactic": info["tactic"],
+                "count": count,
+            }
+        )
 
     rows.sort(key=lambda r: r["count"], reverse=True)
     return rows

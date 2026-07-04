@@ -2,10 +2,11 @@
 Unit tests for db_manager: schema/indexes, audit actions and blocked-IP
 persistence. Each test uses an isolated temporary database.
 """
+
 import sqlite3
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -25,9 +26,7 @@ class TestSchema:
     def test_indexes_created(self, db):
         conn = sqlite3.connect(db)
         try:
-            names = {r[0] for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='index'"
-            ).fetchall()}
+            names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()}
         finally:
             conn.close()
         assert "idx_logs_timestamp" in names
@@ -36,9 +35,7 @@ class TestSchema:
     def test_audit_tables_exist(self, db):
         conn = sqlite3.connect(db)
         try:
-            tables = {r[0] for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()}
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         finally:
             conn.close()
         assert {"security_logs", "actions", "blocked_ips"}.issubset(tables)

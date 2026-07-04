@@ -2,14 +2,16 @@
 Knowledge Base Module - Hybrid RAG system
 Provides reference information about Windows Event IDs.
 """
+
 import json
-from typing import Any, Dict, Optional
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 # File paths
 BASE_DIR = Path(__file__).parent.parent
 LOCAL_KNOWLEDGE_PATH = BASE_DIR / "data" / "local_knowledge.json"
 EXTERNAL_KNOWLEDGE_PATH = BASE_DIR / "data" / "external_knowledge.json"
+
 
 class KnowledgeBase:
     """
@@ -29,7 +31,7 @@ class KnowledgeBase:
         # --- 1. LOAD LOCAL KNOWLEDGE ---
         try:
             if LOCAL_KNOWLEDGE_PATH.exists():
-                with open(LOCAL_KNOWLEDGE_PATH, 'r', encoding='utf-8') as f:
+                with open(LOCAL_KNOWLEDGE_PATH, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     # Local knowledge is normally in the form {"4625": {...}}
                     if isinstance(data, dict):
@@ -46,7 +48,7 @@ class KnowledgeBase:
         # --- 2. LOAD EXTERNAL KNOWLEDGE ---
         try:
             if EXTERNAL_KNOWLEDGE_PATH.exists():
-                with open(EXTERNAL_KNOWLEDGE_PATH, 'r', encoding='utf-8') as f:
+                with open(EXTERNAL_KNOWLEDGE_PATH, "r", encoding="utf-8") as f:
                     external_data = json.load(f)
 
                 self.external_knowledge = {}
@@ -108,20 +110,13 @@ class KnowledgeBase:
         """
         Convert external knowledge (GitHub JSON format) into our internal format.
         """
-        normalized = {
-            "title": "",
-            "description": "",
-            "risk_level": "Medium",
-            "advice": ""
-        }
+        normalized = {"title": "", "description": "", "risk_level": "Medium", "advice": ""}
 
         if isinstance(external_info, dict):
             # --- TITLE ---
             # Fall back to 'subCategory' or a generic label if 'name' is missing
             normalized["title"] = (
-                external_info.get("name") or
-                external_info.get("subCategory") or
-                f"Event {external_info.get('eventID')}"
+                external_info.get("name") or external_info.get("subCategory") or f"Event {external_info.get('eventID')}"
             )
 
             # --- DESCRIPTION ---
@@ -151,15 +146,18 @@ class KnowledgeBase:
 
         return normalized
 
+
 # --- Global helper functions (module-level convenience API) ---
 
 _knowledge_base_instance = None
+
 
 def load_knowledge():
     global _knowledge_base_instance
     if _knowledge_base_instance is None:
         _knowledge_base_instance = KnowledgeBase()
     return _knowledge_base_instance
+
 
 def get_event_info(event_id: str) -> Optional[Dict[str, str]]:
     kb = load_knowledge()

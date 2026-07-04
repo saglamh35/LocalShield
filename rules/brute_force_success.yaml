@@ -1,0 +1,22 @@
+id: "brute_force_success_001"
+name: "Successful Brute Force (logon after repeated failures)"
+description: "Correlates a successful logon (4624) from a source IP that just produced multiple failed logons (4625) — a strong sign a brute-force / password-spray attack succeeded."
+mitre:
+  - "T1110"
+  - "T1078"
+severity: "critical"
+tags:
+  - "credential_access"
+  - "correlation"
+  - "lateral_movement"
+enabled: true
+
+conditions:
+  provider: "Security"
+  event_id: "4624"          # trigger: successful logon
+  correlation:
+    prior_event_id: "4625"  # preceded by failed logons...
+    count: 5                # ...at least this many...
+    within: 300             # ...within this many seconds, from the same source IP
+
+match_message: "🔴 Successful Brute Force: a successful logon followed a burst of failed logons from the same source IP — the account may be compromised. Investigate immediately and reset credentials."

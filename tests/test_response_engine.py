@@ -2,6 +2,7 @@
 Unit tests for the FirewallManager (response engine).
 subprocess.run is patched so no real netsh/firewall commands are executed.
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +17,7 @@ from modules.response_engine import FirewallManager
 
 class FakeResult:
     """Minimal stand-in for subprocess.CompletedProcess."""
+
     def __init__(self, returncode=0, stderr=""):
         self.returncode = returncode
         self.stderr = stderr
@@ -30,27 +32,33 @@ def fw():
 
 
 class TestValidation:
-    @pytest.mark.parametrize("ip,valid", [
-        ("1.2.3.4", True),
-        ("192.168.0.1", True),
-        ("255.255.255.255", True),
-        ("999.1.1.1", False),
-        ("1.2.3", False),
-        ("abc", False),
-        ("", False),
-    ])
+    @pytest.mark.parametrize(
+        "ip,valid",
+        [
+            ("1.2.3.4", True),
+            ("192.168.0.1", True),
+            ("255.255.255.255", True),
+            ("999.1.1.1", False),
+            ("1.2.3", False),
+            ("abc", False),
+            ("", False),
+        ],
+    )
     def test_is_valid_ipv4(self, fw, ip, valid):
         assert fw.is_valid_ipv4(ip) is valid
 
-    @pytest.mark.parametrize("ip,private", [
-        ("10.0.0.1", True),
-        ("172.16.5.5", True),
-        ("192.168.1.100", True),
-        ("127.0.0.1", True),
-        ("169.254.1.1", True),
-        ("8.8.8.8", False),
-        ("1.2.3.4", False),
-    ])
+    @pytest.mark.parametrize(
+        "ip,private",
+        [
+            ("10.0.0.1", True),
+            ("172.16.5.5", True),
+            ("192.168.1.100", True),
+            ("127.0.0.1", True),
+            ("169.254.1.1", True),
+            ("8.8.8.8", False),
+            ("1.2.3.4", False),
+        ],
+    )
     def test_is_private_ip(self, fw, ip, private):
         assert fw.is_private_ip(ip) is private
 
@@ -113,7 +121,8 @@ class TestBlocking:
 
     def test_existing_rule_is_treated_as_success(self, fw, monkeypatch):
         monkeypatch.setattr(
-            response_engine.subprocess, "run",
+            response_engine.subprocess,
+            "run",
             lambda *a, **k: FakeResult(returncode=1, stderr="Rule already exists."),
         )
         assert fw.block_ip("8.8.8.8") is True
@@ -121,7 +130,8 @@ class TestBlocking:
 
     def test_block_failure_returns_false(self, fw, monkeypatch):
         monkeypatch.setattr(
-            response_engine.subprocess, "run",
+            response_engine.subprocess,
+            "run",
             lambda *a, **k: FakeResult(returncode=1, stderr="Access denied."),
         )
         assert fw.block_ip("8.8.8.8") is False
@@ -137,7 +147,8 @@ class TestBlocking:
     def test_unblock_success(self, fw, monkeypatch):
         fw.blocked_ips.add("8.8.8.8")
         monkeypatch.setattr(
-            response_engine.subprocess, "run",
+            response_engine.subprocess,
+            "run",
             lambda *a, **k: FakeResult(returncode=0),
         )
         assert fw.unblock_ip("8.8.8.8") is True
