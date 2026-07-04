@@ -2,11 +2,13 @@
 LocalShield - Configuration File
 Production-Ready: Updated with .env file support and type hints
 """
+
 import os
 from typing import List
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()  # Load .env file
 except ImportError:
     # Continue if python-dotenv is not available (default values will be used)
@@ -58,8 +60,10 @@ DEMO_MODE: bool = os.getenv("DEMO_MODE", "False").lower() in ("true", "1", "yes"
 # Prevents the active-response engine from cutting off DNS/gateway and locking
 # you out. Extra IPs can be added via SAFE_IPS="a,b,c" (comma-separated).
 SAFE_IPS: List[str] = [
-    "8.8.8.8", "8.8.4.4",      # Google DNS
-    "1.1.1.1", "1.0.0.1",      # Cloudflare DNS
+    "8.8.8.8",
+    "8.8.4.4",  # Google DNS
+    "1.1.1.1",
+    "1.0.0.1",  # Cloudflare DNS
 ]
 _extra_safe_ips = os.getenv("SAFE_IPS", "")
 if _extra_safe_ips:
@@ -82,7 +86,7 @@ try:
 except Exception:
     # os.getlogin() may not work on some systems, try alternative methods
     try:
-        current_user = os.environ.get('USERNAME') or os.environ.get('USER') or ""
+        current_user = os.environ.get("USERNAME") or os.environ.get("USER") or ""
         if current_user and current_user not in SAFE_USERS:
             SAFE_USERS.append(current_user)
     except Exception:

@@ -2,6 +2,7 @@
 Unit tests for the KnowledgeBase (hybrid RAG): local/external lookup and the
 external->internal normalization.
 """
+
 import sys
 from pathlib import Path
 

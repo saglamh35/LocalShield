@@ -1,6 +1,7 @@
 """
 Network Scanner Module - Module for Scanning Open Ports
 """
+
 import socket
 from typing import Any, Dict, List, Optional
 
@@ -20,7 +21,7 @@ HIGH_RISK_PORTS = {
     5900: "VNC",
     8080: "HTTP Proxy",
     135: "MSRPC",
-    139: "NetBIOS"
+    139: "NetBIOS",
 }
 
 # Low-risk but common ports
@@ -33,7 +34,7 @@ KNOWN_SAFE_PORTS = {
     110: "POP3",
     143: "IMAP",
     993: "IMAPS",
-    995: "POP3S"
+    995: "POP3S",
 }
 
 
@@ -67,18 +68,15 @@ def get_port_info(port: int, pid: Optional[int] = None) -> Dict[str, Any]:
     Returns:
         dict: Port information (name, risk, description)
     """
-    port_info = {
-        "port": port,
-        "name": "Unknown",
-        "risk": "Low",
-        "description": "Unknown service"
-    }
+    port_info = {"port": port, "name": "Unknown", "risk": "Low", "description": "Unknown service"}
 
     # Check high-risk ports
     if port in HIGH_RISK_PORTS:
         port_info["name"] = HIGH_RISK_PORTS[port]
         port_info["risk"] = "High"
-        port_info["description"] = f"{HIGH_RISK_PORTS[port]} service - Should be carefully monitored from security perspective"
+        port_info["description"] = (
+            f"{HIGH_RISK_PORTS[port]} service - Should be carefully monitored from security perspective"
+        )
         return port_info
 
     # Check known safe ports
@@ -90,7 +88,7 @@ def get_port_info(port: int, pid: Optional[int] = None) -> Dict[str, Any]:
 
     # Query socket service for unknown ports
     try:
-        service_name = socket.getservbyport(port, 'tcp')
+        service_name = socket.getservbyport(port, "tcp")
         port_info["name"] = service_name.upper()
         port_info["description"] = f"{service_name.upper()} service"
     except (OSError, socket.error):
@@ -122,7 +120,7 @@ def scan_open_ports(mock: bool = False) -> List[Dict[str, Any]]:
                 "Application": "System",
                 "Service": "SMB",
                 "Risk": "High",
-                "Description": "SMB service - Should be carefully monitored from security perspective"
+                "Description": "SMB service - Should be carefully monitored from security perspective",
             },
             {
                 "Port": 3389,
@@ -130,7 +128,7 @@ def scan_open_ports(mock: bool = False) -> List[Dict[str, Any]]:
                 "Application": "svchost.exe",
                 "Service": "RDP",
                 "Risk": "High",
-                "Description": "RDP service - Should be carefully monitored from security perspective"
+                "Description": "RDP service - Should be carefully monitored from security perspective",
             },
             {
                 "Port": 135,
@@ -138,7 +136,7 @@ def scan_open_ports(mock: bool = False) -> List[Dict[str, Any]]:
                 "Application": "svchost.exe",
                 "Service": "MSRPC",
                 "Risk": "High",
-                "Description": "MSRPC service - Should be carefully monitored from security perspective"
+                "Description": "MSRPC service - Should be carefully monitored from security perspective",
             },
             {
                 "Port": 80,
@@ -146,7 +144,7 @@ def scan_open_ports(mock: bool = False) -> List[Dict[str, Any]]:
                 "Application": "nginx",
                 "Service": "HTTP",
                 "Risk": "Low",
-                "Description": "HTTP service - Generally safe"
+                "Description": "HTTP service - Generally safe",
             },
             {
                 "Port": 443,
@@ -154,15 +152,15 @@ def scan_open_ports(mock: bool = False) -> List[Dict[str, Any]]:
                 "Application": "nginx",
                 "Service": "HTTPS",
                 "Risk": "Low",
-                "Description": "HTTPS service - Generally safe"
-            }
+                "Description": "HTTPS service - Generally safe",
+            },
         ]
 
     open_ports = []
 
     try:
         # Get all network connections
-        connections = psutil.net_connections(kind='inet')
+        connections = psutil.net_connections(kind="inet")
 
         for conn in connections:
             try:
@@ -187,7 +185,7 @@ def scan_open_ports(mock: bool = False) -> List[Dict[str, Any]]:
                         "Application": process_name,
                         "Service": port_info["name"],
                         "Risk": port_info["risk"],
-                        "Description": port_info["description"]
+                        "Description": port_info["description"],
                     }
 
                     open_ports.append(port_data)
@@ -223,11 +221,7 @@ def get_port_summary(ports: List[Dict[str, Any]]) -> Dict[str, int]:
     Returns:
         dict: Summary statistics
     """
-    summary = {
-        "Total": len(ports),
-        "High Risk": 0,
-        "Low Risk": 0
-    }
+    summary = {"Total": len(ports), "High Risk": 0, "Low Risk": 0}
 
     for port_info in ports:
         if port_info.get("Risk") == "High" or port_info.get("Risk") == "Yüksek":
@@ -236,4 +230,3 @@ def get_port_summary(ports: List[Dict[str, Any]]) -> Dict[str, int]:
             summary["Low Risk"] += 1
 
     return summary
-

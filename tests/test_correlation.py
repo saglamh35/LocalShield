@@ -2,6 +2,7 @@
 Tests for cross-event correlation: a successful logon (4624) after repeated
 failures (4625) from the same source IP fires the 'successful brute force' rule.
 """
+
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -40,9 +41,7 @@ class TestSuccessfulBruteForce:
         assert result["severity"] == "critical"
 
     def test_lone_success_does_not_fire(self, engine):
-        result = engine.check_event(
-            "4624", datetime.now(), _success("198.51.100.9"), "Security"
-        )
+        result = engine.check_event("4624", datetime.now(), _success("198.51.100.9"), "Security")
         # No correlation rule should fire (may be None or a non-correlation match)
         if result is not None:
             assert result["rule_id"] != "brute_force_success_001"

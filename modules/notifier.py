@@ -10,6 +10,7 @@ Design principle: the tool must remain fully functional with NO internet.
 Nothing here may raise into the caller: a notification failure must never
 disrupt event processing.
 """
+
 import json
 import logging
 from datetime import datetime
@@ -39,14 +40,19 @@ class Notifier:
         self.min_rank = _rank(min_severity or getattr(config, "NOTIFY_MIN_SEVERITY", "High"))
         self.alert_log_file: str = str(alert_log_file or getattr(config, "ALERT_LOG_FILE", "alerts.log"))
         self.desktop = getattr(config, "NOTIFY_DESKTOP", False) if desktop is None else desktop
-        self.webhook_url = (webhook_url if webhook_url is not None
-                            else getattr(config, "NOTIFY_WEBHOOK_URL", "")) or ""
+        self.webhook_url = (webhook_url if webhook_url is not None else getattr(config, "NOTIFY_WEBHOOK_URL", "")) or ""
 
     def should_notify(self, severity: str) -> bool:
         return _rank(severity) >= self.min_rank
 
-    def notify(self, severity: str, title: str, detail: str = "",
-               event_id: Optional[str] = None, source_ip: Optional[str] = None) -> None:
+    def notify(
+        self,
+        severity: str,
+        title: str,
+        detail: str = "",
+        event_id: Optional[str] = None,
+        source_ip: Optional[str] = None,
+    ) -> None:
         """
         Send a notification for an event, if it meets the severity threshold.
         Never raises — each backend failure is isolated and logged.
@@ -81,11 +87,13 @@ class Notifier:
             self._post_webhook(payload)
 
     def _write_alert_log(self, payload: Dict[str, Any]) -> None:
-        line = (f"[{payload['time']}] {payload['severity'].upper()} "
-                f"{payload['title']}"
-                + (f" (Event {payload['event_id']})" if payload.get('event_id') else "")
-                + (f" src={payload['source_ip']}" if payload.get('source_ip') else "")
-                + (f" — {payload['detail']}" if payload.get('detail') else ""))
+        line = (
+            f"[{payload['time']}] {payload['severity'].upper()} "
+            f"{payload['title']}"
+            + (f" (Event {payload['event_id']})" if payload.get("event_id") else "")
+            + (f" src={payload['source_ip']}" if payload.get("source_ip") else "")
+            + (f" — {payload['detail']}" if payload.get("detail") else "")
+        )
         with open(self.alert_log_file, "a", encoding="utf-8") as f:
             f.write(line + "\n")
 
@@ -107,8 +115,10 @@ class Notifier:
         try:
             data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
-                self.webhook_url, data=data,
-                headers={"Content-Type": "application/json"}, method="POST",
+                self.webhook_url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
             )
             urllib.request.urlopen(req, timeout=3)  # noqa: S310 - user-configured URL
         except Exception as e:

@@ -2,6 +2,7 @@
 AI Engine Module - Brain Class for Windows Log Analysis
 Production-Ready: Updated with JSON output format and type hints
 """
+
 import json
 import logging
 import re
@@ -101,7 +102,7 @@ RULES:
         Returns:
             Event ID (string) or None
         """
-        match = re.search(r'Event ID\s*[:#]?\s*(\d+)', log_text, re.IGNORECASE)
+        match = re.search(r"Event ID\s*[:#]?\s*(\d+)", log_text, re.IGNORECASE)
         return match.group(1) if match else None
 
     def _cache_key(self, log_text: str) -> str:
@@ -110,8 +111,8 @@ RULES:
         so two occurrences of the same event (differing only in time) collide.
         """
         # Drop date/time substrings and the dedicated "Time:" line
-        key = re.sub(r'\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?', '', log_text)
-        key = re.sub(r'(?im)^\s*Time:.*$', '', key)
+        key = re.sub(r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?", "", log_text)
+        key = re.sub(r"(?im)^\s*Time:.*$", "", key)
         return key.strip()
 
     def analyze(self, log_text: str) -> Tuple[str, str]:
@@ -142,7 +143,9 @@ RULES:
                 try:
                     kb_info = get_event_info(event_id)
                     if kb_info:
-                        logger.info(f"Knowledge base information found (Event ID: {event_id}, Source: {kb_info.get('source', 'unknown')})")
+                        logger.info(
+                            f"Knowledge base information found (Event ID: {event_id}, Source: {kb_info.get('source', 'unknown')})"
+                        )
                 except Exception as e:
                     logger.warning(f"Knowledge base error: {e}")
 
@@ -158,9 +161,9 @@ There is a SECURITY PROTOCOL defined for this event (ID: {event_id}).
 
 In the JSON output's "advice" field, paste the following text VERBATIM. Do not create your own sentences.
 
-MANDATORY TEXT: "{kb_info.get('advice', '')}"
+MANDATORY TEXT: "{kb_info.get("advice", "")}"
 
-Also write this in the "risk_score" field: "{kb_info.get('risk_level', 'Medium')}"
+Also write this in the "risk_score" field: "{kb_info.get("risk_level", "Medium")}"
 
 [IMPORTANT]: Do not modify the "MANDATORY TEXT" above, copy-paste it.
 """
@@ -171,21 +174,15 @@ Also write this in the "risk_score" field: "{kb_info.get('risk_level', 'Medium')
             logger.debug(f"Starting AI analysis (Event ID: {event_id})")
             response = self._client.chat(
                 model=self.model_name,
-                format='json',
+                format="json",
                 messages=[
-                    {
-                        'role': 'system',
-                        'content': enhanced_prompt
-                    },
-                    {
-                        'role': 'user',
-                        'content': f"Analyze this Windows security log:\n\n{log_text}"
-                    }
-                ]
+                    {"role": "system", "content": enhanced_prompt},
+                    {"role": "user", "content": f"Analyze this Windows security log:\n\n{log_text}"},
+                ],
             )
 
             # Get AI's response
-            raw_response: str = response['message']['content'].strip()
+            raw_response: str = response["message"]["content"].strip()
 
             # Parse JSON
             try:

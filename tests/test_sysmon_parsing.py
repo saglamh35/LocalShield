@@ -3,6 +3,7 @@ Tests for Sysmon field parsing (log_watcher): named XML is the primary path,
 positional StringInserts is the fallback. Verifies the fix for silent field
 misalignment when optional StringInserts fields are empty.
 """
+
 import sys
 import types
 from pathlib import Path
@@ -27,7 +28,7 @@ def _watcher():
 
 # Real Sysmon XML carries a default namespace — include it to prove the parser
 # is namespace-agnostic.
-NS = 'http://schemas.microsoft.com/win/2004/08/events/event'
+NS = "http://schemas.microsoft.com/win/2004/08/events/event"
 
 
 def _sysmon_xml(fields: dict) -> str:
@@ -38,10 +39,14 @@ def _sysmon_xml(fields: dict) -> str:
 class TestEventDataXml:
     def test_extracts_named_fields_with_namespace(self):
         w = _watcher()
-        event = SimpleNamespace(XML=_sysmon_xml({
-            "Image": "C:\\Windows\\System32\\cmd.exe",
-            "CommandLine": "cmd /c whoami",
-        }))
+        event = SimpleNamespace(
+            XML=_sysmon_xml(
+                {
+                    "Image": "C:\\Windows\\System32\\cmd.exe",
+                    "CommandLine": "cmd /c whoami",
+                }
+            )
+        )
         got = w._parse_eventdata_xml(event, ["Image", "CommandLine"])
         assert got == {"Image": "C:\\Windows\\System32\\cmd.exe", "CommandLine": "cmd /c whoami"}
 
@@ -55,12 +60,14 @@ class TestEvent1:
     def test_xml_is_primary(self):
         w = _watcher()
         event = SimpleNamespace(
-            XML=_sysmon_xml({
-                "Image": "powershell.exe",
-                "CommandLine": "powershell -enc AAAA",
-                "User": "DOMAIN\\alice",
-                "ParentImage": "explorer.exe",
-            }),
+            XML=_sysmon_xml(
+                {
+                    "Image": "powershell.exe",
+                    "CommandLine": "powershell -enc AAAA",
+                    "User": "DOMAIN\\alice",
+                    "ParentImage": "explorer.exe",
+                }
+            ),
             # Deliberately WRONG positional data to prove XML wins:
             StringInserts=["x"] * 25,
         )

@@ -6,6 +6,7 @@ common neighbours. Unknown IDs degrade gracefully (sub-techniques fall back to
 their parent, otherwise the ID is returned with an "Unknown" tactic), so the
 dashboard never breaks on an unseen technique.
 """
+
 from collections import Counter
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -36,9 +37,19 @@ TECHNIQUES: Dict[str, tuple] = {
 
 # Stable order for display (roughly the ATT&CK kill-chain progression)
 TACTIC_ORDER: List[str] = [
-    "Initial Access", "Execution", "Persistence", "Privilege Escalation",
-    "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement",
-    "Collection", "Command and Control", "Exfiltration", "Impact", "Unknown",
+    "Initial Access",
+    "Execution",
+    "Persistence",
+    "Privilege Escalation",
+    "Defense Evasion",
+    "Credential Access",
+    "Discovery",
+    "Lateral Movement",
+    "Collection",
+    "Command and Control",
+    "Exfiltration",
+    "Impact",
+    "Unknown",
 ]
 
 
@@ -83,12 +94,14 @@ def summarize(techniques: Iterable[Optional[str]]) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for tid, count in counts.items():
         info = technique_info(tid)
-        rows.append({
-            "id": info["id"],
-            "name": info["name"],
-            "tactic": info["tactic"],
-            "count": count,
-        })
+        rows.append(
+            {
+                "id": info["id"],
+                "name": info["name"],
+                "tactic": info["tactic"],
+                "count": count,
+            }
+        )
 
     rows.sort(key=lambda r: r["count"], reverse=True)
     return rows

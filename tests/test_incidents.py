@@ -3,6 +3,7 @@ Tests for incident grouping in db_manager: related high-risk detections for the
 same key roll into one open incident within a window; different keys or events
 outside the window open separate incidents.
 """
+
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,10 +27,16 @@ class TestIncidentGrouping:
         base = datetime.now()
         ids = []
         for i in range(4):
-            ids.append(db_manager.upsert_incident(
-                key="203.0.113.5", title="Brute force", severity="High",
-                timestamp=base + timedelta(seconds=i * 10), window_seconds=1800, db_path=db,
-            ))
+            ids.append(
+                db_manager.upsert_incident(
+                    key="203.0.113.5",
+                    title="Brute force",
+                    severity="High",
+                    timestamp=base + timedelta(seconds=i * 10),
+                    window_seconds=1800,
+                    db_path=db,
+                )
+            )
         assert len(set(ids)) == 1  # all folded into one incident
         incidents = db_manager.get_incidents(db_path=db)
         assert len(incidents) == 1
@@ -44,18 +51,16 @@ class TestIncidentGrouping:
 
     def test_outside_window_opens_new_incident(self, db):
         base = datetime.now()
-        db_manager.upsert_incident("5.5.5.5", "X", "High",
-                                   timestamp=base, window_seconds=60, db_path=db)
-        db_manager.upsert_incident("5.5.5.5", "X", "High",
-                                   timestamp=base + timedelta(seconds=600),
-                                   window_seconds=60, db_path=db)
+        db_manager.upsert_incident("5.5.5.5", "X", "High", timestamp=base, window_seconds=60, db_path=db)
+        db_manager.upsert_incident(
+            "5.5.5.5", "X", "High", timestamp=base + timedelta(seconds=600), window_seconds=60, db_path=db
+        )
         assert len(db_manager.get_incidents(db_path=db)) == 2
 
     def test_max_severity_escalates(self, db):
         now = datetime.now()
         db_manager.upsert_incident("9.9.9.9", "X", "Medium", timestamp=now, db_path=db)
-        db_manager.upsert_incident("9.9.9.9", "X", "Critical",
-                                   timestamp=now + timedelta(seconds=5), db_path=db)
+        db_manager.upsert_incident("9.9.9.9", "X", "Critical", timestamp=now + timedelta(seconds=5), db_path=db)
         inc = db_manager.get_incidents(db_path=db)[0]
         assert inc[6] == "Critical"  # max_severity escalated
         assert inc[5] == 2

@@ -2,6 +2,7 @@
 Log Watcher - Service that continuously monitors Windows Security Event Logs.
 Production-Ready: asynchronous structure with logging.
 """
+
 import asyncio
 import logging
 import sys
@@ -37,17 +38,17 @@ from modules.threat_intel import ThreatIntel
 # Rotate the log file at 5 MB and keep 3 backups so it never grows unbounded.
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL, logging.INFO),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         RotatingFileHandler(
             config.LOG_FILE,
             maxBytes=5 * 1024 * 1024,
             backupCount=3,
-            encoding='utf-8',
-            delay=True  # Open the file on first write, not at import time
+            encoding="utf-8",
+            delay=True,  # Open the file on first write, not at import time
         ),
-        logging.StreamHandler(sys.stdout)
-    ]
+        logging.StreamHandler(sys.stdout),
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ class LogWatcher:
         try:
             security_handle = win32evtlog.OpenEventLog(
                 None,  # Local machine
-                config.EVENT_LOG_NAME
+                config.EVENT_LOG_NAME,
             )
             self.log_handles[config.EVENT_LOG_NAME] = security_handle
             logger.info(f"✅ Successfully opened '{config.EVENT_LOG_NAME}' log")
@@ -102,7 +103,7 @@ class LogWatcher:
         try:
             sysmon_handle = win32evtlog.OpenEventLog(
                 None,  # Local machine
-                config.SYSMON_LOG_NAME
+                config.SYSMON_LOG_NAME,
             )
             self.log_handles[config.SYSMON_LOG_NAME] = sysmon_handle
             logger.info(f"✅ Successfully opened '{config.SYSMON_LOG_NAME}' log")
@@ -164,27 +165,29 @@ class LogWatcher:
         Returns:
             dict of {field: value} for fields found, or None if XML is absent/unparseable.
         """
-        xml = getattr(event, 'XML', None)
+        xml = getattr(event, "XML", None)
         if not xml:
             return None
         try:
             import xml.etree.ElementTree as ET
+
             root = ET.fromstring(xml)
+
             # Windows event XML carries a default namespace, so match by local
             # tag name (ignoring the {namespace} prefix) rather than a plain path.
             def local(tag: str) -> str:
-                return tag.rsplit('}', 1)[-1]
+                return tag.rsplit("}", 1)[-1]
 
-            event_data = next((el for el in root.iter() if local(el.tag) == 'EventData'), None)
+            event_data = next((el for el in root.iter() if local(el.tag) == "EventData"), None)
             if event_data is None:
                 return None
             found = {}
             for data in event_data:
-                if local(data.tag) != 'Data':
+                if local(data.tag) != "Data":
                     continue
-                name = data.get('Name', '')
+                name = data.get("Name", "")
                 if name in wanted_fields:
-                    found[name] = data.text or ''
+                    found[name] = data.text or ""
             return found or None
         except Exception:
             return None
@@ -198,13 +201,11 @@ class LogWatcher:
         Returns:
             dict: Parsed fields (Image, CommandLine, User, ParentImage)
         """
-        parsed_data = {'Image': 'N/A', 'CommandLine': 'N/A', 'User': 'N/A', 'ParentImage': 'N/A'}
+        parsed_data = {"Image": "N/A", "CommandLine": "N/A", "User": "N/A", "ParentImage": "N/A"}
 
         try:
             # 1) PRIMARY: named XML fields (order-independent, version-safe)
-            xml_fields = self._parse_eventdata_xml(
-                event, ['Image', 'CommandLine', 'User', 'ParentImage']
-            )
+            xml_fields = self._parse_eventdata_xml(event, ["Image", "CommandLine", "User", "ParentImage"])
             if xml_fields:
                 for key, value in xml_fields.items():
                     if value:
@@ -216,13 +217,13 @@ class LogWatcher:
                 inserts = [str(insert) for insert in event.StringInserts if insert]
                 # Typical order: [4] Image, [10] CommandLine, [12] User, [19] ParentImage
                 if len(inserts) > 4:
-                    parsed_data['Image'] = inserts[4]
+                    parsed_data["Image"] = inserts[4]
                 if len(inserts) > 10:
-                    parsed_data['CommandLine'] = inserts[10]
+                    parsed_data["CommandLine"] = inserts[10]
                 if len(inserts) > 12:
-                    parsed_data['User'] = inserts[12]
+                    parsed_data["User"] = inserts[12]
                 if len(inserts) > 19:
-                    parsed_data['ParentImage'] = inserts[19]
+                    parsed_data["ParentImage"] = inserts[19]
         except Exception as e:
             logger.warning(f"Error parsing Sysmon Event ID 1: {e}")
 
@@ -236,11 +237,11 @@ class LogWatcher:
         Returns:
             dict: Parsed fields (Image, ProcessId)
         """
-        parsed_data = {'Image': 'N/A', 'ProcessId': 'N/A'}
+        parsed_data = {"Image": "N/A", "ProcessId": "N/A"}
 
         try:
             # 1) PRIMARY: named XML fields
-            xml_fields = self._parse_eventdata_xml(event, ['Image', 'ProcessId'])
+            xml_fields = self._parse_eventdata_xml(event, ["Image", "ProcessId"])
             if xml_fields:
                 for key, value in xml_fields.items():
                     if value:
@@ -251,9 +252,9 @@ class LogWatcher:
             if event.StringInserts:
                 inserts = [str(insert) for insert in event.StringInserts if insert]
                 if len(inserts) > 3:
-                    parsed_data['ProcessId'] = inserts[3]
+                    parsed_data["ProcessId"] = inserts[3]
                 if len(inserts) > 4:
-                    parsed_data['Image'] = inserts[4]
+                    parsed_data["Image"] = inserts[4]
         except Exception as e:
             logger.warning(f"Error parsing Sysmon Event ID 5: {e}")
 
@@ -282,28 +283,25 @@ class LogWatcher:
             if log_source == "Sysmon" and event_id == "1":
                 parsed = self.parse_sysmon_event_1(event)
                 sysmon_data = {
-                    'Image': parsed['Image'],
-                    'CommandLine': parsed['CommandLine'],
-                    'User': parsed['User'],
-                    'ParentImage': parsed['ParentImage']
+                    "Image": parsed["Image"],
+                    "CommandLine": parsed["CommandLine"],
+                    "User": parsed["User"],
+                    "ParentImage": parsed["ParentImage"],
                 }
                 sysmon_details = f"""
 Sysmon Process Creation Details:
-  Image: {parsed['Image']}
-  CommandLine: {parsed['CommandLine']}
-  User: {parsed['User']}
-  ParentImage: {parsed['ParentImage']}
+  Image: {parsed["Image"]}
+  CommandLine: {parsed["CommandLine"]}
+  User: {parsed["User"]}
+  ParentImage: {parsed["ParentImage"]}
 """
             elif log_source == "Sysmon" and event_id == "5":
                 parsed = self.parse_sysmon_event_5(event)
-                sysmon_data = {
-                    'Image': parsed['Image'],
-                    'ProcessId': parsed['ProcessId']
-                }
+                sysmon_data = {"Image": parsed["Image"], "ProcessId": parsed["ProcessId"]}
                 sysmon_details = f"""
 Sysmon Process Terminated Details:
-  Image: {parsed['Image']}
-  ProcessId: {parsed['ProcessId']}
+  Image: {parsed["Image"]}
+  ProcessId: {parsed["ProcessId"]}
 """
 
             # Get additional info from StringInserts
@@ -313,7 +311,7 @@ Sysmon Process Terminated Details:
                 if inserts_str:
                     additional_info = f"\nAdditional Details (StringInserts): {inserts_str}"
 
-            # Combine event in rich format
+                # Combine event in rich format
                 log_text = f"""Log Source: {log_source}
 Event ID: {event_id}
 Time: {event_time}
@@ -340,7 +338,9 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             threat_intel_header = ""
             if threat_intel_match:
                 threat_intel_header = f"🚨 [THREAT INTEL MATCH] IP {threat_intel_match['ip']} found on the malicious list! Category: {threat_intel_match['category']}, Confidence: {threat_intel_match['confidence']}%\n\n"
-                logger.warning(f"🚨 THREAT INTEL: {threat_intel_match['ip']} on malicious list - risk level automatically set to 'High'")
+                logger.warning(
+                    f"🚨 THREAT INTEL: {threat_intel_match['ip']} on malicious list - risk level automatically set to 'High'"
+                )
 
             # FIRST: Detection Engine check (Fast and Precise)
             logger.info(f"Checking Event ID {event_id} in detection engine...")
@@ -352,7 +352,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                 event_time,
                 message,
                 log_source,  # Add log_source parameter
-                sysmon_data  # Add sysmon_data parameter
+                sysmon_data,  # Add sysmon_data parameter
             )
 
             # Rule engine result
@@ -361,18 +361,16 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             rule_match_message: Optional[str] = None
 
             if detection_result:
-                rule_risk_level = detection_result.get('risk_level')
-                mitre_technique = detection_result.get('mitre_technique')
-                rule_match_message = detection_result.get('match_message')
-                logger.warning(f"🔴 RULE MATCH: {detection_result.get('rule_name')} - Risk: {rule_risk_level}, MITRE: {mitre_technique}")
+                rule_risk_level = detection_result.get("risk_level")
+                mitre_technique = detection_result.get("mitre_technique")
+                rule_match_message = detection_result.get("match_message")
+                logger.warning(
+                    f"🔴 RULE MATCH: {detection_result.get('rule_name')} - Risk: {rule_risk_level}, MITRE: {mitre_technique}"
+                )
 
             # THEN: Run AI analysis in thread pool (blocking operation)
             logger.info(f"Analyzing Event ID {event_id} with AI...")
-            analysis, ai_risk_level = await loop.run_in_executor(
-                self.executor,
-                self.brain.analyze,
-                log_text
-            )
+            analysis, ai_risk_level = await loop.run_in_executor(self.executor, self.brain.analyze, log_text)
 
             # Risk level decision logic (priority order):
             # 1. Threat Intelligence (highest priority - malicious IP forces High)
@@ -412,19 +410,15 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             action_taken = ""
             if final_risk_level == "High":
                 block_candidates = self.firewall_manager.extract_source_ips_from_text(combined_text)
-                if threat_intel_match and threat_intel_match['ip'] not in block_candidates:
-                    block_candidates.append(threat_intel_match['ip'])
+                if threat_intel_match and threat_intel_match["ip"] not in block_candidates:
+                    block_candidates.append(threat_intel_match["ip"])
 
                 blocked_ips = []
                 for ip in block_candidates:
                     # Private IP check (also enforced inside FirewallManager, kept here as a guard)
                     if not self.firewall_manager.is_private_ip(ip):
                         # Block the IP (run in the thread pool - blocking operation)
-                        success = await loop.run_in_executor(
-                            self.executor,
-                            self.firewall_manager.block_ip,
-                            ip
-                        )
+                        success = await loop.run_in_executor(self.executor, self.firewall_manager.block_ip, ip)
                         if success:
                             blocked_ips.append(ip)
                             # Persist the block and record it in the audit trail
@@ -436,7 +430,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                                 lambda ip=ip, reason=reason: (
                                     record_blocked_ip(ip, rule_name=mitre_technique, reason=reason),
                                     record_action("block_ip", target=ip, details=reason),
-                                )
+                                ),
                             )
 
                 # If any IP was blocked, prepend a note to the analysis text
@@ -461,11 +455,13 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                     ai_analysis=final_analysis,
                     risk_score=final_risk_level,
                     mitre_technique=mitre_technique,
-                    conn=None  # Each thread opens its own connection
-                )
+                    conn=None,  # Each thread opens its own connection
+                ),
             )
 
-            logger.info(f"Log processed: Event ID {event_id} - Risk: {final_risk_level} - MITRE: {mitre_technique or 'N/A'}")
+            logger.info(
+                f"Log processed: Event ID {event_id} - Risk: {final_risk_level} - MITRE: {mitre_technique or 'N/A'}"
+            )
 
             # NOTIFY + INCIDENT: for events meeting the notify threshold, raise an
             # (offline-first) alert and group into an incident. Best-effort — a
@@ -507,10 +503,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
         try:
             # Run event log reading in thread pool (blocking operation)
             loop = asyncio.get_running_loop()
-            all_events = await loop.run_in_executor(
-                self.executor,
-                self._read_events_sync
-            )
+            all_events = await loop.run_in_executor(self.executor, self._read_events_sync)
 
             if all_events:
                 # Process new events asynchronously
@@ -528,7 +521,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             self.last_check_time = datetime.now()
 
         except Exception as e:
-            error_code = getattr(e, 'winerror', None)
+            error_code = getattr(e, "winerror", None)
             error_msg = str(e).lower()
 
             # Skip normal errors without logging
@@ -572,7 +565,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             if event.TimeGenerated <= time_threshold:
                 continue
 
-            record_number = getattr(event, 'RecordNumber', None)
+            record_number = getattr(event, "RecordNumber", None)
             if record_number is not None:
                 if record_number <= last_record:
                     continue  # Already processed on a previous read
@@ -618,7 +611,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                         log_handle,
                         flags,
                         0,
-                        1000  # Read maximum 1000 events per channel
+                        1000,  # Read maximum 1000 events per channel
                     )
 
                     if events:
@@ -629,7 +622,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                             all_new_events.append((event, log_source))
 
                 except Exception as e:
-                    error_code = getattr(e, 'winerror', None)
+                    error_code = getattr(e, "winerror", None)
                     error_msg = str(e).lower()
 
                     # Silently skip normal errors for this channel
@@ -645,7 +638,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             return all_new_events
 
         except Exception as e:
-            error_code = getattr(e, 'winerror', None)
+            error_code = getattr(e, "winerror", None)
             error_msg = str(e).lower()
 
             # Silently skip normal errors

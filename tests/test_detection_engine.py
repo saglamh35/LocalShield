@@ -2,6 +2,7 @@
 Unit Tests for Detection Engine
 Tests rule loading, brute force detection, and time window functionality
 """
+
 import shutil
 import sys
 import tempfile
@@ -56,7 +57,7 @@ filters:
         """Test: Kural dosyası doğru yükleniyor mu?"""
         # Create a rule file
         rule_file = temp_rules_dir / "brute_force.yaml"
-        rule_file.write_text(sample_rule_yaml, encoding='utf-8')
+        rule_file.write_text(sample_rule_yaml, encoding="utf-8")
 
         # Initialize DetectionEngine with temp directory
         engine = DetectionEngine(rules_dir=str(temp_rules_dir))
@@ -73,7 +74,7 @@ filters:
         """Test: 1 dakika içinde 4 başarısız giriş (Event 4625) kuralı TETİKLEMEMELİ"""
         # Create a rule file
         rule_file = temp_rules_dir / "brute_force.yaml"
-        rule_file.write_text(sample_rule_yaml, encoding='utf-8')
+        rule_file.write_text(sample_rule_yaml, encoding="utf-8")
 
         # Initialize DetectionEngine
         engine = DetectionEngine(rules_dir=str(temp_rules_dir))
@@ -96,7 +97,7 @@ filters:
         """Test: 1 dakika içinde 5 başarısız giriş kuralı TETİKLEMELİ (Detection)"""
         # Create a rule file
         rule_file = temp_rules_dir / "brute_force.yaml"
-        rule_file.write_text(sample_rule_yaml, encoding='utf-8')
+        rule_file.write_text(sample_rule_yaml, encoding="utf-8")
 
         # Initialize DetectionEngine
         engine = DetectionEngine(rules_dir=str(temp_rules_dir))
@@ -112,13 +113,13 @@ filters:
 
             if i < 4:
                 # First 4 should not trigger
-                assert result is None, f"{i+1}. başarısız girişte tetiklenmemeli"
+                assert result is None, f"{i + 1}. başarısız girişte tetiklenmemeli"
             else:
                 # 5th should trigger
                 assert result is not None, "5. başarısız girişte tetiklenmeli"
-                assert result['risk_level'] == "High", "Risk seviyesi 'High' olmalı"
-                assert result['mitre_technique'] == "T1110", "MITRE tekniği 'T1110' olmalı"
-                assert "Brute Force" in result['match_message'], "Match message'da 'Brute Force' olmalı"
+                assert result["risk_level"] == "High", "Risk seviyesi 'High' olmalı"
+                assert result["mitre_technique"] == "T1110", "MITRE tekniği 'T1110' olmalı"
+                assert "Brute Force" in result["match_message"], "Match message'da 'Brute Force' olmalı"
                 detection_triggered = True
 
         assert detection_triggered, "Detection tetiklenmeli"
@@ -127,7 +128,7 @@ filters:
         """Test: Zaman penceresi (time window) dışındaki loglar sayacı sıfırlıyor mu?"""
         # Create a rule file
         rule_file = temp_rules_dir / "brute_force.yaml"
-        rule_file.write_text(sample_rule_yaml, encoding='utf-8')
+        rule_file.write_text(sample_rule_yaml, encoding="utf-8")
 
         # Initialize DetectionEngine
         engine = DetectionEngine(rules_dir=str(temp_rules_dir))
@@ -163,9 +164,9 @@ filters:
         # Add 3 events at time 0, 11, 22 (boundary condition'dan kaçınmak için 10 yerine 11 kullanıyoruz)
         # Bu şekilde T+70'te cleanup yapıldığında (cutoff = T+10), T+11 ve T+22 eventleri korunacak
         timestamps = [
-            base_time + timedelta(seconds=0),   # T+0
+            base_time + timedelta(seconds=0),  # T+0
             base_time + timedelta(seconds=11),  # T+11 (boundary'den kaçınmak için)
-            base_time + timedelta(seconds=22)   # T+22
+            base_time + timedelta(seconds=22),  # T+22
         ]
         for timestamp in timestamps:
             engine.check_event("4625", timestamp, message)
@@ -200,7 +201,7 @@ filters:
         """Test: Farklı Event ID'ler kuralı tetiklememeli"""
         # Create a rule file
         rule_file = temp_rules_dir / "brute_force.yaml"
-        rule_file.write_text(sample_rule_yaml, encoding='utf-8')
+        rule_file.write_text(sample_rule_yaml, encoding="utf-8")
 
         # Initialize DetectionEngine
         engine = DetectionEngine(rules_dir=str(temp_rules_dir))
@@ -236,7 +237,7 @@ mitre_technique: "T1110"
 match_message: "Should not trigger"
 """
         rule_file = temp_rules_dir / "disabled_rule.yaml"
-        rule_file.write_text(disabled_rule_yaml, encoding='utf-8')
+        rule_file.write_text(disabled_rule_yaml, encoding="utf-8")
 
         engine = DetectionEngine(rules_dir=str(temp_rules_dir))
         assert len(engine.rules) == 1
@@ -248,4 +249,3 @@ match_message: "Should not trigger"
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

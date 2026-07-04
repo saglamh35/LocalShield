@@ -2,6 +2,7 @@
 Test Suite for New Detection Engine Rules
 Tests the new YAML schema with real rules from the rules/ directory
 """
+
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -40,7 +41,9 @@ class TestNewRules:
         # Verify specific rules exist
         assert any("brute" in name.lower() for name in rule_names), "Brute force rule should be loaded"
         assert any("powershell" in name.lower() for name in rule_names), "PowerShell rule should be loaded"
-        assert any("parent" in name.lower() or "child" in name.lower() for name in rule_names), "Parent-child rule should be loaded"
+        assert any("parent" in name.lower() or "child" in name.lower() for name in rule_names), (
+            "Parent-child rule should be loaded"
+        )
 
     def test_scenario_1_brute_force(self, detection_engine):
         """
@@ -96,15 +99,12 @@ Network Information:
         for i in range(5):
             timestamp = base_time + timedelta(seconds=i * 10)  # 10 seconds apart
             result = detection_engine.check_event(
-                event_id="4625",
-                timestamp=timestamp,
-                message=message,
-                log_source="Security"
+                event_id="4625", timestamp=timestamp, message=message, log_source="Security"
             )
 
             if i < 4:
                 # First 4 should not trigger (threshold is 5)
-                assert result is None, f"{i+1}. başarısız girişte tetiklenmemeli (threshold 5)"
+                assert result is None, f"{i + 1}. başarısız girişte tetiklenmemeli (threshold 5)"
             else:
                 # 5th should trigger
                 assert result is not None, "5. başarısız girişte tetiklenmeli"
@@ -114,20 +114,24 @@ Network Information:
 
         # Verify result structure
         assert result is not None
-        assert result['rule_id'] == "brute_force_001", f"Rule ID should be 'brute_force_001', got '{result['rule_id']}'"
-        assert result['severity'] == "high", f"Severity should be 'high', got '{result['severity']}'"
-        assert result['risk_level'] == "High", f"Risk level should be 'High', got '{result['risk_level']}'"
+        assert result["rule_id"] == "brute_force_001", f"Rule ID should be 'brute_force_001', got '{result['rule_id']}'"
+        assert result["severity"] == "high", f"Severity should be 'high', got '{result['severity']}'"
+        assert result["risk_level"] == "High", f"Risk level should be 'High', got '{result['risk_level']}'"
 
         # Verify MITRE techniques
-        assert 'mitre_techniques' in result, "Result should contain 'mitre_techniques'"
-        assert isinstance(result['mitre_techniques'], list), "mitre_techniques should be a list"
-        assert "T1110" in result['mitre_techniques'], f"MITRE techniques should include 'T1110', got {result['mitre_techniques']}"
-        assert "T1110.001" in result['mitre_techniques'], f"MITRE techniques should include 'T1110.001', got {result['mitre_techniques']}"
+        assert "mitre_techniques" in result, "Result should contain 'mitre_techniques'"
+        assert isinstance(result["mitre_techniques"], list), "mitre_techniques should be a list"
+        assert "T1110" in result["mitre_techniques"], (
+            f"MITRE techniques should include 'T1110', got {result['mitre_techniques']}"
+        )
+        assert "T1110.001" in result["mitre_techniques"], (
+            f"MITRE techniques should include 'T1110.001', got {result['mitre_techniques']}"
+        )
 
         # Verify tags
-        assert 'tags' in result, "Result should contain 'tags'"
-        assert isinstance(result['tags'], list), "tags should be a list"
-        assert "brute_force" in result['tags'], f"Tags should include 'brute_force', got {result['tags']}"
+        assert "tags" in result, "Result should contain 'tags'"
+        assert isinstance(result["tags"], list), "tags should be a list"
+        assert "brute_force" in result["tags"], f"Tags should include 'brute_force', got {result['tags']}"
 
         print("\n✅ Brute Force Test Passed:")
         print(f"   Rule ID: {result['rule_id']}")
@@ -177,33 +181,37 @@ ParentImage: C:\\Windows\\System32\\cmd.exe
 ParentCommandLine: cmd.exe"""
 
         sysmon_data = {
-            'Image': 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
-            'CommandLine': 'powershell.exe -EncodedCommand JABwAGEAcwBzACAAPQAgACcAUABhAHMAcwB3AG8AcgBkADEAMgAzACcA',
-            'User': 'DOMAIN\\user',
-            'ParentImage': 'C:\\Windows\\System32\\cmd.exe'
+            "Image": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+            "CommandLine": "powershell.exe -EncodedCommand JABwAGEAcwBzACAAPQAgACcAUABhAHMAcwB3AG8AcgBkADEAMgAzACcA",
+            "User": "DOMAIN\\user",
+            "ParentImage": "C:\\Windows\\System32\\cmd.exe",
         }
 
         # Check event
         result = detection_engine.check_event(
-            event_id="1",
-            timestamp=timestamp,
-            message=message,
-            log_source="Sysmon",
-            sysmon_data=sysmon_data
+            event_id="1", timestamp=timestamp, message=message, log_source="Sysmon", sysmon_data=sysmon_data
         )
 
         assert result is not None, "PowerShell EncodedCommand rule should trigger"
-        assert "powershell" in result['rule_name'].lower(), f"Rule name should contain 'powershell', got '{result['rule_name']}'"
-        assert result['rule_id'] == "powershell_encoded_001", f"Rule ID should be 'powershell_encoded_001', got '{result['rule_id']}'"
-        assert result['severity'] == "high", f"Severity should be 'high', got '{result['severity']}'"
+        assert "powershell" in result["rule_name"].lower(), (
+            f"Rule name should contain 'powershell', got '{result['rule_name']}'"
+        )
+        assert result["rule_id"] == "powershell_encoded_001", (
+            f"Rule ID should be 'powershell_encoded_001', got '{result['rule_id']}'"
+        )
+        assert result["severity"] == "high", f"Severity should be 'high', got '{result['severity']}'"
 
         # Verify MITRE techniques
-        assert 'mitre_techniques' in result, "Result should contain 'mitre_techniques'"
-        assert "T1059.001" in result['mitre_techniques'], f"MITRE techniques should include 'T1059.001', got {result['mitre_techniques']}"
+        assert "mitre_techniques" in result, "Result should contain 'mitre_techniques'"
+        assert "T1059.001" in result["mitre_techniques"], (
+            f"MITRE techniques should include 'T1059.001', got {result['mitre_techniques']}"
+        )
 
         # Verify tags
-        assert 'tags' in result, "Result should contain 'tags'"
-        assert "powershell" in [tag.lower() for tag in result['tags']], f"Tags should include 'powershell', got {result['tags']}"
+        assert "tags" in result, "Result should contain 'tags'"
+        assert "powershell" in [tag.lower() for tag in result["tags"]], (
+            f"Tags should include 'powershell', got {result['tags']}"
+        )
 
         print("\n✅ PowerShell EncodedCommand Test Passed:")
         print(f"   Rule ID: {result['rule_id']}")
@@ -254,34 +262,34 @@ ParentImage: C:\\Program Files\\Microsoft Office\\Office16\\WINWORD.EXE
 ParentCommandLine: WINWORD.EXE /n "C:\\Users\\Test\\document.doc" """
 
         sysmon_data = {
-            'Image': 'C:\\Windows\\System32\\cmd.exe',
-            'CommandLine': 'cmd.exe /c whoami',
-            'User': 'DOMAIN\\user',
-            'ParentImage': 'C:\\Program Files\\Microsoft Office\\Office16\\WINWORD.EXE'
+            "Image": "C:\\Windows\\System32\\cmd.exe",
+            "CommandLine": "cmd.exe /c whoami",
+            "User": "DOMAIN\\user",
+            "ParentImage": "C:\\Program Files\\Microsoft Office\\Office16\\WINWORD.EXE",
         }
 
         # Check event
         result = detection_engine.check_event(
-            event_id="1",
-            timestamp=timestamp,
-            message=message,
-            log_source="Sysmon",
-            sysmon_data=sysmon_data
+            event_id="1", timestamp=timestamp, message=message, log_source="Sysmon", sysmon_data=sysmon_data
         )
 
         assert result is not None, "Parent-child suspicious rule should trigger"
-        assert result['rule_id'] == "parent_child_001", f"Rule ID should be 'parent_child_001', got '{result['rule_id']}'"
-        assert result['severity'] == "high", f"Severity should be 'high', got '{result['severity']}'"
+        assert result["rule_id"] == "parent_child_001", (
+            f"Rule ID should be 'parent_child_001', got '{result['rule_id']}'"
+        )
+        assert result["severity"] == "high", f"Severity should be 'high', got '{result['severity']}'"
 
         # Verify MITRE techniques
-        assert 'mitre_techniques' in result, "Result should contain 'mitre_techniques'"
-        assert "T1059.001" in result['mitre_techniques'] or "T1204.002" in result['mitre_techniques'], \
+        assert "mitre_techniques" in result, "Result should contain 'mitre_techniques'"
+        assert "T1059.001" in result["mitre_techniques"] or "T1204.002" in result["mitre_techniques"], (
             f"MITRE techniques should include 'T1059.001' or 'T1204.002', got {result['mitre_techniques']}"
+        )
 
         # Verify tags
-        assert 'tags' in result, "Result should contain 'tags'"
-        assert any("process" in tag.lower() or "execution" in tag.lower() for tag in result['tags']), \
+        assert "tags" in result, "Result should contain 'tags'"
+        assert any("process" in tag.lower() or "execution" in tag.lower() for tag in result["tags"]), (
             f"Tags should include process/execution related tags, got {result['tags']}"
+        )
 
         print("\n✅ Parent-Child Suspicious Test Passed:")
         print(f"   Rule ID: {result['rule_id']}")
@@ -301,7 +309,7 @@ ParentCommandLine: WINWORD.EXE /n "C:\\Users\\Test\\document.doc" """
             event_id="4624",  # Successful logon
             timestamp=timestamp,
             message=message,
-            log_source="Security"
+            log_source="Security",
         )
 
         assert result is None, "Normal successful logon should not trigger any rule"
@@ -309,4 +317,3 @@ ParentCommandLine: WINWORD.EXE /n "C:\\Users\\Test\\document.doc" """
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
-

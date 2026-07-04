@@ -2,6 +2,7 @@
 Demo Data Generator for LocalShield Dashboard
 Creates realistic security events for LinkedIn screenshots
 """
+
 import random
 from datetime import datetime, timedelta
 from typing import List
@@ -39,7 +40,7 @@ Risk Level: High
 • Check for lateral movement indicators
 • Consider this a potential APT29 intrusion and escalate to incident response team""",
         "risk_score": "High",
-        "mitre_technique": "T1059.001, T1204.002, T1027"
+        "mitre_technique": "T1059.001, T1204.002, T1027",
     }
 ]
 
@@ -86,7 +87,7 @@ Risk Level: High
 • Enable MFA for all privileged accounts
 • Monitor for successful authentication from this IP range""",
         "risk_score": "High",
-        "mitre_technique": "T1110, T1110.001"
+        "mitre_technique": "T1110, T1110.001",
     },
     {
         "event_id": "4625",
@@ -130,8 +131,8 @@ Risk Level: High
 • Enable detailed logging for HR department accounts
 • Consider this part of a larger APT campaign and escalate""",
         "risk_score": "High",
-        "mitre_technique": "T1110, T1078"
-    }
+        "mitre_technique": "T1110, T1078",
+    },
 ]
 
 MEDIUM_RISK_EVENTS = [
@@ -164,7 +165,7 @@ Risk Level: Medium
 • Ensure privilege assignment follows least privilege principle
 • Monitor for abuse of elevated privileges""",
         "risk_score": "Medium",
-        "mitre_technique": "T1078, T1548"
+        "mitre_technique": "T1078, T1548",
     },
     {
         "event_id": "4672",
@@ -193,8 +194,8 @@ Risk Level: Medium
 • Consider restricting SeImpersonatePrivilege if not required
 • Implement additional monitoring for this account""",
         "risk_score": "Medium",
-        "mitre_technique": "T1078, T1134"
-    }
+        "mitre_technique": "T1078, T1134",
+    },
 ]
 
 LOW_RISK_EVENTS = [
@@ -237,7 +238,7 @@ Risk Level: Low
 • No action required - this is normal system activity
 • Continue monitoring for any anomalies in system account behavior""",
         "risk_score": "Low",
-        "mitre_technique": None
+        "mitre_technique": None,
     },
     {
         "event_id": "4624",
@@ -274,8 +275,8 @@ Risk Level: Low
 • Ensure MFA is enabled for administrative accounts
 • Monitor for any unusual activity during this session""",
         "risk_score": "Low",
-        "mitre_technique": None
-    }
+        "mitre_technique": None,
+    },
 ]
 
 
@@ -292,7 +293,7 @@ def generate_timestamps(count: int, hours_back: int = 24) -> List[datetime]:
 
 def format_message_template(template: str, timestamp: datetime) -> str:
     """Format message template with timestamp"""
-    return template.format(timestamp=timestamp.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3])
+    return template.format(timestamp=timestamp.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3])
 
 
 def generate_demo_data():
@@ -306,7 +307,7 @@ def generate_demo_data():
     print("⚠️  WARNING: This will DELETE all existing log entries!")
     response = input("Do you want to continue? (yes/no): ").strip().lower()
 
-    if response != 'yes':
+    if response != "yes":
         print("❌ Operation cancelled.")
         return
 
@@ -343,10 +344,10 @@ def generate_demo_data():
             ai_analysis=event["ai_analysis"],
             risk_score=event["risk_score"],
             mitre_technique=event["mitre_technique"],
-            conn=conn
+            conn=conn,
         )
         inserted_count += 1
-        print(f"  ✓ Critical event {i+1} inserted")
+        print(f"  ✓ Critical event {i + 1} inserted")
 
     # Insert High risk events (2)
     print("\n🟠 Inserting HIGH risk events...")
@@ -360,10 +361,10 @@ def generate_demo_data():
             ai_analysis=event["ai_analysis"],
             risk_score=event["risk_score"],
             mitre_technique=event["mitre_technique"],
-            conn=conn
+            conn=conn,
         )
         inserted_count += 1
-        print(f"  ✓ High risk event {i+1} inserted")
+        print(f"  ✓ High risk event {i + 1} inserted")
 
     # Insert Medium risk events (2)
     print("\n🟡 Inserting MEDIUM risk events...")
@@ -377,10 +378,10 @@ def generate_demo_data():
             ai_analysis=event["ai_analysis"],
             risk_score=event["risk_score"],
             mitre_technique=event["mitre_technique"],
-            conn=conn
+            conn=conn,
         )
         inserted_count += 1
-        print(f"  ✓ Medium risk event {i+1} inserted")
+        print(f"  ✓ Medium risk event {i + 1} inserted")
 
     # Insert Low risk events (30 - fill the rest)
     print("\n🟢 Inserting LOW risk events...")
@@ -408,11 +409,11 @@ def generate_demo_data():
             ai_analysis=event["ai_analysis"],
             risk_score=event["risk_score"],
             mitre_technique=event["mitre_technique"],
-            conn=conn
+            conn=conn,
         )
         inserted_count += 1
         if (i + 1) % 10 == 0:
-            print(f"  ✓ {i+1} low risk events inserted...")
+            print(f"  ✓ {i + 1} low risk events inserted...")
 
     conn.close()
 
@@ -436,5 +437,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n\n❌ Error: {e}")
         import traceback
-        traceback.print_exc()
 
+        traceback.print_exc()

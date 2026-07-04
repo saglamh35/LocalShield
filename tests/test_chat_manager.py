@@ -2,6 +2,7 @@
 Unit tests for chat_manager: system-summary building from the DB and the
 assistant call (Ollama mocked, so no live model / network needed).
 """
+
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -27,8 +28,9 @@ def temp_db(tmp_path, monkeypatch):
 
 class TestSystemSummary:
     def test_includes_high_risk_logs(self, temp_db):
-        db_manager.insert_log(datetime.now(), "4625", "failed logon 1.2.3.4",
-                              "analysis", "High", "T1110", db_path=temp_db)
+        db_manager.insert_log(
+            datetime.now(), "4625", "failed logon 1.2.3.4", "analysis", "High", "T1110", db_path=temp_db
+        )
         summary = chat_manager.get_system_summary()
         assert "HIGH RISK LOGS" in summary
         assert "4625" in summary

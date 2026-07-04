@@ -2,6 +2,7 @@
 Database Manager - SQLite database management
 Production-Ready: Updated with type hints and logging
 """
+
 import logging
 import sqlite3
 from datetime import datetime
@@ -29,11 +30,11 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
         # Thread-safe connection: with timeout and WAL mode
         conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
         # Enable WAL (Write-Ahead Logging) mode (better performance and thread-safety)
-        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute("PRAGMA journal_mode=WAL")
         cursor = conn.cursor()
 
         # Create security_logs table
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS security_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp DATETIME NOT NULL,
@@ -43,11 +44,11 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
                 risk_score TEXT,
                 mitre_technique TEXT
             )
-        ''')
+        """)
 
         # Add mitre_technique column to existing tables (if not exists)
         try:
-            cursor.execute('ALTER TABLE security_logs ADD COLUMN mitre_technique TEXT')
+            cursor.execute("ALTER TABLE security_logs ADD COLUMN mitre_technique TEXT")
             conn.commit()
             logger.debug("'mitre_technique' column added")
         except sqlite3.OperationalError:
@@ -55,11 +56,11 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
             pass
 
         # Indexes speed up the dashboard's time-ordered and risk-filtered queries
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON security_logs(timestamp)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_logs_risk ON security_logs(risk_score)')
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON security_logs(timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_risk ON security_logs(risk_score)")
 
         # Audit trail of automated actions (e.g. firewall blocks)
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS actions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp DATETIME NOT NULL,
@@ -67,22 +68,22 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
                 target TEXT,
                 details TEXT
             )
-        ''')
+        """)
 
         # Current set of IP addresses blocked by the response engine (persisted
         # so a restart knows what is already blocked)
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS blocked_ips (
                 ip TEXT PRIMARY KEY,
                 rule_name TEXT,
                 blocked_at DATETIME NOT NULL,
                 reason TEXT
             )
-        ''')
+        """)
 
         # Incidents: related high-risk detections grouped by a key (source IP or
         # rule) within a rolling window, so the analyst sees incidents, not noise.
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS incidents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 key TEXT NOT NULL,
@@ -93,7 +94,7 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
                 max_severity TEXT,
                 status TEXT NOT NULL DEFAULT 'open'
             )
-        ''')
+        """)
 
         conn.commit()
         logger.info(f"Database '{db_path}' successfully created/connected")
@@ -113,7 +114,7 @@ def insert_log(
     risk_score: Optional[str] = None,
     mitre_technique: Optional[str] = None,
     db_path: Optional[str] = None,
-    conn: Optional[sqlite3.Connection] = None
+    conn: Optional[sqlite3.Connection] = None,
 ) -> int:
     """
     Adds a new log entry to security_logs table.
@@ -137,19 +138,22 @@ def insert_log(
         # Thread-safe connection: with timeout and WAL mode
         conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
         # Enable WAL (Write-Ahead Logging) mode (better performance and thread-safety)
-        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute("PRAGMA journal_mode=WAL")
         should_close = True
 
     try:
         cursor = conn.cursor()
 
         # Convert timestamp to string format
-        timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO security_logs (timestamp, event_id, message, ai_analysis, risk_score, mitre_technique)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', (timestamp_str, event_id, message, ai_analysis, risk_score, mitre_technique))
+        """,
+            (timestamp_str, event_id, message, ai_analysis, risk_score, mitre_technique),
+        )
 
         conn.commit()
         log_id: int = cursor.lastrowid or -1
@@ -166,9 +170,7 @@ def insert_log(
 
 
 def get_all_logs(
-    db_path: Optional[str] = None,
-    limit: Optional[int] = None,
-    order_by: str = 'DESC'
+    db_path: Optional[str] = None, limit: Optional[int] = None, order_by: str = "DESC"
 ) -> List[Tuple[int, str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]]:
     """
     Gets all log entries from security_logs table.
@@ -185,26 +187,28 @@ def get_all_logs(
 
     # Validate untrusted-ish inputs before interpolating them into SQL.
     # ORDER BY direction must be an exact keyword; LIMIT must be a positive int.
-    direction = 'DESC' if str(order_by).strip().upper() != 'ASC' else 'ASC'
+    direction = "DESC" if str(order_by).strip().upper() != "ASC" else "ASC"
 
     conn = sqlite3.connect(db_path)
 
     try:
         cursor = conn.cursor()
 
-        query = f'''
+        query = f"""
             SELECT id, timestamp, event_id, message, ai_analysis, risk_score, mitre_technique
             FROM security_logs
             ORDER BY timestamp {direction}
-        '''
+        """
 
         params: Tuple = ()
         if limit is not None:
-            query += ' LIMIT ?'
+            query += " LIMIT ?"
             params = (int(limit),)
 
         cursor.execute(query, params)
-        results: List[Tuple[int, str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]] = cursor.fetchall()
+        results: List[Tuple[int, str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]] = (
+            cursor.fetchall()
+        )
 
         logger.debug(f"{len(results)} log entries retrieved (limit: {limit})")
         return results
@@ -232,10 +236,10 @@ def get_high_risk_count(db_path: Optional[str] = None) -> int:
     try:
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute("""
             SELECT COUNT(*) FROM security_logs
             WHERE risk_score = 'Yüksek' OR risk_score = 'High'
-        ''')
+        """)
         count: int = cursor.fetchone()[0]
         return count
 
@@ -261,7 +265,7 @@ def get_total_log_count(db_path: Optional[str] = None) -> int:
 
     try:
         cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM security_logs')
+        cursor.execute("SELECT COUNT(*) FROM security_logs")
         count: int = cursor.fetchone()[0]
         return count
 
@@ -288,11 +292,11 @@ def get_latest_detection(db_path: Optional[str] = None) -> Optional[str]:
     try:
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute("""
             SELECT timestamp FROM security_logs
             ORDER BY timestamp DESC
             LIMIT 1
-        ''')
+        """)
         result = cursor.fetchone()
         return result[0] if result else None
 
@@ -318,7 +322,7 @@ def clear_all_logs(db_path: Optional[str] = None) -> bool:
 
     try:
         cursor = conn.cursor()
-        cursor.execute('DELETE FROM security_logs')
+        cursor.execute("DELETE FROM security_logs")
         conn.commit()
 
         deleted_count = cursor.rowcount
@@ -354,12 +358,12 @@ def record_action(
         int: ID of the inserted audit row
     """
     db_path = db_path or config.DB_PATH
-    ts = (timestamp or datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
+    ts = (timestamp or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
     conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
     try:
         cursor = conn.cursor()
         cursor.execute(
-            'INSERT INTO actions (timestamp, action_type, target, details) VALUES (?, ?, ?, ?)',
+            "INSERT INTO actions (timestamp, action_type, target, details) VALUES (?, ?, ?, ?)",
             (ts, action_type, target, details),
         )
         conn.commit()
@@ -383,12 +387,12 @@ def record_blocked_ip(
     Uses INSERT OR REPLACE so re-blocking the same IP is idempotent.
     """
     db_path = db_path or config.DB_PATH
-    ts = (timestamp or datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
+    ts = (timestamp or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
     conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
     try:
         cursor = conn.cursor()
         cursor.execute(
-            'INSERT OR REPLACE INTO blocked_ips (ip, rule_name, blocked_at, reason) VALUES (?, ?, ?, ?)',
+            "INSERT OR REPLACE INTO blocked_ips (ip, rule_name, blocked_at, reason) VALUES (?, ?, ?, ?)",
             (ip, rule_name, ts, reason),
         )
         conn.commit()
@@ -404,7 +408,7 @@ def get_blocked_ips(db_path: Optional[str] = None) -> List[Tuple[str, Optional[s
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
-        cursor.execute('SELECT ip, rule_name, blocked_at, reason FROM blocked_ips ORDER BY blocked_at DESC')
+        cursor.execute("SELECT ip, rule_name, blocked_at, reason FROM blocked_ips ORDER BY blocked_at DESC")
         return cursor.fetchall()
     except Exception as e:
         logger.error(f"Error reading blocked IPs: {e}", exc_info=True)
@@ -423,8 +427,7 @@ def get_recent_actions(
     try:
         cursor = conn.cursor()
         cursor.execute(
-            'SELECT id, timestamp, action_type, target, details FROM actions '
-            'ORDER BY timestamp DESC LIMIT ?',
+            "SELECT id, timestamp, action_type, target, details FROM actions ORDER BY timestamp DESC LIMIT ?",
             (int(limit),),
         )
         return cursor.fetchall()
@@ -453,7 +456,7 @@ def upsert_incident(
     """
     db_path = db_path or config.DB_PATH
     ts = timestamp or datetime.now()
-    ts_str = ts.strftime('%Y-%m-%d %H:%M:%S')
+    ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
     conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
     try:
         cursor = conn.cursor()
@@ -469,7 +472,7 @@ def upsert_incident(
         if row:
             inc_id, last_seen, count, max_sev = row
             try:
-                last_dt = datetime.strptime(str(last_seen), '%Y-%m-%d %H:%M:%S')
+                last_dt = datetime.strptime(str(last_seen), "%Y-%m-%d %H:%M:%S")
                 fresh = (ts - last_dt).total_seconds() <= window_seconds
             except Exception:
                 fresh = False
@@ -479,8 +482,7 @@ def upsert_incident(
             if _SEVERITY_RANK.get(str(severity).lower(), 0) > _SEVERITY_RANK.get(str(max_sev).lower(), 0):
                 new_sev = severity
             cursor.execute(
-                "UPDATE incidents SET last_seen = ?, event_count = event_count + 1, "
-                "max_severity = ? WHERE id = ?",
+                "UPDATE incidents SET last_seen = ?, event_count = event_count + 1, max_severity = ? WHERE id = ?",
                 (ts_str, new_sev, inc_id),
             )
             conn.commit()
@@ -513,8 +515,7 @@ def get_incidents(
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
-        query = ("SELECT id, key, title, first_seen, last_seen, event_count, "
-                 "max_severity, status FROM incidents")
+        query = "SELECT id, key, title, first_seen, last_seen, event_count, max_severity, status FROM incidents"
         params: Tuple = ()
         if status:
             query += " WHERE status = ?"
@@ -548,10 +549,7 @@ def get_open_incident_count(db_path: Optional[str] = None) -> int:
 # Example usage for testing
 if __name__ == "__main__":
     # Logging configuration
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     # Initialize database
     conn = init_db(config.DB_PATH)
@@ -564,7 +562,7 @@ if __name__ == "__main__":
         message="Failed login attempt to administrator account",
         ai_analysis="Potential brute-force attack detected.",
         risk_score="High",
-        conn=conn
+        conn=conn,
     )
 
     # Close connection

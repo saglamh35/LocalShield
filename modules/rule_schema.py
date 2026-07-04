@@ -5,6 +5,7 @@ Gives rule authors a clear contract and turns a malformed rule into a skipped
 rule with a helpful error, instead of a silently mis-parsed one. Mirrors the
 type-safe-validation approach used for AI output in modules/ai_models.py.
 """
+
 from typing import Any, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class RuleConditions(BaseModel):
     """The 'conditions' block of a detection rule."""
+
     # event_id may be a single value or a list (OR-match)
     event_id: Optional[Union[str, int, List[Union[str, int]]]] = None
     provider: Optional[str] = None
@@ -31,6 +33,7 @@ class RuleConditions(BaseModel):
 
 class DetectionRuleSchema(BaseModel):
     """A single detection rule."""
+
     # id is optional: DetectionRule auto-generates one from the filename if absent.
     id: Optional[str] = None
     name: str = Field(..., min_length=1)

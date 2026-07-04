@@ -1,6 +1,7 @@
 """
 Unit tests for the offline MITRE ATT&CK lookup used by the dashboard heatmap.
 """
+
 import sys
 from pathlib import Path
 

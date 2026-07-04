@@ -3,6 +3,7 @@ Response Engine Module - Active Response
 Blocks IP addresses via the Windows Firewall.
 Production-Ready: with error handling and logging.
 """
+
 import ipaddress
 import logging
 import re
@@ -11,6 +12,7 @@ from typing import Iterable, List, Optional
 
 try:
     import config
+
     _DEFAULT_ALLOWLIST = list(getattr(config, "SAFE_IPS", []))
 except Exception:  # config import should never fail, but stay defensive
     _DEFAULT_ALLOWLIST = []
@@ -91,7 +93,7 @@ class FirewallManager:
             List[str]: List of valid IP addresses found
         """
         # IPv4 regex pattern
-        ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+        ip_pattern = r"\b(?:\d{1,3}\.){3}\d{1,3}\b"
         matches = re.findall(ip_pattern, text)
 
         # Keep only valid IPs
@@ -119,9 +121,9 @@ class FirewallManager:
             List[str]: Ordered, de-duplicated list of valid source IPs
         """
         patterns = [
-            r'Source Network Address:\s*(\d{1,3}(?:\.\d{1,3}){3})',
-            r'rhost=(\d{1,3}(?:\.\d{1,3}){3})',
-            r'\bfrom\s+(\d{1,3}(?:\.\d{1,3}){3})',
+            r"Source Network Address:\s*(\d{1,3}(?:\.\d{1,3}){3})",
+            r"rhost=(\d{1,3}(?:\.\d{1,3}){3})",
+            r"\bfrom\s+(\d{1,3}(?:\.\d{1,3}){3})",
         ]
 
         found: List[str] = []
@@ -171,12 +173,16 @@ class FirewallManager:
             # action=block : drop the traffic
             # remoteip : the IP address to block
             command = [
-                'netsh', 'advfirewall', 'firewall', 'add', 'rule',
-                f'name={rule_name}',
-                'dir=in',
-                'action=block',
-                f'remoteip={ip_address}',
-                'enable=yes'
+                "netsh",
+                "advfirewall",
+                "firewall",
+                "add",
+                "rule",
+                f"name={rule_name}",
+                "dir=in",
+                "action=block",
+                f"remoteip={ip_address}",
+                "enable=yes",
             ]
 
             # Run the command
@@ -185,7 +191,7 @@ class FirewallManager:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                check=False  # Do not raise on non-zero exit
+                check=False,  # Do not raise on non-zero exit
             )
 
             # Success check
@@ -198,7 +204,7 @@ class FirewallManager:
                 error_output = result.stderr.lower()
 
                 # If the rule already exists, that is not an error
-                if 'already exists' in error_output or 'zaten var' in error_output:
+                if "already exists" in error_output or "zaten var" in error_output:
                     self.blocked_ips.add(ip_address)
                     logger.info(f"ℹ️  Firewall rule already exists: {rule_name}")
                     return True
@@ -226,18 +232,9 @@ class FirewallManager:
         rule_name = f"LocalShield_Block_{ip_address.replace('.', '_')}"
 
         try:
-            command = [
-                'netsh', 'advfirewall', 'firewall', 'delete', 'rule',
-                f'name={rule_name}'
-            ]
+            command = ["netsh", "advfirewall", "firewall", "delete", "rule", f"name={rule_name}"]
 
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False
-            )
+            result = subprocess.run(command, capture_output=True, text=True, timeout=10, check=False)
 
             if result.returncode == 0:
                 self.blocked_ips.discard(ip_address)

@@ -2,6 +2,7 @@
 Unit tests for the AIAnalysisResponse Pydantic model.
 Covers risk-score normalization (English + legacy Turkish) and markdown rendering.
 """
+
 import sys
 from pathlib import Path
 
@@ -24,16 +25,19 @@ def _make(risk: str) -> AIAnalysisResponse:
 class TestRiskScoreNormalization:
     """validate_risk_score must always return canonical English values."""
 
-    @pytest.mark.parametrize("value,expected", [
-        ("High", "High"),
-        ("high", "High"),
-        ("Yüksek", "High"),
-        ("yüksek", "High"),
-        ("Medium", "Medium"),
-        ("orta", "Medium"),
-        ("Low", "Low"),
-        ("düşük", "Low"),
-    ])
+    @pytest.mark.parametrize(
+        "value,expected",
+        [
+            ("High", "High"),
+            ("high", "High"),
+            ("Yüksek", "High"),
+            ("yüksek", "High"),
+            ("Medium", "Medium"),
+            ("orta", "Medium"),
+            ("Low", "Low"),
+            ("düşük", "Low"),
+        ],
+    )
     def test_known_values_map_to_english(self, value, expected):
         assert _make(value).risk_score == expected
 

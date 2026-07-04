@@ -2,6 +2,7 @@
 Unit tests for Brain (ai_engine): response caching and Ollama JSON mode.
 ollama.chat is patched so no real model is needed.
 """
+
 import sys
 from pathlib import Path
 
@@ -27,6 +28,7 @@ def counting_chat(monkeypatch):
     class FakeClient:
         def __init__(self, *a, **k):
             pass
+
         chat = staticmethod(fake_chat)
 
     monkeypatch.setattr(ai_engine.ollama, "Client", FakeClient)
@@ -62,9 +64,11 @@ class TestBrain:
 
     def test_timeout_falls_back_to_medium(self, monkeypatch):
         """A hung/slow model (client raises) must degrade to a Medium fallback, not propagate."""
+
         class TimeoutClient:
             def __init__(self, *a, **k):
                 pass
+
             def chat(self, **kwargs):
                 raise TimeoutError("model timed out")
 

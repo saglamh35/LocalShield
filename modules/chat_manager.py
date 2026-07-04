@@ -2,6 +2,7 @@
 Chat Manager Module - AI Chatbot Assistant
 Interactive AI assistant module for LocalShield.
 """
+
 import ollama
 
 import config
@@ -27,13 +28,13 @@ def get_system_summary() -> str:
 
     try:
         # Get last 10 high-risk logs from database
-        all_logs = get_all_logs(config.DB_PATH, limit=50, order_by='DESC')
+        all_logs = get_all_logs(config.DB_PATH, limit=50, order_by="DESC")
         high_risk_logs = []
 
         for log in all_logs:
             if len(log) >= 6:
                 risk_level = str(log[5]).strip().lower()
-                if risk_level == 'yüksek' or risk_level == 'high':
+                if risk_level == "yüksek" or risk_level == "high":
                     high_risk_logs.append(log)
             if len(high_risk_logs) >= 10:  # Maximum 10 entries
                 break
@@ -69,7 +70,7 @@ def get_system_summary() -> str:
     try:
         # Perform port scan
         ports = scan_open_ports()
-        high_risk_ports = [p for p in ports if p.get('Risk') == 'Yüksek' or p.get('Risk') == 'High']
+        high_risk_ports = [p for p in ports if p.get("Risk") == "Yüksek" or p.get("Risk") == "High"]
 
         # Port summary
         if high_risk_ports:
@@ -89,11 +90,7 @@ def get_system_summary() -> str:
             total_ports = len(ports)
             high_count = len(high_risk_ports)
             low_count = total_ports - high_count
-            summary_parts.append(
-                f"\nTotal Open Ports: {total_ports}\n"
-                f"High Risk: {high_count}\n"
-                f"Low Risk: {low_count}\n"
-            )
+            summary_parts.append(f"\nTotal Open Ports: {total_ports}\nHigh Risk: {high_count}\nLow Risk: {low_count}\n")
 
     except Exception as e:
         summary_parts.append(f"=== PORT DATA ===\nCould not read port data: {e}\n")
@@ -119,10 +116,8 @@ def ask_assistant(user_question: str) -> str:
         system_prompt = (
             "You are a Senior SOC (Security Operations Center) Analyst with extensive experience in "
             "cybersecurity threat detection, incident response, and security analysis.\n\n"
-
             "SYSTEM DATA:\n"
             f"{system_data}\n\n"
-
             "RESPONSE GUIDELINES:\n"
             "1. Respond in English, clearly and professionally.\n"
             "2. Base your response ONLY on the information provided in the system data above.\n"
@@ -138,27 +133,17 @@ def ask_assistant(user_question: str) -> str:
             "   • Summary (1-2 sentences)\n"
             "   • Key Findings (bullet points)\n"
             "   • Recommendations (bullet points)\n\n"
-
             "Answer the user's question as a Senior SOC Analyst would:"
         )
 
         # Send to Ollama
         response = _client.chat(
             model=config.MODEL_NAME,
-            messages=[
-                {
-                    'role': 'system',
-                    'content': system_prompt
-                },
-                {
-                    'role': 'user',
-                    'content': user_question
-                }
-            ]
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_question}],
         )
 
         # Get the AI's answer
-        answer = response['message']['content'].strip()
+        answer = response["message"]["content"].strip()
 
         return answer
 
@@ -167,4 +152,3 @@ def ask_assistant(user_question: str) -> str:
         error_message = f"Sorry, an error occurred: {str(e)}\n"
         error_message += "Please try again or contact the system administrator."
         return error_message
-

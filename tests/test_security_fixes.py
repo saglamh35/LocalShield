@@ -9,6 +9,7 @@ Regression tests for the security/logic fixes found during the audit:
 3. The log watcher deduplicates events by Windows RecordNumber, so the 5-second
    overlap window cannot process the same event twice.
 """
+
 import sys
 import types
 from datetime import datetime, timedelta
@@ -31,26 +32,20 @@ def engine():
 
 class TestPerSourceBruteForce:
     def _msg(self, ip, user="victim"):
-        return (f"An account failed to log on.\n"
-                f"\tAccount Name:\t{user}\n"
-                f"\tSource Network Address:\t{ip}\n")
+        return f"An account failed to log on.\n\tAccount Name:\t{user}\n\tSource Network Address:\t{ip}\n"
 
     def test_five_failures_from_five_hosts_do_not_trigger(self, engine):
         base = datetime.now()
         result = None
         for i in range(5):
-            result = engine.check_event(
-                "4625", base + timedelta(seconds=i), self._msg(f"10.0.0.{i}"), "Security"
-            )
+            result = engine.check_event("4625", base + timedelta(seconds=i), self._msg(f"10.0.0.{i}"), "Security")
         assert result is None, "unrelated single failures must not add up to one alert"
 
     def test_five_failures_from_same_host_trigger(self, engine):
         base = datetime.now()
         result = None
         for i in range(5):
-            result = engine.check_event(
-                "4625", base + timedelta(seconds=i), self._msg("203.0.113.66"), "Security"
-            )
+            result = engine.check_event("4625", base + timedelta(seconds=i), self._msg("203.0.113.66"), "Security")
         assert result is not None
         assert result["rule_id"] == "brute_force_001"
 
@@ -59,19 +54,19 @@ class TestPerSourceBruteForce:
         base = datetime.now()
         result = None
         for i in range(5):
-            result = engine.check_event(
-                "4625", base + timedelta(seconds=i), "Account Name: X", "Security"
-            )
+            result = engine.check_event("4625", base + timedelta(seconds=i), "Account Name: X", "Security")
         assert result is not None
 
 
 class TestSourceIPExtraction:
     def test_structured_fields_extracted(self):
         fw = FirewallManager(allowlist=[])
-        text = ("An account failed to log on.\n"
-                "\tSource Network Address:\t203.0.113.5\n"
-                "pam_unix: authentication failure; rhost=198.51.100.7\n"
-                "Failed password for root from 192.0.2.9 port 22\n")
+        text = (
+            "An account failed to log on.\n"
+            "\tSource Network Address:\t203.0.113.5\n"
+            "pam_unix: authentication failure; rhost=198.51.100.7\n"
+            "Failed password for root from 192.0.2.9 port 22\n"
+        )
         ips = fw.extract_source_ips_from_text(text)
         assert ips == ["203.0.113.5", "198.51.100.7", "192.0.2.9"]
 
@@ -79,16 +74,16 @@ class TestSourceIPExtraction:
         # The old blanket scan would have picked 8.8.8.8 out of the username
         # and blocked it. The source-field extraction must not.
         fw = FirewallManager(allowlist=[])
-        text = ("An account failed to log on.\n"
-                "\tAccount Name:\t8.8.8.8\n"
-                "\tWorkstation Name:\tEVIL-1.2.3.4\n")
+        text = "An account failed to log on.\n\tAccount Name:\t8.8.8.8\n\tWorkstation Name:\tEVIL-1.2.3.4\n"
         assert fw.extract_source_ips_from_text(text) == []
 
     def test_deduplicates_and_validates(self):
         fw = FirewallManager(allowlist=[])
-        text = ("Source Network Address: 203.0.113.5\n"
-                "Source Network Address: 203.0.113.5\n"
-                "Source Network Address: 999.999.1.1\n")
+        text = (
+            "Source Network Address: 203.0.113.5\n"
+            "Source Network Address: 203.0.113.5\n"
+            "Source Network Address: 999.999.1.1\n"
+        )
         assert fw.extract_source_ips_from_text(text) == ["203.0.113.5"]
 
 
@@ -99,6 +94,7 @@ def watcher_cls():
     for name in ("win32evtlog", "win32evtlogutil", "win32con"):
         sys.modules.setdefault(name, types.ModuleType(name))
     import log_watcher
+
     return log_watcher.LogWatcher
 
 

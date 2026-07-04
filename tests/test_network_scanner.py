@@ -2,6 +2,7 @@
 Unit tests for the network_scanner module.
 Covers port risk classification, summary counts and demo-mode scanning.
 """
+
 import sys
 from pathlib import Path
 
@@ -59,7 +60,7 @@ class TestScanOpenPorts:
     def test_real_scan_returns_list(self, monkeypatch):
         # Force a non-demo path with no connections so it stays fast and deterministic
         monkeypatch.setattr(network_scanner.config, "DEMO_MODE", False)
-        monkeypatch.setattr(network_scanner.psutil, "net_connections", lambda kind='inet': [])
+        monkeypatch.setattr(network_scanner.psutil, "net_connections", lambda kind="inet": [])
         ports = scan_open_ports(mock=False)
         assert ports == []
 

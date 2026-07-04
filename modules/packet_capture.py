@@ -2,6 +2,7 @@
 Packet Capture Module - Network Traffic Sniffer
 Production-Ready: AsyncIO-compatible packet capture using Scapy
 """
+
 import asyncio
 import logging
 import random
@@ -21,14 +22,17 @@ try:
     from scapy.all import get_if_addr, get_if_list, sniff, wrpcap
     from scapy.layers.inet import ICMP, IP, TCP, UDP
     from scapy.layers.l2 import Ether
+
     # Windows-specific interface detection
     try:
         from scapy.arch.windows import get_windows_if_list
+
         WINDOWS_IF_LIST_AVAILABLE = True
     except ImportError:
         WINDOWS_IF_LIST_AVAILABLE = False
     try:
         from scapy.interfaces import get_working_ifaces
+
         WORKING_IFACES_AVAILABLE = True
     except ImportError:
         WORKING_IFACES_AVAILABLE = False
@@ -75,12 +79,12 @@ class PacketSniffer:
 
         # Statistics (mixed value types: counters, timestamp, per-key defaultdicts)
         self.stats: Dict[str, Any] = {
-            'total_packets': 0,
-            'start_time': None,
-            'source_ips': defaultdict(int),
-            'dest_ips': defaultdict(int),
-            'ports': defaultdict(int),
-            'protocols': defaultdict(int)
+            "total_packets": 0,
+            "start_time": None,
+            "source_ips": defaultdict(int),
+            "dest_ips": defaultdict(int),
+            "ports": defaultdict(int),
+            "protocols": defaultdict(int),
         }
 
         logger.info(f"PacketSniffer initialized on interface: {self.interface}")
@@ -100,7 +104,7 @@ class PacketSniffer:
             s.settimeout(0.1)  # Very short timeout
             try:
                 # Connect to Google DNS (doesn't actually send data)
-                s.connect(('8.8.8.8', 80))
+                s.connect(("8.8.8.8", 80))
                 local_ip = s.getsockname()[0]
                 s.close()
                 return local_ip
@@ -131,16 +135,18 @@ class PacketSniffer:
                         if windows_if_list:
                             for iface_info in windows_if_list:
                                 if isinstance(iface_info, dict):
-                                    iface_ip = iface_info.get('ip', '')
-                                    iface_name = iface_info.get('name', '')
-                                    iface_desc = iface_info.get('description', iface_info.get('win_name', ''))
+                                    iface_ip = iface_info.get("ip", "")
+                                    iface_name = iface_info.get("name", "")
+                                    iface_desc = iface_info.get("description", iface_info.get("win_name", ""))
 
                                     # Match the IP address
                                     if iface_ip == active_local_ip:
                                         print(f"✅ Found active interface: {iface_desc or iface_name}")
                                         print(f"   GUID: {iface_name}")
                                         print(f"   IP: {iface_ip}")
-                                        logger.info(f"Selected interface (socket-based): {iface_name} ({iface_desc}) - IP: {iface_ip}")
+                                        logger.info(
+                                            f"Selected interface (socket-based): {iface_name} ({iface_desc}) - IP: {iface_ip}"
+                                        )
                                         return iface_name
                     except Exception as e:
                         logger.debug(f"get_windows_if_list() failed: {e}")
@@ -173,16 +179,21 @@ class PacketSniffer:
 
                         for iface_info in windows_if_list:
                             if isinstance(iface_info, dict):
-                                name = iface_info.get('name', '')
-                                ip = iface_info.get('ip', '')
-                                desc = iface_info.get('description', iface_info.get('win_name', ''))
+                                name = iface_info.get("name", "")
+                                ip = iface_info.get("ip", "")
+                                desc = iface_info.get("description", iface_info.get("win_name", ""))
 
                                 # Skip loopback and invalid IPs
-                                if ip and ip != '0.0.0.0' and ip != '127.0.0.1':
+                                if ip and ip != "0.0.0.0" and ip != "127.0.0.1":
                                     # Prefer non-loopback interfaces
-                                    if 'Loopback' not in str(desc) and 'lo' not in str(desc).lower():
+                                    if "Loopback" not in str(desc) and "lo" not in str(desc).lower():
                                         # Prefer Ethernet/Wi-Fi over other interfaces
-                                        if not best_iface or 'Ethernet' in str(desc) or 'Wi-Fi' in str(desc) or 'Wireless' in str(desc):
+                                        if (
+                                            not best_iface
+                                            or "Ethernet" in str(desc)
+                                            or "Wi-Fi" in str(desc)
+                                            or "Wireless" in str(desc)
+                                        ):
                                             best_iface = name
                                             best_iface_desc = desc
                                             best_iface_ip = ip
@@ -191,7 +202,9 @@ class PacketSniffer:
                             print(f"✅ Found interface using get_windows_if_list(): {best_iface_desc or best_iface}")
                             print(f"   GUID: {best_iface}")
                             print(f"   IP: {best_iface_ip}")
-                            logger.info(f"Selected interface (get_windows_if_list fallback): {best_iface} ({best_iface_desc}) - IP: {best_iface_ip}")
+                            logger.info(
+                                f"Selected interface (get_windows_if_list fallback): {best_iface} ({best_iface_desc}) - IP: {best_iface_ip}"
+                            )
                             return best_iface
                 except Exception as e:
                     logger.debug(f"get_windows_if_list() fallback failed: {e}")
@@ -215,8 +228,8 @@ class PacketSniffer:
                 for iface in if_list:
                     try:
                         addr = get_if_addr(iface)
-                        if addr and addr != '0.0.0.0' and addr != '127.0.0.1':
-                            if 'Loopback' not in str(iface) and 'lo' not in str(iface).lower():
+                        if addr and addr != "0.0.0.0" and addr != "127.0.0.1":
+                            if "Loopback" not in str(iface) and "lo" not in str(iface).lower():
                                 print(f"✅ Found active interface: {iface} (IP: {addr})")
                                 logger.info(f"Selected interface (get_if_list fallback): {iface} - IP: {addr}")
                                 return iface
@@ -252,15 +265,15 @@ class PacketSniffer:
                 self.packet_data.append(packet_info)
 
                 # Update statistics
-                self.stats['total_packets'] += 1
-                if packet_info['source_ip']:
-                    self.stats['source_ips'][packet_info['source_ip']] += 1
-                if packet_info['dest_ip']:
-                    self.stats['dest_ips'][packet_info['dest_ip']] += 1
-                if packet_info['port']:
-                    self.stats['ports'][packet_info['port']] += 1
-                if packet_info['protocol']:
-                    self.stats['protocols'][packet_info['protocol']] += 1
+                self.stats["total_packets"] += 1
+                if packet_info["source_ip"]:
+                    self.stats["source_ips"][packet_info["source_ip"]] += 1
+                if packet_info["dest_ip"]:
+                    self.stats["dest_ips"][packet_info["dest_ip"]] += 1
+                if packet_info["port"]:
+                    self.stats["ports"][packet_info["port"]] += 1
+                if packet_info["protocol"]:
+                    self.stats["protocols"][packet_info["protocol"]] += 1
 
         except Exception as e:
             logger.error(f"Error processing packet: {e}", exc_info=True)
@@ -278,40 +291,40 @@ class PacketSniffer:
         """
         try:
             packet_info = {
-                'timestamp': timestamp,
-                'source_ip': None,
-                'dest_ip': None,
-                'protocol': None,
-                'port': None,
-                'length': len(packet),
-                'summary': packet.summary()
+                "timestamp": timestamp,
+                "source_ip": None,
+                "dest_ip": None,
+                "protocol": None,
+                "port": None,
+                "length": len(packet),
+                "summary": packet.summary(),
             }
 
             # Extract IP layer information
             if IP in packet:
                 ip_layer = packet[IP]
-                packet_info['source_ip'] = ip_layer.src
-                packet_info['dest_ip'] = ip_layer.dst
-                packet_info['protocol'] = ip_layer.proto
+                packet_info["source_ip"] = ip_layer.src
+                packet_info["dest_ip"] = ip_layer.dst
+                packet_info["protocol"] = ip_layer.proto
 
                 # Extract port information (TCP/UDP)
                 if TCP in packet:
                     tcp_layer = packet[TCP]
-                    packet_info['port'] = tcp_layer.dport  # Destination port
-                    packet_info['protocol'] = 'TCP'
+                    packet_info["port"] = tcp_layer.dport  # Destination port
+                    packet_info["protocol"] = "TCP"
                 elif UDP in packet:
                     udp_layer = packet[UDP]
-                    packet_info['port'] = udp_layer.dport  # Destination port
-                    packet_info['protocol'] = 'UDP'
+                    packet_info["port"] = udp_layer.dport  # Destination port
+                    packet_info["protocol"] = "UDP"
                 elif ICMP in packet:
-                    packet_info['protocol'] = 'ICMP'
+                    packet_info["protocol"] = "ICMP"
 
             # Extract Ethernet layer information if no IP
             elif Ether in packet:
                 eth_layer = packet[Ether]
-                packet_info['source_ip'] = eth_layer.src
-                packet_info['dest_ip'] = eth_layer.dst
-                packet_info['protocol'] = 'Ethernet'
+                packet_info["source_ip"] = eth_layer.src
+                packet_info["dest_ip"] = eth_layer.dst
+                packet_info["protocol"] = "Ethernet"
 
             return packet_info
 
@@ -325,38 +338,38 @@ class PacketSniffer:
         Simulates attack traffic from suspicious IPs.
         """
         logger.info("Demo mode: Starting fake packet generation")
-        self.stats['start_time'] = datetime.now()
+        self.stats["start_time"] = datetime.now()
 
         # Demo packet templates
         demo_packets = [
             {
-                'source_ip': f'185.25.{random.randint(1, 255)}.{random.randint(1, 255)}',
-                'dest_ip': '192.168.1.10',
-                'protocol': 'TCP',
-                'port': 3389,
-                'length': random.randint(60, 1500)
+                "source_ip": f"185.25.{random.randint(1, 255)}.{random.randint(1, 255)}",
+                "dest_ip": "192.168.1.10",
+                "protocol": "TCP",
+                "port": 3389,
+                "length": random.randint(60, 1500),
             },
             {
-                'source_ip': f'45.33.{random.randint(1, 255)}.{random.randint(1, 255)}',
-                'dest_ip': '192.168.1.10',
-                'protocol': 'UDP',
-                'port': 53,
-                'length': random.randint(60, 512)
+                "source_ip": f"45.33.{random.randint(1, 255)}.{random.randint(1, 255)}",
+                "dest_ip": "192.168.1.10",
+                "protocol": "UDP",
+                "port": 53,
+                "length": random.randint(60, 512),
             },
             {
-                'source_ip': f'185.220.{random.randint(1, 255)}.{random.randint(1, 255)}',
-                'dest_ip': '192.168.1.10',
-                'protocol': 'TCP',
-                'port': 445,
-                'length': random.randint(100, 1500)
+                "source_ip": f"185.220.{random.randint(1, 255)}.{random.randint(1, 255)}",
+                "dest_ip": "192.168.1.10",
+                "protocol": "TCP",
+                "port": 445,
+                "length": random.randint(100, 1500),
             },
             {
-                'source_ip': f'45.146.{random.randint(1, 255)}.{random.randint(1, 255)}',
-                'dest_ip': '192.168.1.10',
-                'protocol': 'TCP',
-                'port': 443,
-                'length': random.randint(200, 1500)
-            }
+                "source_ip": f"45.146.{random.randint(1, 255)}.{random.randint(1, 255)}",
+                "dest_ip": "192.168.1.10",
+                "protocol": "TCP",
+                "port": 443,
+                "length": random.randint(200, 1500),
+            },
         ]
 
         packet_counter = 0
@@ -368,24 +381,24 @@ class PacketSniffer:
                 timestamp = datetime.now()
 
                 packet_info = {
-                    'timestamp': timestamp,
-                    'source_ip': template['source_ip'],
-                    'dest_ip': template['dest_ip'],
-                    'protocol': template['protocol'],
-                    'port': template['port'],
-                    'length': template['length'],
-                    'summary': f"{template['protocol']} {template['source_ip']} > {template['dest_ip']}:{template['port']}"
+                    "timestamp": timestamp,
+                    "source_ip": template["source_ip"],
+                    "dest_ip": template["dest_ip"],
+                    "protocol": template["protocol"],
+                    "port": template["port"],
+                    "length": template["length"],
+                    "summary": f"{template['protocol']} {template['source_ip']} > {template['dest_ip']}:{template['port']}",
                 }
 
                 # Add to packet data
                 self.packet_data.append(packet_info)
 
                 # Update statistics
-                self.stats['total_packets'] += 1
-                self.stats['source_ips'][packet_info['source_ip']] += 1
-                self.stats['dest_ips'][packet_info['dest_ip']] += 1
-                self.stats['ports'][packet_info['port']] += 1
-                self.stats['protocols'][packet_info['protocol']] += 1
+                self.stats["total_packets"] += 1
+                self.stats["source_ips"][packet_info["source_ip"]] += 1
+                self.stats["dest_ips"][packet_info["dest_ip"]] += 1
+                self.stats["ports"][packet_info["port"]] += 1
+                self.stats["protocols"][packet_info["protocol"]] += 1
 
                 packet_counter += 1
 
@@ -405,17 +418,17 @@ class PacketSniffer:
         """
         try:
             logger.info(f"Starting packet capture on interface: {self.interface}")
-            self.stats['start_time'] = datetime.now()
+            self.stats["start_time"] = datetime.now()
 
             # Scapy's sniff() is blocking, so we run it in a thread
             # Windows-specific: Use monitor=False (promiscuous mode may not work on all interfaces)
             # Use a filter to capture only IP traffic (more efficient)
             sniff_kwargs = {
-                'iface': self.interface,
-                'prn': self._packet_handler,
-                'stop_filter': lambda x: self.stop_event.is_set(),
-                'timeout': 1,  # Check stop condition every second
-                'store': False,  # Don't store packets in Scapy's buffer, we handle it ourselves
+                "iface": self.interface,
+                "prn": self._packet_handler,
+                "stop_filter": lambda x: self.stop_event.is_set(),
+                "timeout": 1,  # Check stop condition every second
+                "store": False,  # Don't store packets in Scapy's buffer, we handle it ourselves
             }
 
             # On Windows, try without promiscuous mode first
@@ -426,7 +439,7 @@ class PacketSniffer:
                 logger.warning(f"Sniff failed with default settings: {e}")
                 logger.info("Retrying with monitor=False (non-promiscuous mode)...")
                 # Retry without promiscuous mode
-                sniff_kwargs['monitor'] = False
+                sniff_kwargs["monitor"] = False
                 try:
                     sniff(**sniff_kwargs)
                 except Exception as e2:
@@ -453,7 +466,7 @@ class PacketSniffer:
             logger.info("Demo mode enabled - generating fake packets for screenshots")
             self.running = True
             self.stop_event.clear()
-            self.stats['start_time'] = datetime.now()
+            self.stats["start_time"] = datetime.now()
 
             # Start fake packet generator in background thread
             self.sniff_thread = threading.Thread(target=self._demo_packet_loop, daemon=True)
@@ -466,7 +479,7 @@ class PacketSniffer:
 
         self.running = True
         self.stop_event.clear()
-        self.stats['start_time'] = datetime.now()
+        self.stats["start_time"] = datetime.now()
 
         # Start sniffing in background thread
         self.sniff_thread = threading.Thread(target=self._sniff_loop, daemon=True)
@@ -505,7 +518,7 @@ class PacketSniffer:
             pd.DataFrame: DataFrame with columns: Time, Source IP, Dest IP, Protocol, Port, Length
         """
         if not self.packet_data:
-            return pd.DataFrame(columns=['Time', 'Source IP', 'Dest IP', 'Protocol', 'Port', 'Length'])
+            return pd.DataFrame(columns=["Time", "Source IP", "Dest IP", "Protocol", "Port", "Length"])
 
         # Get last 'count' packets
         recent_packets = list(self.packet_data)[-count:]
@@ -513,14 +526,16 @@ class PacketSniffer:
         # Convert to DataFrame
         data = []
         for pkt in recent_packets:
-            data.append({
-                'Time': pkt['timestamp'].strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
-                'Source IP': pkt['source_ip'] or 'N/A',
-                'Dest IP': pkt['dest_ip'] or 'N/A',
-                'Protocol': pkt['protocol'] or 'Unknown',
-                'Port': pkt['port'] or 'N/A',
-                'Length': pkt['length']
-            })
+            data.append(
+                {
+                    "Time": pkt["timestamp"].strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+                    "Source IP": pkt["source_ip"] or "N/A",
+                    "Dest IP": pkt["dest_ip"] or "N/A",
+                    "Protocol": pkt["protocol"] or "Unknown",
+                    "Port": pkt["port"] or "N/A",
+                    "Length": pkt["length"],
+                }
+            )
 
         return pd.DataFrame(data)
 
@@ -532,52 +547,31 @@ class PacketSniffer:
             dict: Statistics including top source IPs, ports, protocols, etc.
         """
         uptime = None
-        if self.stats['start_time']:
-            uptime = (datetime.now() - self.stats['start_time']).total_seconds()
+        if self.stats["start_time"]:
+            uptime = (datetime.now() - self.stats["start_time"]).total_seconds()
 
         # Get top N items
-        top_source_ips = sorted(
-            self.stats['source_ips'].items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:10]
+        top_source_ips = sorted(self.stats["source_ips"].items(), key=lambda x: x[1], reverse=True)[:10]
 
-        top_dest_ips = sorted(
-            self.stats['dest_ips'].items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:10]
+        top_dest_ips = sorted(self.stats["dest_ips"].items(), key=lambda x: x[1], reverse=True)[:10]
 
-        top_ports = sorted(
-            self.stats['ports'].items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:10]
+        top_ports = sorted(self.stats["ports"].items(), key=lambda x: x[1], reverse=True)[:10]
 
-        top_protocols = sorted(
-            self.stats['protocols'].items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:10]
+        top_protocols = sorted(self.stats["protocols"].items(), key=lambda x: x[1], reverse=True)[:10]
 
         return {
-            'total_packets': self.stats['total_packets'],
-            'packets_in_buffer': len(self.packet_data),
-            'uptime_seconds': uptime,
-            'interface': self.interface,
-            'running': self.running,
-            'top_source_ips': [{'ip': ip, 'count': count} for ip, count in top_source_ips],
-            'top_dest_ips': [{'ip': ip, 'count': count} for ip, count in top_dest_ips],
-            'top_ports': [{'port': port, 'count': count} for port, count in top_ports],
-            'top_protocols': [{'protocol': proto, 'count': count} for proto, count in top_protocols]
+            "total_packets": self.stats["total_packets"],
+            "packets_in_buffer": len(self.packet_data),
+            "uptime_seconds": uptime,
+            "interface": self.interface,
+            "running": self.running,
+            "top_source_ips": [{"ip": ip, "count": count} for ip, count in top_source_ips],
+            "top_dest_ips": [{"ip": ip, "count": count} for ip, count in top_dest_ips],
+            "top_ports": [{"port": port, "count": count} for port, count in top_ports],
+            "top_protocols": [{"protocol": proto, "count": count} for proto, count in top_protocols],
         }
 
-    async def start_capture_to_file(
-        self,
-        filename: str,
-        duration: float,
-        interface: Optional[str] = None
-    ) -> str:
+    async def start_capture_to_file(self, filename: str, duration: float, interface: Optional[str] = None) -> str:
         """
         Captures packets to a PCAP file for a specified duration.
         This is an async function that runs capture in a thread pool.
@@ -599,29 +593,18 @@ class PacketSniffer:
 
         filepath = Path(filename)
         if not filepath.suffix:
-            filepath = filepath.with_suffix('.pcap')
+            filepath = filepath.with_suffix(".pcap")
 
         logger.info(f"Starting PCAP capture to {filepath} for {duration} seconds...")
 
         # Run blocking capture in thread pool
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            self._capture_to_file_sync,
-            str(filepath),
-            duration,
-            interface
-        )
+        await loop.run_in_executor(None, self._capture_to_file_sync, str(filepath), duration, interface)
 
         logger.info(f"PCAP capture completed: {filepath}")
         return str(filepath)
 
-    def _capture_to_file_sync(
-        self,
-        filepath: str,
-        duration: float,
-        interface: str
-    ) -> None:
+    def _capture_to_file_sync(self, filepath: str, duration: float, interface: str) -> None:
         """
         Synchronous PCAP capture function (runs in thread pool).
 
@@ -633,12 +616,7 @@ class PacketSniffer:
         packets_captured = []
 
         try:
-            sniff(
-                iface=interface,
-                prn=lambda p: packets_captured.append(p),
-                timeout=duration,
-                store=True
-            )
+            sniff(iface=interface, prn=lambda p: packets_captured.append(p), timeout=duration, store=True)
 
             # Save to PCAP file
             if packets_captured:
@@ -656,12 +634,12 @@ class PacketSniffer:
         self.packets.clear()
         self.packet_data.clear()
         self.stats = {
-            'total_packets': 0,
-            'start_time': None,
-            'source_ips': defaultdict(int),
-            'dest_ips': defaultdict(int),
-            'ports': defaultdict(int),
-            'protocols': defaultdict(int)
+            "total_packets": 0,
+            "start_time": None,
+            "source_ips": defaultdict(int),
+            "dest_ips": defaultdict(int),
+            "ports": defaultdict(int),
+            "protocols": defaultdict(int),
         }
         logger.info("Packet buffer cleared")
 
@@ -731,4 +709,3 @@ if __name__ == "__main__":
         print("\nNOTE: On Windows, you may need to:")
         print("1. Install Npcap: https://npcap.com/")
         print("2. Run as Administrator")
-

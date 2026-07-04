@@ -10,6 +10,7 @@ Windows-style Event IDs so existing rules (e.g. brute force on 4625) apply:
 
 This lets LocalShield run and be tested on non-Windows hosts.
 """
+
 import logging
 import re
 from datetime import datetime
@@ -18,16 +19,10 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger(__name__)
 
 # SSH auth.log line shapes we care about
-_SYSLOG_PREFIX = re.compile(r'^(?P<mon>\w{3})\s+(?P<day>\d{1,2})\s+(?P<time>\d{2}:\d{2}:\d{2})\s')
-_FAILED = re.compile(
-    r'Failed password for (?:invalid user )?(?P<user>\S+) from (?P<ip>\d{1,3}(?:\.\d{1,3}){3})'
-)
-_ACCEPTED = re.compile(
-    r'Accepted password for (?P<user>\S+) from (?P<ip>\d{1,3}(?:\.\d{1,3}){3})'
-)
-_AUTH_FAILURE = re.compile(
-    r'authentication failure;.*rhost=(?P<ip>\d{1,3}(?:\.\d{1,3}){3})(?:.*user=(?P<user>\S+))?'
-)
+_SYSLOG_PREFIX = re.compile(r"^(?P<mon>\w{3})\s+(?P<day>\d{1,2})\s+(?P<time>\d{2}:\d{2}:\d{2})\s")
+_FAILED = re.compile(r"Failed password for (?:invalid user )?(?P<user>\S+) from (?P<ip>\d{1,3}(?:\.\d{1,3}){3})")
+_ACCEPTED = re.compile(r"Accepted password for (?P<user>\S+) from (?P<ip>\d{1,3}(?:\.\d{1,3}){3})")
+_AUTH_FAILURE = re.compile(r"authentication failure;.*rhost=(?P<ip>\d{1,3}(?:\.\d{1,3}){3})(?:.*user=(?P<user>\S+))?")
 
 
 def parse_auth_line(line: str, default_year: Optional[int] = None) -> Optional[Dict[str, Any]]:
@@ -51,12 +46,12 @@ def parse_auth_line(line: str, default_year: Optional[int] = None) -> Optional[D
     auth_fail = _AUTH_FAILURE.search(line)
 
     if failed:
-        user, ip, event_id, outcome = failed.group('user'), failed.group('ip'), "4625", "failure"
+        user, ip, event_id, outcome = failed.group("user"), failed.group("ip"), "4625", "failure"
     elif auth_fail:
-        user = auth_fail.group('user') or "unknown"
-        ip, event_id, outcome = auth_fail.group('ip'), "4625", "failure"
+        user = auth_fail.group("user") or "unknown"
+        ip, event_id, outcome = auth_fail.group("ip"), "4625", "failure"
     elif accepted:
-        user, ip, event_id, outcome = accepted.group('user'), accepted.group('ip'), "4624", "success"
+        user, ip, event_id, outcome = accepted.group("user"), accepted.group("ip"), "4624", "success"
     else:
         return None
 
@@ -123,9 +118,7 @@ def import_auth_log(
 
         summary["parsed"] += 1
 
-        detection = engine.check_event(
-            event["event_id"], event["timestamp"], event["message"], "Security"
-        )
+        detection = engine.check_event(event["event_id"], event["timestamp"], event["message"], "Security")
         risk = detection["risk_level"] if detection else ("Medium" if event["outcome"] == "failure" else "Low")
         mitre = detection["mitre_technique"] if detection else None
         if detection:
@@ -137,6 +130,7 @@ def import_auth_log(
 
         if insert:
             from db_manager import insert_log
+
             insert_log(
                 timestamp=event["timestamp"],
                 event_id=event["event_id"],
@@ -148,10 +142,7 @@ def import_auth_log(
             )
             summary["inserted"] += 1
 
-    logger.info(
-        f"Imported {summary['parsed']} SSH auth events from {path} "
-        f"({summary['detections']} rule detections)"
-    )
+    logger.info(f"Imported {summary['parsed']} SSH auth events from {path} ({summary['detections']} rule detections)")
     return summary
 
 
