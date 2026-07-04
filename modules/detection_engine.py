@@ -10,6 +10,8 @@ from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime, timedelta
 from collections import defaultdict
 
+from modules.rule_schema import validate_rule
+
 # Logging configuration
 logger = logging.getLogger(__name__)
 
@@ -52,19 +54,44 @@ class DetectionRule:
         self.rule_file: str = rule_file
         
         # Extract condition values
-        self.event_id: Optional[str] = self.conditions.get('event_id')
+        # event_id may be a single value OR a list (OR-match across event IDs).
+        raw_event_id = self.conditions.get('event_id')
+        if isinstance(raw_event_id, list):
+            self.event_ids: List[str] = [str(e) for e in raw_event_id]
+            self.event_id: Optional[str] = self.event_ids[0] if self.event_ids else None
+        elif raw_event_id is not None:
+            self.event_id = str(raw_event_id)
+            self.event_ids = [self.event_id]
+        else:
+            self.event_id = None
+            self.event_ids = []
+
         self.provider: Optional[str] = self.conditions.get('provider')  # Security, Sysmon, etc.
         self.message_regex: Optional[str] = self.conditions.get('message_regex')
         self.command_line_regex: Optional[str] = self.conditions.get('command_line_regex')
         self.image_regex: Optional[str] = self.conditions.get('image_regex')
         self.parent_image_regex: Optional[str] = self.conditions.get('parent_image_regex')
-        
+        # Negative conditions: the rule does NOT match if these patterns match.
+        self.not_message_regex: Optional[str] = self.conditions.get('not_message_regex')
+        self.not_command_line_regex: Optional[str] = self.conditions.get('not_command_line_regex')
+
         # Threshold and time window (for counting-based rules)
         self.time_window: int = self.conditions.get('time_window', 60)  # seconds
         self.threshold: int = self.conditions.get('threshold', 0)  # 0 means no threshold check
         # Optional threshold grouping: 'source_ip' counts per attacker address
         # (extracted from the message) instead of one global counter per event_id.
         self.group_by: Optional[str] = self.conditions.get('group_by')
+
+        # Cross-event correlation: fire the trigger (event_id) only when a prior
+        # event pattern has occurred >= count times for the same source within a
+        # window. E.g. a successful logon (4624) after 5 failures (4625) = a
+        # successful brute force.
+        corr = self.conditions.get('correlation')
+        self.correlation: Optional[Dict[str, Any]] = corr if isinstance(corr, dict) else None
+        if self.correlation:
+            self.corr_prior_event_id: str = str(self.correlation.get('prior_event_id', ''))
+            self.corr_count: int = int(self.correlation.get('count', 5))
+            self.corr_within: int = int(self.correlation.get('within', 300))
         
         # Backward compatibility: if old format has risk_level, map to severity
         if 'risk_level' in rule_data and not rule_data.get('severity'):
@@ -109,17 +136,22 @@ class DetectionRule:
         """
         if not self.enabled:
             return False
-        
+
         # Provider check (if specified)
         if self.provider:
             if self.provider.lower() != log_source.lower():
                 return False
-        
-        # Event ID check
-        if self.event_id:
-            if str(event_id) != str(self.event_id):
+
+        # Correlation rules observe two event types (prior + trigger); handle
+        # them separately, after the provider gate.
+        if self.correlation:
+            return self._matches_correlation(event_id, timestamp, message, sysmon_data)
+
+        # Event ID check (single value or OR across a list)
+        if self.event_ids:
+            if str(event_id) not in self.event_ids:
                 return False
-        
+
         # Message regex check
         if self.message_regex:
             try:
@@ -128,6 +160,14 @@ class DetectionRule:
             except re.error as e:
                 logger.warning(f"Invalid regex pattern in rule {self.id}: {self.message_regex} - {e}")
                 return False
+
+        # Negative message regex: rule must NOT match this pattern
+        if self.not_message_regex:
+            try:
+                if re.search(self.not_message_regex, message, re.IGNORECASE | re.MULTILINE):
+                    return False
+            except re.error as e:
+                logger.warning(f"Invalid not_message_regex in rule {self.id}: {e}")
         
         # Sysmon-specific checks (if sysmon_data is provided)
         if sysmon_data:
@@ -148,6 +188,14 @@ class DetectionRule:
                 except re.error as e:
                     logger.warning(f"Invalid command_line_regex in rule {self.id}: {e}")
                     return False
+
+            # Negative command line regex: rule must NOT match this pattern
+            if self.not_command_line_regex and 'CommandLine' in sysmon_data:
+                try:
+                    if re.search(self.not_command_line_regex, sysmon_data['CommandLine'], re.IGNORECASE):
+                        return False
+                except re.error as e:
+                    logger.warning(f"Invalid not_command_line_regex in rule {self.id}: {e}")
             
             # Parent image regex check (for parent-child detection)
             if self.parent_image_regex and 'ParentImage' in sysmon_data:
@@ -211,6 +259,44 @@ class DetectionRule:
         # If no threshold, this is a single-event match rule
         return True
     
+    def _matches_correlation(
+        self,
+        event_id: str,
+        timestamp: datetime,
+        message: str,
+        sysmon_data: Optional[Dict[str, str]],
+    ) -> bool:
+        """
+        Handles a cross-event correlation rule.
+
+        Records occurrences of the prior event (keyed by source IP), and fires
+        only when the trigger event arrives for a source that has accumulated
+        >= corr_count prior events within corr_within seconds.
+        """
+        source = self._extract_source_ip_from_message(message)
+        if not source:
+            return False
+
+        # Prune expired prior events across all sources (keeps memory bounded)
+        cutoff = timestamp - timedelta(seconds=self.corr_within)
+        for key in list(self.event_history.keys()):
+            self.event_history[key] = [
+                (ts, ctx) for ts, ctx in self.event_history[key] if ts > cutoff
+            ]
+            if not self.event_history[key]:
+                del self.event_history[key]
+
+        # A prior event (e.g. a failed logon): record it, don't fire yet.
+        if str(event_id) == self.corr_prior_event_id:
+            self.event_history[source].append((timestamp, {}))
+            return False
+
+        # The trigger event (e.g. a successful logon): fire if enough priors.
+        if self.event_ids and str(event_id) in self.event_ids:
+            return len(self.event_history.get(source, [])) >= self.corr_count
+
+        return False
+
     def _get_event_key(self, event_id: str, message: str, sysmon_data: Optional[Dict[str, str]]) -> str:
         """
         Creates a unique key for grouping similar events for threshold counting.
@@ -358,16 +444,21 @@ class DetectionEngine:
                     
                     if rule_data:
                         # Support both single rule and list of rules
-                        if isinstance(rule_data, list):
-                            for rule_item in rule_data:
-                                rule = DetectionRule(rule_item, yaml_file.name)
-                                self.rules.append(rule)
-                                logger.info(f"Rule loaded: {rule.name} (ID: {rule.id}) from {yaml_file.name}")
-                        else:
-                            rule = DetectionRule(rule_data, yaml_file.name)
+                        rule_items = rule_data if isinstance(rule_data, list) else [rule_data]
+                        for rule_item in rule_items:
+                            # Validate against the schema; skip (don't crash) on a
+                            # malformed rule so one bad file can't disable the engine.
+                            try:
+                                validate_rule(rule_item)
+                            except Exception as ve:
+                                logger.error(
+                                    f"Skipping invalid rule in {yaml_file.name}: {ve}"
+                                )
+                                continue
+                            rule = DetectionRule(rule_item, yaml_file.name)
                             self.rules.append(rule)
                             logger.info(f"Rule loaded: {rule.name} (ID: {rule.id}) from {yaml_file.name}")
-                
+
                 except Exception as e:
                     logger.error(f"Error loading rule ({yaml_file}): {e}", exc_info=True)
             
