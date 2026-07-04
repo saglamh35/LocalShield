@@ -108,28 +108,17 @@
 
 ## 📸 Screenshots
 
-### Dashboard Overview (Threat Analysis)
+### Log Analysis — risk scoring &amp; MITRE ATT&CK coverage
 
-<img width="3839" height="1972" alt="Screenshot 2025-12-09 200938" src="https://github.com/user-attachments/assets/85acfa1e-f8f9-4f48-9151-a5486c2c88e4" />
+![LocalShield dashboard — Log Analysis tab with KPI cards, timeline and MITRE ATT&CK coverage](docs/screenshots/dashboard-log-analysis.png)
 
-<img width="3205" height="1837" alt="Screenshot 2025-12-09 201020" src="https://github.com/user-attachments/assets/63396210-5b5a-4a90-b88f-4d661a1d3a38" />
-[Screenshot: Dashboard showing high-risk events, MITRE techniques, and AI analysis]
+### Incidents — related detections grouped for triage
 
-### Network Traffic Monitor (Live Sniffing)
+![LocalShield dashboard — Incidents tab grouping related high-risk detections by source IP](docs/screenshots/incidents.png)
 
-<img width="3839" height="1903" alt="Screenshot 2025-12-09 201140" src="https://github.com/user-attachments/assets/1a6b662e-9326-4d3f-8a0a-f7174c37533c" />
-[Screenshot: Real-time packet capture interface with protocol distribution charts]
+### Active Response (SOAR) — blocked IPs &amp; audit trail
 
-### Vulnerability Scan (Open Ports)
-
-<img width="3839" height="1914" alt="Screenshot 2025-12-09 201212" src="https://github.com/user-attachments/assets/237c6353-e1cd-4130-98c4-b6afa8e323ee" />
-[Screenshot: Port scanner showing high-risk open ports with detailed information]
-
-
-### AI Security Analyst (Interactive Chat)
-
-<img width="3825" height="1342" alt="Screenshot 2025-12-09 201233" src="https://github.com/user-attachments/assets/d5f28259-3659-46cf-8ccf-491cd7933255" />
-[Screenshot: Chat interface with AI assistant providing security recommendations]
+![LocalShield dashboard — Active Response tab showing blocked IPs and the response audit trail](docs/screenshots/active-response.png)
 
 ---
 
@@ -408,6 +397,7 @@ Please use it with that in mind:
 
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — component map & data flow
 - **[docs/RULES.md](docs/RULES.md)** — detection-rule authoring guide
+- **[docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md)** — self-assessment: threat model & hardening
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — setup, tooling, adding a rule
 
 ## 📝 License
