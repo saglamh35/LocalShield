@@ -24,6 +24,15 @@ dev = ["ruff>=0.5", "mypy>=1.8", "pytest>=7.4.0", "pytest-cov>=4.0"]
 [project.scripts]
 localshield-watch = "log_watcher:main"
 
+[tool.setuptools]
+# The project uses a flat layout with data directories (data/, rules/) alongside
+# the code, so setuptools' automatic package discovery can't tell packages from
+# data dirs. Declare the importable code explicitly instead. This is what the
+# `localshield-watch` entry point (log_watcher:main) needs at runtime:
+# log_watcher imports config, db_manager and the modules package.
+packages = ["modules"]
+py-modules = ["log_watcher", "config", "db_manager"]
+
 [tool.pytest.ini_options]
 # Only collect the real unit tests under tests/.
 # The repo root contains ad-hoc helper scripts (beyin_test.py, test_firewall.py,
