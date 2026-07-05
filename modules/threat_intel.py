@@ -1,26 +1,33 @@
 """
 Threat Intelligence Module - Malicious IP lookup
 Checks IPs against a list of known attacker addresses and reports their risk.
-Production-Ready: CSV-based threat intelligence feed.
+Production-Ready: CSV-based threat intelligence feed (IPv4 and IPv6).
 """
 
 import csv
 import ipaddress
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+from modules import iputils
 
 # Logging configuration
 logger = logging.getLogger(__name__)
+
+# A loaded network entry may be either family
+_AnyNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
 
 class ThreatIntel:
     """
     Manages the threat intelligence database and performs IP lookups.
 
-    The CSV 'ip' column accepts either a single address (e.g. 1.2.3.4) or a
-    CIDR range (e.g. 185.220.0.0/16). Single addresses are matched in O(1);
-    ranges are checked against the queried address.
+    The CSV 'ip' column accepts either a single address (IPv4 or IPv6, e.g.
+    1.2.3.4 or 2001:db8::1) or a CIDR range (e.g. 185.220.0.0/16,
+    2001:db8::/32). Single addresses are matched in O(1); ranges are checked
+    against the queried address. Addresses are canonicalised on load and on
+    lookup so equivalent IPv6 spellings always match.
     """
 
     def __init__(self, csv_path: str = "data/threat_intel.csv"):
@@ -36,7 +43,7 @@ class ThreatIntel:
         # Set of exact IPs for fast lookups
         self.threat_ips: set[str] = set()
         # CIDR ranges: (network, entry_string, category, confidence)
-        self.threat_networks: List[Tuple[ipaddress.IPv4Network, str, str, int]] = []
+        self.threat_networks: List[Tuple[_AnyNetwork, str, str, int]] = []
 
         self._load_threat_intel()
 
@@ -67,17 +74,19 @@ class ThreatIntel:
                         continue
 
                     if "/" in ip:
-                        # CIDR range entry
+                        # CIDR range entry (either family)
                         try:
-                            network = ipaddress.IPv4Network(ip, strict=False)
+                            network = ipaddress.ip_network(ip, strict=False)
                             self.threat_networks.append((network, ip, category, confidence))
                             count += 1
                         except (ValueError, ipaddress.AddressValueError):
                             logger.warning(f"⚠️  Skipping invalid CIDR in threat feed: {ip}")
                     else:
-                        # Single address entry
-                        self.threat_db[ip] = (category, confidence)
-                        self.threat_ips.add(ip)
+                        # Single address entry — store the canonical form so
+                        # any spelling of the same IPv6 address matches
+                        key = iputils.normalize_ip(ip) or ip
+                        self.threat_db[key] = (category, confidence)
+                        self.threat_ips.add(key)
                         count += 1
 
                 logger.info(
@@ -102,7 +111,8 @@ class ThreatIntel:
         if not ip_address or not ip_address.strip():
             return None
 
-        ip_clean = ip_address.strip()
+        # Canonicalise so e.g. '2001:DB8::1' matches a '2001:db8::1' entry
+        ip_clean = iputils.normalize_ip(ip_address) or ip_address.strip()
 
         # 1. Exact IP match (O(1))
         if ip_clean in self.threat_ips:
@@ -113,12 +123,12 @@ class ThreatIntel:
         # 2. CIDR range match
         if self.threat_networks:
             try:
-                addr = ipaddress.IPv4Address(ip_clean)
+                addr = ipaddress.ip_address(ip_clean)
             except (ValueError, ipaddress.AddressValueError):
                 return None
 
             for network, entry, category, confidence in self.threat_networks:
-                if addr in network:
+                if addr.version == network.version and addr in network:
                     logger.warning(
                         f"🚨 THREAT INTEL MATCH: {ip_clean} in {entry} - "
                         f"Category: {category}, Confidence: {confidence}%"

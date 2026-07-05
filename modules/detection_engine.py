@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
+from modules import iputils
 from modules.rule_schema import validate_rule
 
 # Logging configuration
@@ -327,20 +328,13 @@ class DetectionRule:
     @staticmethod
     def _extract_source_ip_from_message(message: str) -> Optional[str]:
         """
-        Extracts the source/attacker IP from known log field shapes:
-        Windows 'Source Network Address:', PAM 'rhost=', SSH 'from <ip>'.
+        Extracts the source/attacker IP (IPv4 or IPv6) from known log field
+        shapes: Windows 'Source Network Address:', PAM 'rhost=', SSH 'from <ip>'.
+        Shares the response engine's extraction logic (modules/iputils) so the
+        two engines can never drift apart on what counts as a source address.
         """
-        if not message:
-            return None
-        for pattern in (
-            r"Source Network Address:\s*(\d{1,3}(?:\.\d{1,3}){3})",
-            r"rhost=(\d{1,3}(?:\.\d{1,3}){3})",
-            r"\bfrom\s+(\d{1,3}(?:\.\d{1,3}){3})",
-        ):
-            match = re.search(pattern, message, re.IGNORECASE)
-            if match:
-                return match.group(1)
-        return None
+        ips = iputils.extract_source_ips(message)
+        return ips[0] if ips else None
 
     def _extract_user_from_message(self, message: str) -> Optional[str]:
         """
@@ -465,7 +459,8 @@ class DetectionEngine:
         sysmon_data: Optional[Dict[str, str]] = None,
     ) -> Optional[Dict[str, Any]]:
         """
-        Checks an event against all rules.
+        Checks an event against all rules and returns the single most severe
+        match (backward-compatible wrapper around check_event_all).
 
         Args:
             event_id: Event ID
@@ -475,23 +470,44 @@ class DetectionEngine:
             sysmon_data: Optional dict with Sysmon fields (Image, CommandLine, ParentImage, etc.)
 
         Returns:
-            dict: If rule matches, rule result with all metadata
+            dict: If a rule matches, the most severe rule's result
                  None if no match
         """
-        # Check all enabled rules
-        # Sort by severity: critical -> high -> medium -> low
+        results = self.check_event_all(event_id, timestamp, message, log_source, sysmon_data)
+        return results[0] if results else None
+
+    def check_event_all(
+        self,
+        event_id: str,
+        timestamp: datetime,
+        message: str = "",
+        log_source: str = "Security",
+        sysmon_data: Optional[Dict[str, str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Checks an event against ALL rules and returns every match, most severe
+        first. One event can legitimately trip several rules (e.g. an encoded
+        PowerShell download matches both the encoding and the LOLBin rule);
+        stopping at the first match would silently drop the others' MITRE
+        techniques and keep their threshold counters from advancing.
+
+        Returns:
+            list: Result dicts of every matching rule (empty list if none)
+        """
+        # Evaluate in severity order: critical -> high -> medium -> low
         severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
         sorted_rules = sorted([r for r in self.rules if r.enabled], key=lambda r: severity_order.get(r.severity, 99))
 
+        results: List[Dict[str, Any]] = []
         for rule in sorted_rules:
             if rule.matches(event_id, timestamp, message, log_source, sysmon_data):
                 logger.warning(
                     f"🔴 RULE MATCH: {rule.name} (ID: {rule.id}) - Event ID: {event_id}, "
                     f"Severity: {rule.severity}, MITRE: {', '.join(rule.mitre) if rule.mitre else 'N/A'}"
                 )
-                return rule.get_result()
+                results.append(rule.get_result())
 
-        return None
+        return results
 
     def reload_rules(self) -> None:
         """Reloads rules (hot reload)"""

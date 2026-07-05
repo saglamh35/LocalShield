@@ -155,5 +155,127 @@ class TestBlocking:
         assert "8.8.8.8" not in fw.blocked_ips
 
 
+class TestIPv6:
+    @pytest.mark.parametrize(
+        "ip,valid",
+        [
+            ("2607:f8b0::1", True),
+            ("2001:db8::5", True),
+            ("::1", True),
+            ("1.2.3.4", True),
+            ("2607:f8b0::zzzz", False),
+            ("not-an-ip", False),
+        ],
+    )
+    def test_is_valid_ip_both_families(self, fw, ip, valid):
+        assert fw.is_valid_ip(ip) is valid
+
+    @pytest.mark.parametrize(
+        "ip,private",
+        [
+            ("::1", True),  # loopback
+            ("fe80::1", True),  # link-local
+            ("fd12:3456::1", True),  # unique-local (ULA)
+            ("2607:f8b0::1", False),  # public
+        ],
+    )
+    def test_is_private_ipv6(self, fw, ip, private):
+        assert fw.is_private_ip(ip) is private
+
+    def test_extract_ips_finds_ipv6(self, fw):
+        text = "Connections from 2607:f8b0::1 and 1.2.3.4 at 10:30:00 today"
+        ips = fw.extract_ips_from_text(text)
+        assert "2607:f8b0::1" in ips
+        assert "1.2.3.4" in ips
+        assert "10:30:00" not in ips  # timestamps are not addresses
+
+    def test_extract_source_ipv6_windows_field(self, fw):
+        text = "An account failed to log on.\n\tSource Network Address:\t2001:db8::5\n"
+        assert fw.extract_source_ips_from_text(text) == ["2001:db8::5"]
+
+    def test_extract_source_ipv6_ssh(self, fw):
+        text = "Failed password for root from 2001:db8::7 port 22 ssh2"
+        assert fw.extract_source_ips_from_text(text) == ["2001:db8::7"]
+
+    def test_ipv6_in_attacker_controlled_field_is_ignored(self, fw):
+        # LS-01 regression, IPv6 flavour: an address planted in a name field
+        # must never become a blocking candidate.
+        text = "An account failed to log on.\n\tAccount Name:\t2607:f8b0::99\n\tWorkstation Name:\tEVIL\n"
+        assert fw.extract_source_ips_from_text(text) == []
+
+    def test_source_extraction_normalizes_spelling(self, fw):
+        text = "Source Network Address: 2001:0db8:0000:0000:0000:0000:0000:0005"
+        assert fw.extract_source_ips_from_text(text) == ["2001:db8::5"]
+
+    def test_block_ipv6_builds_safe_rule_name(self, fw, monkeypatch):
+        calls = {}
+
+        def fake_run(cmd, **kwargs):
+            calls["cmd"] = cmd
+            return FakeResult(returncode=0)
+
+        monkeypatch.setattr(response_engine.subprocess, "run", fake_run)
+        assert fw.block_ip("2607:f8b0::1") is True
+        assert "remoteip=2607:f8b0::1" in calls["cmd"]
+        # Rule names must not contain ':' (not name-safe)
+        name_arg = next(part for part in calls["cmd"] if part.startswith("name="))
+        assert ":" not in name_arg.removeprefix("name=")
+
+    def test_allowlist_matches_any_ipv6_spelling(self, monkeypatch):
+        # The allowlist entry and the log spelling differ but are the same address
+        fw2 = FirewallManager(allowlist=["2001:4860:4860:0:0:0:0:8888"])
+
+        def fail(*a, **k):
+            raise AssertionError("subprocess must not run for an allowlisted IP")
+
+        monkeypatch.setattr(response_engine.subprocess, "run", fail)
+        assert fw2.block_ip("2001:4860:4860::8888") is False
+
+    def test_private_ipv6_is_refused(self, fw, monkeypatch):
+        def fail(*a, **k):
+            raise AssertionError("subprocess must not run for a private IP")
+
+        monkeypatch.setattr(response_engine.subprocess, "run", fail)
+        assert fw.block_ip("fe80::1") is False
+        assert fw.block_ip("fd00::1") is False
+
+
+class TestDryRun:
+    def test_dry_run_blocks_without_firewall_command(self, monkeypatch):
+        fw = FirewallManager(allowlist=[], dry_run=True)
+
+        def fail(*a, **k):
+            raise AssertionError("subprocess must not run in dry-run mode")
+
+        monkeypatch.setattr(response_engine.subprocess, "run", fail)
+        assert fw.block_ip("93.184.216.34") is True
+        assert "93.184.216.34" in fw.blocked_ips
+
+    def test_dry_run_safety_checks_still_apply(self, monkeypatch):
+        fw = FirewallManager(allowlist=["8.8.8.8"], dry_run=True)
+        monkeypatch.setattr(
+            response_engine.subprocess,
+            "run",
+            lambda *a, **k: (_ for _ in ()).throw(AssertionError("no subprocess in dry-run")),
+        )
+        assert fw.block_ip("8.8.8.8") is False  # allowlisted
+        assert fw.block_ip("192.168.1.5") is False  # private
+        assert fw.block_ip("garbage") is False  # invalid
+
+    def test_dry_run_unblock(self, monkeypatch):
+        fw = FirewallManager(allowlist=[], dry_run=True)
+        monkeypatch.setattr(
+            response_engine.subprocess,
+            "run",
+            lambda *a, **k: (_ for _ in ()).throw(AssertionError("no subprocess in dry-run")),
+        )
+        assert fw.block_ip("93.184.216.34") is True
+        assert fw.unblock_ip("93.184.216.34") is True
+        assert "93.184.216.34" not in fw.blocked_ips
+
+    def test_default_is_real_mode(self):
+        assert FirewallManager(allowlist=[]).dry_run is False
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

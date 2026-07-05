@@ -60,6 +60,18 @@ class TestSummarize:
         rows = mitre.summarize(["T1543.003"])
         assert rows[0]["tactic"] == "Persistence"
 
+    def test_comma_joined_entry_counts_each_technique(self):
+        # One DB row can carry several techniques (multi-rule match)
+        rows = mitre.summarize(["T1110, T1059.001", "T1110"])
+        by_id = {r["id"]: r["count"] for r in rows}
+        assert by_id["T1110"] == 2
+        assert by_id["T1059.001"] == 1
+
+    def test_comma_joined_with_blanks_is_safe(self):
+        rows = mitre.summarize(["T1110, , T1047,"])
+        by_id = {r["id"]: r["count"] for r in rows}
+        assert by_id == {"T1110": 1, "T1047": 1}
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

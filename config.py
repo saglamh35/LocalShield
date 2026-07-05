@@ -23,6 +23,9 @@ OLLAMA_TIMEOUT: int = int(os.getenv("OLLAMA_TIMEOUT", "60"))
 
 # Database Settings
 DB_PATH: str = os.getenv("DB_PATH", "logs.db")
+# Delete security_logs / actions rows older than this many days.
+# 0 (default) disables the purge entirely — nothing is ever deleted.
+LOG_RETENTION_DAYS: int = int(os.getenv("LOG_RETENTION_DAYS", "0"))
 
 # Windows Event Log Settings
 EVENT_LOG_NAME: str = os.getenv("EVENT_LOG_NAME", "Security")
@@ -56,14 +59,26 @@ INCIDENT_WINDOW: int = int(os.getenv("INCIDENT_WINDOW", "1800"))  # 30 minutes
 # Set to True to enable demo mode (generates fake data for screenshots)
 DEMO_MODE: bool = os.getenv("DEMO_MODE", "False").lower() in ("true", "1", "yes")
 
+# Active Response (SOAR) Settings
+# Dry-run: run every safety check and audit record, but never execute a real
+# firewall command. Useful for evaluating the response layer risk-free.
+RESPONSE_DRY_RUN: bool = os.getenv("RESPONSE_DRY_RUN", "False").lower() in ("true", "1", "yes")
+# Automatic block expiry in minutes. 0 (default) = blocks are permanent.
+# With a value > 0, the watcher lifts each block after the duration elapses.
+BLOCK_DURATION_MINUTES: int = int(os.getenv("BLOCK_DURATION_MINUTES", "0"))
+
 # Firewall allowlist - critical IPs that must NEVER be auto-blocked.
 # Prevents the active-response engine from cutting off DNS/gateway and locking
 # you out. Extra IPs can be added via SAFE_IPS="a,b,c" (comma-separated).
 SAFE_IPS: List[str] = [
     "8.8.8.8",
-    "8.8.4.4",  # Google DNS
+    "8.8.4.4",  # Google DNS (IPv4)
     "1.1.1.1",
-    "1.0.0.1",  # Cloudflare DNS
+    "1.0.0.1",  # Cloudflare DNS (IPv4)
+    "2001:4860:4860::8888",
+    "2001:4860:4860::8844",  # Google DNS (IPv6)
+    "2606:4700:4700::1111",
+    "2606:4700:4700::1001",  # Cloudflare DNS (IPv6)
 ]
 _extra_safe_ips = os.getenv("SAFE_IPS", "")
 if _extra_safe_ips:

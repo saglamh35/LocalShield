@@ -22,10 +22,13 @@ except ImportError:
 import config
 from db_manager import (
     get_blocked_ips,
+    get_expired_blocked_ips,
     init_db,
     insert_log,
+    purge_old_logs,
     record_action,
     record_blocked_ip,
+    remove_blocked_ip,
     upsert_incident,
 )
 from modules.ai_engine import Brain
@@ -80,6 +83,8 @@ class LogWatcher:
         # Highest RecordNumber processed per channel (event deduplication)
         self._last_record: dict[str, int] = {}
         self.last_check_time = datetime.now()
+        # datetime.min so the first maintenance pass runs the retention purge
+        self._last_purge = datetime.min
         self.check_interval: int = config.CHECK_INTERVAL
         self.executor = ThreadPoolExecutor(max_workers=3)  # Thread pool for blocking operations
         self.running: bool = False
@@ -342,12 +347,14 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                     f"🚨 THREAT INTEL: {threat_intel_match['ip']} on malicious list - risk level automatically set to 'High'"
                 )
 
-            # FIRST: Detection Engine check (Fast and Precise)
+            # FIRST: Detection Engine check (Fast and Precise).
+            # One event can trip several rules; collect ALL matches so no
+            # rule's MITRE technique or context is silently dropped.
             logger.info(f"Checking Event ID {event_id} in detection engine...")
             loop = asyncio.get_running_loop()
-            detection_result = await loop.run_in_executor(
+            detection_results = await loop.run_in_executor(
                 self.executor,
-                self.detection_engine.check_event,
+                self.detection_engine.check_event_all,
                 event_id,
                 event_time,
                 message,
@@ -355,17 +362,36 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                 sysmon_data,  # Add sysmon_data parameter
             )
 
-            # Rule engine result
+            # Rule engine result (merged across all matching rules)
             rule_risk_level: Optional[str] = None
             mitre_technique: Optional[str] = None
             rule_match_message: Optional[str] = None
 
-            if detection_result:
-                rule_risk_level = detection_result.get("risk_level")
-                mitre_technique = detection_result.get("mitre_technique")
-                rule_match_message = detection_result.get("match_message")
+            if detection_results:
+                # Results are sorted most-severe first, so the first entry's
+                # risk level is the maximum across all matches.
+                rule_risk_level = detection_results[0].get("risk_level")
+
+                # Merge MITRE techniques from every match (de-duplicated)
+                techniques: List[str] = []
+                for result in detection_results:
+                    for tech in result.get("mitre_techniques") or []:
+                        if tech and tech not in techniques:
+                            techniques.append(tech)
+                mitre_technique = ", ".join(techniques) if techniques else None
+
+                # Merge match messages so the analyst sees every rule that fired
+                messages_seen: List[str] = []
+                for result in detection_results:
+                    match_msg = result.get("match_message")
+                    if match_msg and match_msg not in messages_seen:
+                        messages_seen.append(match_msg)
+                rule_match_message = "\n".join(messages_seen) if messages_seen else None
+
+                rule_names = ", ".join(str(r.get("rule_name")) for r in detection_results)
                 logger.warning(
-                    f"🔴 RULE MATCH: {detection_result.get('rule_name')} - Risk: {rule_risk_level}, MITRE: {mitre_technique}"
+                    f"🔴 RULE MATCH ({len(detection_results)} rule(s)): {rule_names} - "
+                    f"Risk: {rule_risk_level}, MITRE: {mitre_technique}"
                 )
 
             # THEN: Run AI analysis in thread pool (blocking operation)
@@ -425,10 +451,18 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                             reason = f"Event ID {event_id}"
                             if threat_intel_match:
                                 reason += f" / threat intel: {threat_intel_match['category']}"
+                            if self.firewall_manager.dry_run:
+                                reason += " (dry-run)"
+                            # Timed block: record when to lift it (None = permanent)
+                            expires_at = None
+                            if config.BLOCK_DURATION_MINUTES > 0:
+                                expires_at = datetime.now() + timedelta(minutes=config.BLOCK_DURATION_MINUTES)
                             await loop.run_in_executor(
                                 self.executor,
-                                lambda ip=ip, reason=reason: (
-                                    record_blocked_ip(ip, rule_name=mitre_technique, reason=reason),
+                                lambda ip=ip, reason=reason, expires_at=expires_at: (
+                                    record_blocked_ip(
+                                        ip, rule_name=mitre_technique, reason=reason, expires_at=expires_at
+                                    ),
                                     record_action("block_ip", target=ip, details=reason),
                                 ),
                             )
@@ -436,8 +470,14 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                 # If any IP was blocked, prepend a note to the analysis text
                 if blocked_ips:
                     blocked_ips_str = ", ".join(blocked_ips)
-                    action_taken = f"🛡️ [ACTION TAKEN]: Blocked IP address(es): {blocked_ips_str}\n\n"
-                    logger.warning(f"🛡️ ACTIVE RESPONSE: blocked {len(blocked_ips)} IP address(es): {blocked_ips_str}")
+                    if self.firewall_manager.dry_run:
+                        action_taken = f"🧪 [DRY-RUN]: Would block IP address(es): {blocked_ips_str}\n\n"
+                        logger.warning(f"🧪 DRY-RUN: would block {len(blocked_ips)} IP address(es): {blocked_ips_str}")
+                    else:
+                        action_taken = f"🛡️ [ACTION TAKEN]: Blocked IP address(es): {blocked_ips_str}\n\n"
+                        logger.warning(
+                            f"🛡️ ACTIVE RESPONSE: blocked {len(blocked_ips)} IP address(es): {blocked_ips_str}"
+                        )
 
             # Prepend the "action taken" message to the analysis text
             if action_taken:
@@ -471,7 +511,9 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                 src_ips = self.firewall_manager.extract_source_ips_from_text(combined_text)
                 source_ip = src_ips[0] if src_ips else None
                 incident_key = source_ip or (mitre_technique or event_id)
-                title = rule_match_message or f"High-risk Event ID {event_id}"
+                # rule_match_message may span several lines (multi-rule match);
+                # the first line is the most severe rule and makes the title.
+                title = rule_match_message.splitlines()[0] if rule_match_message else f"High-risk Event ID {event_id}"
 
                 def _notify_and_group():
                     try:
@@ -650,6 +692,33 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             logger.warning(f"Event reading error: {e}")
             return []
 
+    def _maintenance_sync(self) -> None:
+        """
+        Periodic housekeeping, run once per watch cycle in the thread pool:
+        - lift timed firewall blocks whose duration has expired
+        - once per 24h, purge rows older than the retention window
+        Best-effort: a maintenance failure must never disrupt event processing.
+        """
+        # Expire timed blocks (cheap query; permanent blocks are never returned)
+        try:
+            for ip in get_expired_blocked_ips():
+                if self.firewall_manager.unblock_ip(ip):
+                    remove_blocked_ip(ip)
+                    record_action("unblock_ip", target=ip, details="block duration expired")
+                    logger.info(f"⏲️  Timed block expired and lifted: {ip}")
+        except Exception as e:
+            logger.debug(f"block-expiry maintenance failed (ignored): {e}")
+
+        # Daily retention purge (no-op when LOG_RETENTION_DAYS is 0)
+        if config.LOG_RETENTION_DAYS > 0:
+            now = datetime.now()
+            if (now - self._last_purge) >= timedelta(hours=24):
+                self._last_purge = now
+                try:
+                    purge_old_logs()
+                except Exception as e:
+                    logger.debug(f"retention purge failed (ignored): {e}")
+
     async def run_async(self) -> None:
         """Monitors logs asynchronously"""
         logger.info("🛡️  LocalShield Log Watcher starting...")
@@ -670,6 +739,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             while self.running:
                 try:
                     await self.check_new_events_async()
+                    await loop.run_in_executor(self.executor, self._maintenance_sync)
                     await asyncio.sleep(self.check_interval)
                 except KeyboardInterrupt:
                     logger.info("\n\n⚠️  Stopped by user.")

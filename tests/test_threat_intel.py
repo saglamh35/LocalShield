@@ -107,5 +107,42 @@ class TestCIDRRanges:
         assert cidr_feed.check_ip("not-an-ip") is None
 
 
+IPV6_CONTENT = """ip,category,confidence
+2001:0db8:0000:0000:0000:0000:0000:0001,Botnet,95
+2607:f8b0::/32,BadRange,80
+1.2.3.4,Botnet,100
+"""
+
+
+@pytest.fixture
+def ipv6_feed(tmp_path):
+    csv_file = tmp_path / "threat_intel.csv"
+    csv_file.write_text(IPV6_CONTENT, encoding="utf-8")
+    return ThreatIntel(csv_path=str(csv_file))
+
+
+class TestIPv6Feed:
+    def test_all_entries_loaded(self, ipv6_feed):
+        assert ipv6_feed.get_threat_count() == 3
+
+    def test_exact_ipv6_matches_any_spelling(self, ipv6_feed):
+        # The feed stores the long form; the query uses the compressed form
+        result = ipv6_feed.check_ip("2001:db8::1")
+        assert result is not None
+        assert result["category"] == "Botnet"
+
+    def test_ipv6_cidr_range_matches(self, ipv6_feed):
+        result = ipv6_feed.check_ip("2607:f8b0:1234::9")
+        assert result is not None
+        assert result["matched_range"] == "2607:f8b0::/32"
+
+    def test_ipv6_outside_range_no_match(self, ipv6_feed):
+        assert ipv6_feed.check_ip("2607:f8b1::1") is None
+
+    def test_ipv4_still_works_alongside_ipv6(self, ipv6_feed):
+        assert ipv6_feed.check_ip("1.2.3.4") is not None
+        assert ipv6_feed.check_ip("5.6.7.8") is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

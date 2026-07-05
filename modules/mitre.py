@@ -80,16 +80,18 @@ def summarize(techniques: Iterable[Optional[str]]) -> List[Dict[str, Any]]:
     """
     Aggregate an iterable of technique ids into a per-technique summary list:
     [{'id', 'name', 'tactic', 'count'}], sorted by count desc.
-    Blank/None entries are ignored.
+    Blank/None entries are ignored. An entry may hold several comma-separated
+    ids (one event can match multiple rules); each id is counted separately.
     """
     counts: Counter = Counter()
     for t in techniques:
         if t is None:
             continue
-        tid = str(t).strip()
-        if not tid or tid.lower() in ("none", "nan", "n/a"):
-            continue
-        counts[tid.upper()] += 1
+        for part in str(t).split(","):
+            tid = part.strip()
+            if not tid or tid.lower() in ("none", "nan", "n/a"):
+                continue
+            counts[tid.upper()] += 1
 
     rows: List[Dict[str, Any]] = []
     for tid, count in counts.items():

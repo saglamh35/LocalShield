@@ -44,8 +44,9 @@ Windows Event Log (Security + Sysmon)          Linux auth.log (cross-platform)
 | `modules/rule_schema.py` | Pydantic schema; validates rules at load, skips malformed ones. |
 | `modules/ai_engine.py` | Local-LLM analysis with strict JSON output, a repeat-event cache, and a hard request timeout. |
 | `modules/knowledge_base.py` | Hybrid RAG: local + external Event-ID knowledge feeding the AI prompt. |
-| `modules/threat_intel.py` | CSV IP reputation (single IPs + CIDR ranges). |
-| `modules/response_engine.py` | Windows Firewall SOAR with an allowlist and structured-source-only targeting. |
+| `modules/threat_intel.py` | CSV IP reputation (single IPs + CIDR ranges, IPv4 and IPv6). |
+| `modules/iputils.py` | Shared family-neutral IP helpers (validation, canonicalisation, structured source-field extraction) used by both engines. |
+| `modules/response_engine.py` | Windows Firewall SOAR with an allowlist, structured-source-only targeting, optional timed blocks and a dry-run mode. |
 | `modules/notifier.py` | Offline-first alerting (alert-log always on; desktop toast / webhook opt-in). |
 | `modules/network_scanner.py`, `modules/packet_capture.py` | Open-port scan and live packet capture (Scapy). |
 | `db_manager.py` | SQLite schema, indexes, and helpers for logs, audit actions, blocked IPs, and incidents. |
