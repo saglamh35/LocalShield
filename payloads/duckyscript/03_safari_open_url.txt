@@ -1,0 +1,30 @@
+REM ============================================================
+REM  03 - Open Safari and Navigate to a Safe URL
+REM  Target : iPad Air / iPadOS 26 (O.MG Cable Elite as keyboard)
+REM  Goal   : Learn app-launch + address-bar timing. This is the
+REM           benign, iPad-legal version of the "open a browser"
+REM           step that many desktop payloads start with.
+REM  Setup  : Start anywhere. This opens Safari to a public info page
+REM           about USB-drop / BadUSB attacks (educational content).
+REM  Effect : Opens one web page. No downloads, no forms, no logins.
+REM ============================================================
+
+DELAY 2000
+
+REM Open Spotlight and launch Safari.
+GUI SPACE
+DELAY 800
+STRING Safari
+DELAY 800
+ENTER
+DELAY 2000
+
+REM Focus the Safari address bar. GUI l (Command+L) selects it,
+REM the same shortcut used on macOS.
+GUI l
+DELAY 600
+
+REM Type a safe, well-known reference URL and go. Change this to any
+REM page you want to demo with - keep it benign.
+STRING https://en.wikipedia.org/wiki/USB_dead_drop
+ENTER

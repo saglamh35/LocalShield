@@ -1,0 +1,20 @@
+REM ============================================================
+REM  01 - Hello World
+REM  Target : iPad Air / iPadOS 26 (O.MG Cable Elite as keyboard)
+REM  Goal   : Prove the cable can type. The minimum viable payload.
+REM  Setup  : Open the Notes app (or any text field) and tap into it
+REM           BEFORE running this payload.
+REM  Effect : Types one line of text. Nothing else.
+REM ============================================================
+
+REM Lines starting with REM are comments - ignored by the cable.
+
+REM Give the target a moment to be ready after the cable "enumerates"
+REM (registers itself as a keyboard). iPad can take a second or two.
+DELAY 1500
+
+REM STRING types the literal text that follows it.
+STRING hello from my O.MG cable - HID injection works
+
+REM ENTER presses the Return/Enter key.
+ENTER
