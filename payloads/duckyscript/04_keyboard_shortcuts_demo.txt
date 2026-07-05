@@ -1,0 +1,40 @@
+REM ============================================================
+REM  04 - iPadOS Keyboard Shortcut Demo
+REM  Target : iPad Air / iPadOS 26 (O.MG Cable Elite as keyboard)
+REM  Goal   : Practice the GUI (Command) modifier and see which
+REM           iPadOS system shortcuts a keyboard can drive. This is
+REM           purely navigation - it moves you around the UI and
+REM           returns you home. Nothing is created or changed.
+REM  Setup  : Start at the Home screen. Watch the screen as it runs.
+REM ============================================================
+
+DELAY 2000
+
+REM --- Spotlight ---
+REM GUI SPACE opens Spotlight search. ESCAPE (or GUI SPACE again) closes it.
+GUI SPACE
+DELAY 1000
+ESCAPE
+DELAY 1000
+
+REM --- App switcher ---
+REM GUI TAB opens the app switcher; release returns to the highlighted app.
+REM (Hold behavior varies by firmware; this is a quick tap-through.)
+GUI TAB
+DELAY 1200
+
+REM --- Go Home ---
+REM GUI H acts like pressing the Home gesture, returning to the Home screen.
+GUI h
+DELAY 1000
+
+REM --- Show all shortcuts ---
+REM Press and hold GUI on iPadOS normally shows the shortcut cheat-sheet.
+REM A quick tap here just re-focuses; use this as a placeholder to
+REM experiment with your own combos, e.g.:
+REM   GUI SHIFT 3   (screenshot on some setups)
+REM   GUI SHIFT h   (varies)
+REM Try one at a time and observe.
+
+REM End back on the Home screen.
+GUI h

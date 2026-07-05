@@ -1,0 +1,35 @@
+REM ============================================================
+REM  05 - Timing and REPEAT
+REM  Target : iPad Air / iPadOS 26 (O.MG Cable Elite as keyboard)
+REM  Goal   : Understand the two things that make or break a payload:
+REM             1) DELAY / DEFAULT_DELAY  (giving the target time)
+REM             2) REPEAT                 (re-running the previous line)
+REM  Setup  : Open Notes (or any text field) and tap into it first.
+REM  Effect : Types a few lines. No effect beyond text.
+REM ============================================================
+
+REM Why timing matters:
+REM A keyboard has no idea whether the iPad is ready. If you type before
+REM an app has focus, keystrokes are lost. DELAY is how you stay in sync.
+
+REM DEFAULT_DELAY sets a pause inserted BEFORE every following command,
+REM so you don't have to write DELAY on every line. Value is milliseconds.
+DEFAULT_DELAY 300
+
+REM Initial wait for enumeration is still explicit and larger.
+DELAY 1500
+
+STRING Timing demo line 1
+ENTER
+
+STRING Timing demo line 2
+ENTER
+
+REM REPEAT N re-runs the PREVIOUS command N more times.
+REM The line below types a dash, then REPEAT 9 types nine more = 10 dashes.
+STRING -
+REPEAT 9
+ENTER
+
+STRING Done. Notice how DEFAULT_DELAY paced every line without extra DELAYs.
+ENTER

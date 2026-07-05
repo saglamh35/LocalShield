@@ -345,8 +345,10 @@ LocalShield/
 │   ├── new_user_account.yaml       #  T1136.001
 │   ├── added_to_admin_group.yaml   #  T1098 / T1078.003
 │   ├── account_lockout.yaml        #  T1110
-│   └── wmic_process_call.yaml      #  T1047
+│   ├── wmic_process_call.yaml      #  T1047
+│   └── hid_injection.yaml          #  T1200 / T1059.001  (BadUSB)
 │
+├── payloads/duckyscript/     # Educational DuckyScript demos (O.MG cable / iPadOS)
 ├── tests/                    # 120+ unit & integration tests
 ├── data/                     # Knowledge base and threat intel data
 ├── .streamlit/config.toml    # Binds the dashboard to localhost
@@ -478,6 +480,7 @@ Please use it with that in mind:
 
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — component map & data flow
 - **[docs/RULES.md](docs/RULES.md)** — detection-rule authoring guide
+- **[docs/DUCKYSCRIPT.md](docs/DUCKYSCRIPT.md)** — HID injection / BadUSB explained, DuckyScript reference & benign O.MG payloads (red → blue)
 - **[docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md)** — self-assessment: threat model & hardening
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — setup, tooling, adding a rule
 

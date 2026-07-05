@@ -1,0 +1,21 @@
+id: "hid_injection_001"
+name: "HID Injection / BadUSB Payload (explorer spawns hidden interpreter)"
+description: "Detects the desktop footprint of a keystroke-injection (BadUSB / O.MG cable, MITRE T1200) payload: the shell/launcher (explorer.exe) spawning a command interpreter with the flags a typed one-liner uses (encoded/hidden execution or an inline download). Ducky-style payloads open the Run dialog and type a PowerShell/cmd one-liner, producing exactly this explorer -> interpreter lineage. See docs/DUCKYSCRIPT.md."
+mitre:
+  - "T1200"        # Hardware Additions
+  - "T1059.001"    # Command and Scripting Interpreter: PowerShell
+severity: "high"
+tags:
+  - "execution"
+  - "hardware-additions"
+  - "badusb"
+enabled: true
+
+conditions:
+  provider: "Sysmon"
+  event_id: "1"  # Process Creation
+  parent_image_regex: "(?i)explorer\\.exe"
+  image_regex: "(?i)(powershell|pwsh|cmd|wscript|cscript|mshta)(\\.exe)?$"
+  command_line_regex: "(?i)(-enc\\b|-encodedcommand|-w\\s+hidden|-windowstyle\\s+hidden|-nop\\b|iwr\\b|invoke-webrequest|downloadstring|new-object\\s+net\\.webclient|/c\\s+.*http)"
+
+match_message: "🔴 HID Injection / BadUSB suspected: explorer.exe spawned a command interpreter with encoded/hidden or inline-download flags. This is the signature of a typed one-liner from a keystroke-injection device (e.g. O.MG cable). Check for a newly attached USB HID keyboard around the same time."

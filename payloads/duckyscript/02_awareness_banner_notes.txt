@@ -1,0 +1,40 @@
+REM ============================================================
+REM  02 - Security Awareness Banner (via Notes)
+REM  Target : iPad Air / iPadOS 26 (O.MG Cable Elite as keyboard)
+REM  Goal   : The classic benign BadUSB demo - open an app with a
+REM           keyboard shortcut, then type a message. Here the message
+REM           is a security-awareness banner instead of anything harmful.
+REM  Setup  : Start at the Home screen / any app. Hardware keyboard
+REM           shortcuts must be enabled (they are by default).
+REM  Effect : Opens Notes and types an awareness note. No data leaves
+REM           the device; nothing is deleted or changed elsewhere.
+REM ============================================================
+
+REM Wait for enumeration.
+DELAY 2000
+
+REM GUI is the Command key on iPadOS. GUI SPACE opens Spotlight search.
+GUI SPACE
+DELAY 800
+
+REM Search for Notes and open it with ENTER.
+STRING Notes
+DELAY 800
+ENTER
+DELAY 1500
+
+REM Some layouts land on the notes list; Cmd+N starts a new note.
+GUI n
+DELAY 800
+
+REM Type the awareness banner. Each line is typed then ENTER for a newline.
+STRING *** SECURITY AWARENESS DEMO ***
+ENTER
+STRING You just watched a "charging cable" type this by itself.
+ENTER
+STRING That is HID injection (BadUSB). A malicious cable acts as a keyboard.
+ENTER
+STRING Lesson: never plug unknown cables or chargers into your devices.
+ENTER
+STRING Use data-blocker adapters and only trust hardware you own.
+ENTER
