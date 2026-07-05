@@ -41,6 +41,11 @@ localshield.log
 Thumbs.db
 .DS_Store
 
+# Python build artifacts (setuptools/pip)
+build/
+dist/
+*.egg-info/
+
 # Test and cache files
 .pytest_cache/
 .coverage
