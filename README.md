@@ -60,20 +60,23 @@
 ### 🕵️‍♂️ Detection Engine
 
 - **Curated Rule Set**: Ships with rules for brute force, encoded PowerShell, suspicious parent-child chains, LOLBin downloads (certutil/bitsadmin), new services (7045), new accounts (4720), privileged-group changes (4732), account lockouts (4740) and WMIC process creation
-- **Per-Source Correlation**: Threshold rules (e.g. brute force) count **per attacker IP**, so unrelated failures across hosts don't raise false alerts
+- **Multi-Rule Matching**: One event can trip several rules; every match is reported (all MITRE techniques preserved), not just the first
+- **Per-Source Correlation**: Threshold rules (e.g. brute force) count **per attacker IP** — IPv4 or IPv6, with equivalent IPv6 spellings sharing one counter — so unrelated failures across hosts don't raise false alerts
 - **Flexible Conditions**: Event ID, provider, regex on message / command line / image / parent image, time-window thresholds, and per-source grouping
 - **MITRE-Mapped**: Each rule declares its techniques, severity and tags
 
 ### 🛡️ Automated Response (SOAR)
 
-- **Active Defense**: Automatic Windows Firewall blocking of high-risk source IPs
+- **Active Defense**: Automatic Windows Firewall blocking of high-risk source IPs (IPv4 **and** IPv6)
 - **Safe Targeting**: Block candidates are taken only from structured source-address fields and confirmed threat-intel hits — never a blanket scan of message text (prevents block-list poisoning)
 - **Critical-IP Allowlist**: DNS/gateway and other critical IPs are never blocked
+- **Timed Blocks**: Optional auto-expiry (`BLOCK_DURATION_MINUTES`) lifts each block after a set duration
+- **Dry-Run Mode**: `RESPONSE_DRY_RUN=True` exercises every safety check and audit record without touching the firewall
 - **Private-IP Filtering** and a **persisted audit trail** of every automated action
 
 ### 🌐 Threat Intelligence & Network Monitoring
 
-- **IP Reputation**: CSV-based feed supporting both single IPs and **CIDR ranges**
+- **IP Reputation**: CSV-based feed supporting single IPs and **CIDR ranges**, in both IPv4 and IPv6
 - **Live Packet Capture**: Wireshark-like capture using Scapy, with protocol analysis and PCAP export
 - **Traffic Statistics**: Top source/destination IPs, port analysis, and protocol breakdown
 - **Vulnerability Scanner**: Open-port detection with risk assessment
@@ -91,6 +94,7 @@
 
 - **SQLite (WAL mode)** with indexes on timestamp and risk score
 - **Audit tables**: automated `actions` and persisted `blocked_ips` survive restarts
+- **Retention policy**: optional `LOG_RETENTION_DAYS` purge keeps the database from growing unbounded
 
 ### 🔒 Privacy & Security Posture
 
@@ -305,11 +309,21 @@ SYSMON_LOG_NAME=Microsoft-Windows-Sysmon/Operational
 # Log Watcher
 CHECK_INTERVAL=5
 
+# Retention: delete logs/audit rows older than N days (0 = keep forever)
+LOG_RETENTION_DAYS=0
+
+# Active response: dry-run runs every safety check and audit record but
+# never touches the firewall — evaluate the SOAR layer risk-free.
+RESPONSE_DRY_RUN=False
+
+# Timed blocks: lift each firewall block after N minutes (0 = permanent)
+BLOCK_DURATION_MINUTES=0
+
 # Demo Mode (for screenshots/testing)
 DEMO_MODE=False
 
-# Extra IPs the auto-response must never block (comma-separated).
-# Common DNS resolvers are already allowlisted by default.
+# Extra IPs the auto-response must never block (comma-separated, IPv4 or
+# IPv6). Common DNS resolvers (both families) are allowlisted by default.
 SAFE_IPS=192.168.1.1
 ```
 

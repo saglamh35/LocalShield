@@ -5,7 +5,7 @@ Production-Ready: Updated with type hints and logging
 
 import logging
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 import config
@@ -71,15 +71,26 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
         """)
 
         # Current set of IP addresses blocked by the response engine (persisted
-        # so a restart knows what is already blocked)
+        # so a restart knows what is already blocked). expires_at is NULL for
+        # permanent blocks; timed blocks are lifted once it passes.
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS blocked_ips (
                 ip TEXT PRIMARY KEY,
                 rule_name TEXT,
                 blocked_at DATETIME NOT NULL,
-                reason TEXT
+                reason TEXT,
+                expires_at DATETIME
             )
         """)
+
+        # Add expires_at to databases created before timed blocks existed
+        try:
+            cursor.execute("ALTER TABLE blocked_ips ADD COLUMN expires_at DATETIME")
+            conn.commit()
+            logger.debug("'expires_at' column added to blocked_ips")
+        except sqlite3.OperationalError:
+            # Don't error if column already exists
+            pass
 
         # Incidents: related high-risk detections grouped by a key (source IP or
         # rule) within a rolling window, so the analyst sees incidents, not noise.
@@ -337,6 +348,47 @@ def clear_all_logs(db_path: Optional[str] = None) -> bool:
         conn.close()
 
 
+def purge_old_logs(
+    retention_days: Optional[int] = None,
+    now: Optional[datetime] = None,
+    db_path: Optional[str] = None,
+) -> int:
+    """
+    Delete security_logs and actions rows older than the retention window so
+    the database cannot grow unbounded on a long-running install.
+
+    retention_days defaults to config.LOG_RETENTION_DAYS; a value of 0 (the
+    default configuration) disables the purge and deletes nothing. Incidents
+    and blocked_ips are intentionally kept — they are small, and they carry
+    state (open incidents, active blocks) that must survive.
+
+    Returns:
+        int: Number of rows deleted (across both tables)
+    """
+    days = config.LOG_RETENTION_DAYS if retention_days is None else retention_days
+    if days <= 0:
+        return 0
+
+    db_path = db_path or config.DB_PATH
+    cutoff = ((now or datetime.now()) - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM security_logs WHERE timestamp < ?", (cutoff,))
+        deleted = cursor.rowcount
+        cursor.execute("DELETE FROM actions WHERE timestamp < ?", (cutoff,))
+        deleted += cursor.rowcount
+        conn.commit()
+        if deleted:
+            logger.info(f"Retention purge: deleted {deleted} row(s) older than {days} day(s)")
+        return deleted
+    except Exception as e:
+        logger.error(f"Error purging old logs: {e}", exc_info=True)
+        return 0
+    finally:
+        conn.close()
+
+
 def record_action(
     action_type: str,
     target: Optional[str] = None,
@@ -380,24 +432,64 @@ def record_blocked_ip(
     rule_name: Optional[str] = None,
     reason: Optional[str] = None,
     timestamp: Optional[datetime] = None,
+    expires_at: Optional[datetime] = None,
     db_path: Optional[str] = None,
 ) -> None:
     """
     Persist a blocked IP so a restart knows it is already blocked.
     Uses INSERT OR REPLACE so re-blocking the same IP is idempotent.
+    expires_at=None means the block is permanent; otherwise the watcher lifts
+    the block once the expiry time passes.
     """
     db_path = db_path or config.DB_PATH
     ts = (timestamp or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+    exp = expires_at.strftime("%Y-%m-%d %H:%M:%S") if expires_at else None
     conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT OR REPLACE INTO blocked_ips (ip, rule_name, blocked_at, reason) VALUES (?, ?, ?, ?)",
-            (ip, rule_name, ts, reason),
+            "INSERT OR REPLACE INTO blocked_ips (ip, rule_name, blocked_at, reason, expires_at) VALUES (?, ?, ?, ?, ?)",
+            (ip, rule_name, ts, reason, exp),
         )
         conn.commit()
     except Exception as e:
         logger.error(f"Error recording blocked IP: {e}", exc_info=True)
+    finally:
+        conn.close()
+
+
+def get_expired_blocked_ips(now: Optional[datetime] = None, db_path: Optional[str] = None) -> List[str]:
+    """
+    Return IPs whose timed block has expired (expires_at is set and in the
+    past). Permanent blocks (expires_at NULL) are never returned.
+    """
+    db_path = db_path or config.DB_PATH
+    ts = (now or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT ip FROM blocked_ips WHERE expires_at IS NOT NULL AND expires_at <= ?",
+            (ts,),
+        )
+        return [row[0] for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"Error reading expired blocks: {e}", exc_info=True)
+        return []
+    finally:
+        conn.close()
+
+
+def remove_blocked_ip(ip: str, db_path: Optional[str] = None) -> None:
+    """Remove an IP from the persisted block list (after a successful unblock)."""
+    db_path = db_path or config.DB_PATH
+    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM blocked_ips WHERE ip = ?", (ip,))
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error removing blocked IP: {e}", exc_info=True)
     finally:
         conn.close()
 

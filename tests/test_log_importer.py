@@ -46,6 +46,22 @@ class TestParseAuthLine:
         assert parse_auth_line("Jan 10 06:55:01 srv systemd[1]: Started Daily apt.", 2024) is None
         assert parse_auth_line("", 2024) is None
 
+    def test_failed_password_from_ipv6(self):
+        line = "Jan 10 06:55:01 srv sshd[111]: Failed password for root from 2001:db8::7 port 22 ssh2"
+        ev = parse_auth_line(line, default_year=2024)
+        assert ev is not None
+        assert ev["event_id"] == "4625"
+        assert ev["source_ip"] == "2001:db8::7"
+
+    def test_ipv6_spelling_is_normalized(self):
+        line = "Jan 10 06:55:01 srv sshd[111]: Failed password for root from 2001:0DB8::0007 port 22 ssh2"
+        ev = parse_auth_line(line, default_year=2024)
+        assert ev["source_ip"] == "2001:db8::7"
+
+    def test_garbage_address_token_is_rejected(self):
+        line = "Jan 10 06:55:01 srv sshd[111]: Failed password for root from 999.999.999.999 port 22 ssh2"
+        assert parse_auth_line(line, default_year=2024) is None
+
 
 class TestImportAuthLog:
     def test_brute_force_detected_from_auth_log(self, tmp_path):

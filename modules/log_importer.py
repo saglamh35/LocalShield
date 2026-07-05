@@ -16,13 +16,18 @@ import re
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from modules import iputils
+
 logger = logging.getLogger(__name__)
 
-# SSH auth.log line shapes we care about
+# SSH auth.log line shapes we care about. The address group is deliberately
+# loose (IPv4 or IPv6 shaped); every candidate is validated with iputils
+# before the line is accepted.
+_IP = r"[0-9A-Fa-f:.]+"
 _SYSLOG_PREFIX = re.compile(r"^(?P<mon>\w{3})\s+(?P<day>\d{1,2})\s+(?P<time>\d{2}:\d{2}:\d{2})\s")
-_FAILED = re.compile(r"Failed password for (?:invalid user )?(?P<user>\S+) from (?P<ip>\d{1,3}(?:\.\d{1,3}){3})")
-_ACCEPTED = re.compile(r"Accepted password for (?P<user>\S+) from (?P<ip>\d{1,3}(?:\.\d{1,3}){3})")
-_AUTH_FAILURE = re.compile(r"authentication failure;.*rhost=(?P<ip>\d{1,3}(?:\.\d{1,3}){3})(?:.*user=(?P<user>\S+))?")
+_FAILED = re.compile(rf"Failed password for (?:invalid user )?(?P<user>\S+) from (?P<ip>{_IP})")
+_ACCEPTED = re.compile(rf"Accepted password for (?P<user>\S+) from (?P<ip>{_IP})")
+_AUTH_FAILURE = re.compile(rf"authentication failure;.*rhost=(?P<ip>{_IP})(?:.*user=(?P<user>\S+))?")
 
 
 def parse_auth_line(line: str, default_year: Optional[int] = None) -> Optional[Dict[str, Any]]:
@@ -46,13 +51,18 @@ def parse_auth_line(line: str, default_year: Optional[int] = None) -> Optional[D
     auth_fail = _AUTH_FAILURE.search(line)
 
     if failed:
-        user, ip, event_id, outcome = failed.group("user"), failed.group("ip"), "4625", "failure"
+        user, raw_ip, event_id, outcome = failed.group("user"), failed.group("ip"), "4625", "failure"
     elif auth_fail:
         user = auth_fail.group("user") or "unknown"
-        ip, event_id, outcome = auth_fail.group("ip"), "4625", "failure"
+        raw_ip, event_id, outcome = auth_fail.group("ip"), "4625", "failure"
     elif accepted:
-        user, ip, event_id, outcome = accepted.group("user"), accepted.group("ip"), "4624", "success"
+        user, raw_ip, event_id, outcome = accepted.group("user"), accepted.group("ip"), "4624", "success"
     else:
+        return None
+
+    # The loose pattern can capture non-address tokens; require a real IP
+    ip = iputils.normalize_ip(raw_ip)
+    if ip is None:
         return None
 
     # Parse the syslog timestamp (year-less); fall back to now() on failure
