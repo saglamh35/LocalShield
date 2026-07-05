@@ -1,0 +1,38 @@
+# LocalShield — one-command stack: the dashboard/detection core plus a bundled
+# Ollama service so local AI analysis works out of the box.
+#
+#   docker compose up -d --build
+#   docker compose exec ollama ollama pull gemma3:4b     # one-time model pull
+#   open http://localhost:8501
+#
+# The dashboard is published to 127.0.0.1 only — it has no authentication and
+# exposes your full log history. Do not change this to 0.0.0.0 without putting
+# an authenticating reverse proxy in front.
+
+services:
+  ollama:
+    image: ollama/ollama
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    # No host port is published; LocalShield reaches Ollama over the internal
+    # compose network at http://ollama:11434.
+
+  localshield:
+    build: .
+    depends_on:
+      - ollama
+    ports:
+      - "127.0.0.1:8501:8501"
+    environment:
+      # ollama.Client() honors OLLAMA_HOST — point it at the ollama service.
+      OLLAMA_HOST: "http://ollama:11434"
+      OLLAMA_MODEL_NAME: "gemma3:4b"
+      DB_PATH: "/data/logs.db"
+    volumes:
+      - localshield-data:/data
+    restart: unless-stopped
+
+volumes:
+  ollama-data:
+  localshield-data:

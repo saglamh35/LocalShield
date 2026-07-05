@@ -1,0 +1,34 @@
+# Keep the build context small and avoid baking local state into the image.
+.git
+.github
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local databases and logs (runtime state, not source)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.log
+
+# Packet captures and exports
+*.pcap
+*.cap
+*_export.csv
+
+# Local environment / secrets
+.env
+.env.local
+
+# Tooling caches and IDE files
+.pytest_cache/
+.coverage
+htmlcov/
+.vscode/
+.idea/
+*.swp

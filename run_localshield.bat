@@ -13,6 +13,15 @@ set "ROOT_DIR=%cd%"
 echo [0/4] Working directory: %ROOT_DIR%
 echo.
 
+:: Python availability check
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Python was not found on your PATH.
+    echo Install Python 3.10+ from https://www.python.org/ and re-run this script.
+    pause
+    exit /b 1
+)
+
 :: 2. Virtual environment check and creation
 if exist "venv\Scripts\activate.bat" (
     echo [1/4] Virtual environment found, activating...

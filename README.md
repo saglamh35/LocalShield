@@ -128,6 +128,19 @@
 
 ## 🚀 Installation & Usage
 
+### ⚡ Quick Start — pick your path
+
+| Path | Best for | One-liner |
+| ---- | -------- | --------- |
+| 🐳 **Docker** | Trying it out fast, any OS (Linux/macOS/Windows+WSL) | `docker compose up -d --build` → [details](#-run-with-docker) |
+| 🪟 **Windows launcher** | Full features incl. live Event Log capture & firewall response | double-click `run_localshield.bat` |
+| 🐧 **Linux/macOS launcher** | Native dashboard + detection core (no Docker) | `./run_localshield.sh` |
+| 🔧 **Manual** | Full control over each step | see [detailed steps](#step-1-clone-the-repository) below |
+
+> Docker runs the **cross-platform detection core + dashboard** and bundles Ollama
+> for AI. Live Windows Event Log capture and automated firewall blocking are
+> Windows-only — use `run_localshield.bat` for those.
+
 ### Prerequisites
 
 - **Windows 10/11** (Administrator privileges required)
@@ -197,9 +210,17 @@ This script will:
 - Start Log Watcher in background (requires Admin)
 - Launch Streamlit Dashboard
 
-**Option B: Manual start**
+**Option B: Linux / macOS launcher**
 ```bash
-# Terminal 1: Start Log Watcher (as Administrator)
+./run_localshield.sh
+```
+Creates/activates the virtualenv, installs dependencies, and launches the
+dashboard. Live Windows capture isn't available off Windows — feed the detection
+core with the [`auth.log` importer](#-cross-platform-log-import-linux) instead.
+
+**Option C: Manual start**
+```bash
+# Terminal 1: Start Log Watcher (as Administrator, Windows)
 python log_watcher.py
 
 # Terminal 2: Start Dashboard
@@ -207,6 +228,48 @@ streamlit run dashboard.py
 ```
 
 The dashboard will be available at: `http://localhost:8501`
+
+---
+
+## 🐳 Run with Docker
+
+The fastest way to try LocalShield on any OS. The stack bundles an **Ollama**
+service so local AI analysis works out of the box — no separate install needed.
+
+```bash
+# 1. Build and start the dashboard + Ollama
+docker compose up -d --build
+
+# 2. Pull an AI model into the Ollama container (one-time)
+docker compose exec ollama ollama pull gemma3:4b
+
+# 3. (Optional) populate with realistic demo attack data
+docker compose exec localshield python generate_demo_data.py
+```
+
+Open the dashboard at **http://localhost:8501**.
+
+Feed the detection core with real logs (SSH failures map to Event ID 4625, so the
+brute-force rule applies):
+
+```bash
+docker compose exec localshield python -m modules.log_importer /path/to/auth.log
+```
+
+Tear the stack down (data persists in named volumes) with:
+
+```bash
+docker compose down
+```
+
+**What runs in the container:** the cross-platform **detection engine**,
+**dashboard**, and **`auth.log` importer**. Live Windows Event Log capture and
+automated firewall blocking are Windows-only and are **not** available in Docker
+— use [`run_localshield.bat`](#step-6-launch-localshield) on Windows for those.
+
+**Security note:** the dashboard is published to `127.0.0.1:8501` only, because it
+has no built-in authentication and exposes your full log history. Keep it that
+way unless you place an authenticating reverse proxy in front.
 
 ---
 
@@ -254,6 +317,10 @@ LocalShield/
 ├── config.py                 # Configuration and environment variables
 ├── generate_demo_data.py     # Demo data generator for testing
 ├── run_localshield.bat       # Windows launcher script
+├── run_localshield.sh        # Linux/macOS launcher script
+├── Dockerfile                # Container image (dashboard + detection core)
+├── docker-compose.yml        # One-command stack (LocalShield + Ollama)
+├── .dockerignore             # Build-context exclusions
 ├── pyproject.toml            # Pytest configuration
 │
 ├── modules/
