@@ -23,6 +23,8 @@ from db_manager import (
     get_open_incident_count,
     get_recent_actions,
     get_total_log_count,
+    get_vulnerabilities,
+    get_vulnerability_counts,
 )
 from modules.chat_manager import ask_assistant
 from modules.mitre import summarize as mitre_summarize
@@ -697,13 +699,14 @@ def main() -> None:
     st.markdown("")
 
     # Tab structure
-    tab_logs, tab_incidents, tab_response, tab_traffic, tab_network, tab_chat = st.tabs(
+    tab_logs, tab_incidents, tab_response, tab_traffic, tab_network, tab_vulns, tab_chat = st.tabs(
         [
             "📋 Log Analysis",
             "🔥 Incidents",
             "🛡️ Active Response",
             "🌐 Network Traffic",
             "🔍 Network Scan",
+            "🐞 Vulnerabilities",
             "💬 AI Assistant",
         ]
     )
@@ -1212,6 +1215,68 @@ def main() -> None:
                 st.info("✅ No open ports found or scan failed.")
         else:
             st.info("🔍 Click the button above to scan ports.")
+
+    # --- VULNERABILITIES TAB (Trivy-based CVE findings) ---
+    with tab_vulns:
+        st.header("🐞 Vulnerability Management")
+        st.caption(
+            "CVE findings from the offline Trivy scanner — which package on which target is affected, and whether a fix exists."
+        )
+
+        counts = get_vulnerability_counts()
+
+        if counts["total"] == 0:
+            st.info(
+                "No vulnerability findings yet. Run a scan with "
+                "`python -m modules.vuln_scanner` (configure targets via "
+                "`VULN_SCAN_IMAGES` / `VULN_SCAN_PATHS`) after pre-downloading Trivy's DB."
+            )
+        else:
+            # KPI row — reuse the shared render_kpi card component.
+            k1, k2, k3, k4 = st.columns(4)
+            render_kpi(k1, "🔴", "Critical", counts["critical"], accent="#e5484d")
+            render_kpi(k2, "🟠", "High", counts["high"], accent="#f5a623")
+            render_kpi(k3, "🟡", "Medium", counts["medium"], accent="#e2c541")
+            fix_pct = round(100 * counts["fixable"] / counts["total"]) if counts["total"] else 0
+            render_kpi(k4, "🩹", "Fix available", f"{fix_pct}%", foot=f"{counts['fixable']} of {counts['total']}")
+
+            st.markdown("---")
+
+            # Filters
+            fcol1, fcol2 = st.columns([1, 1])
+            with fcol1:
+                sev_filter = st.selectbox(
+                    "Severity", ["All", "Critical", "High", "Medium", "Low", "Unknown"], key="vuln_sev"
+                )
+            with fcol2:
+                fixable_only = st.checkbox("Only findings with a fix available", key="vuln_fixable")
+
+            rows = get_vulnerabilities(
+                severity=None if sev_filter == "All" else sev_filter,
+                fixable_only=fixable_only,
+            )
+
+            if rows:
+                vuln_df = pd.DataFrame(
+                    rows,
+                    columns=[
+                        "id",
+                        "CVE",
+                        "Package",
+                        "Installed",
+                        "Fixed",
+                        "Severity",
+                        "Target",
+                        "Type",
+                        "CVSS",
+                        "Title",
+                        "Scanned",
+                    ],
+                ).drop(columns=["id"])
+                st.subheader(f"🐞 Findings ({len(vuln_df)})")
+                st.dataframe(vuln_df, use_container_width=True, hide_index=True)
+            else:
+                st.info("No findings match the current filters.")
 
     # --- TAB 3: AI ASSISTANT (UPDATED UI) ---
     with tab_chat:

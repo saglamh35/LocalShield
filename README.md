@@ -81,6 +81,14 @@
 - **Traffic Statistics**: Top source/destination IPs, port analysis, and protocol breakdown
 - **Vulnerability Scanner**: Open-port detection with risk assessment
 
+### 🐞 Vulnerability Management (CVE)
+
+- **Trivy-based CVE scanning** of container images and host filesystems — surfaces *which package on which target is affected* and whether a fix is available
+- **Offline-first**: Trivy's DB is downloaded once and then used air-gapped (`--skip-db-update`), like the local Ollama model; the scanner degrades gracefully when Trivy is absent
+- **Dedup on `(cve_id, package, target)`**: repeated scans upsert findings instead of multiplying them
+- **De-spammed alerting**: one summary notification per scan (Critical/High counts) via the existing `Notifier`, not one alert per CVE
+- **Vulnerabilities dashboard tab**: severity KPI row, "% with a fix" metric, and a filterable CVE table
+
 ### 📊 Security Dashboard
 
 - **Log Analysis**: Risk-level visualization, timeline and risk-distribution charts
@@ -394,6 +402,21 @@ DEMO_MODE=False
 # Extra IPs the auto-response must never block (comma-separated, IPv4 or
 # IPv6). Common DNS resolvers (both families) are allowlisted by default.
 SAFE_IPS=192.168.1.1
+
+# Vulnerability scanning (Trivy-based, offline-first). Pre-download the DB once
+# with `trivy image --download-db-only`, then scans run air-gapped.
+TRIVY_PATH=trivy
+TRIVY_CACHE_DIR=
+VULN_SCAN_IMAGES=python:3.9-slim,nginx:1.18
+VULN_SCAN_PATHS=/opt/app
+VULN_NOTIFY_MIN_SEVERITY=High
+```
+
+Run a scan (stores findings in the `vulnerabilities` table, surfaced in the
+dashboard's **Vulnerabilities** tab):
+
+```bash
+python -m modules.vuln_scanner
 ```
 
 ### Detection Rules
