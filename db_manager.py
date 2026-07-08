@@ -107,6 +107,28 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
             )
         """)
 
+        # Vulnerabilities: CVE findings from the Trivy-based vuln scanner
+        # (modules/vuln_scanner.py). One row per (cve, package, target); repeated
+        # scans upsert the same row so findings don't multiply over time.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS vulnerabilities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cve_id TEXT NOT NULL,
+                package TEXT NOT NULL,
+                installed_version TEXT,
+                fixed_version TEXT,
+                severity TEXT,
+                target TEXT NOT NULL,
+                target_type TEXT,
+                cvss REAL,
+                title TEXT,
+                scan_time DATETIME NOT NULL,
+                UNIQUE(cve_id, package, target)
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vulns_severity ON vulnerabilities(severity)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_vulns_target ON vulnerabilities(target)")
+
         conn.commit()
         logger.info(f"Database '{db_path}' successfully created/connected")
         logger.debug("'security_logs' table ready")
@@ -634,6 +656,156 @@ def get_open_incident_count(db_path: Optional[str] = None) -> int:
     except Exception as e:
         logger.error(f"Error counting incidents: {e}", exc_info=True)
         return 0
+    finally:
+        conn.close()
+
+
+def record_vulnerability(
+    cve_id: str,
+    package: str,
+    target: str,
+    installed_version: Optional[str] = None,
+    fixed_version: Optional[str] = None,
+    severity: Optional[str] = None,
+    target_type: Optional[str] = None,
+    cvss: Optional[float] = None,
+    title: Optional[str] = None,
+    scan_time: Optional[datetime] = None,
+    db_path: Optional[str] = None,
+) -> None:
+    """
+    Persist (or refresh) a single CVE finding. Upserts on
+    (cve_id, package, target) so re-scanning updates the existing row — the new
+    installed/fixed version, severity and scan_time — instead of adding a duplicate.
+    """
+    db_path = db_path or config.DB_PATH
+    ts = (scan_time or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO vulnerabilities
+                (cve_id, package, installed_version, fixed_version, severity,
+                 target, target_type, cvss, title, scan_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(cve_id, package, target) DO UPDATE SET
+                installed_version = excluded.installed_version,
+                fixed_version = excluded.fixed_version,
+                severity = excluded.severity,
+                target_type = excluded.target_type,
+                cvss = excluded.cvss,
+                title = excluded.title,
+                scan_time = excluded.scan_time
+            """,
+            (cve_id, package, installed_version, fixed_version, severity, target, target_type, cvss, title, ts),
+        )
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error recording vulnerability: {e}", exc_info=True)
+    finally:
+        conn.close()
+
+
+def get_vulnerabilities(
+    severity: Optional[str] = None,
+    target: Optional[str] = None,
+    fixable_only: bool = False,
+    limit: int = 1000,
+    db_path: Optional[str] = None,
+) -> List[
+    Tuple[
+        int,
+        str,
+        str,
+        Optional[str],
+        Optional[str],
+        Optional[str],
+        str,
+        Optional[str],
+        Optional[float],
+        Optional[str],
+        str,
+    ]
+]:
+    """
+    Return vulnerability findings, most severe first. Optionally filter by
+    severity, target, and whether a fix is available. Rows are:
+    (id, cve_id, package, installed_version, fixed_version, severity, target,
+     target_type, cvss, title, scan_time).
+    """
+    db_path = db_path or config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        query = (
+            "SELECT id, cve_id, package, installed_version, fixed_version, severity, "
+            "target, target_type, cvss, title, scan_time FROM vulnerabilities"
+        )
+        clauses: List[str] = []
+        params: List = []
+        if severity:
+            clauses.append("LOWER(severity) = ?")
+            params.append(str(severity).lower())
+        if target:
+            clauses.append("target = ?")
+            params.append(target)
+        if fixable_only:
+            clauses.append("fixed_version IS NOT NULL AND fixed_version != ''")
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        # Order by severity rank (critical first), then CVSS
+        query += (
+            " ORDER BY CASE LOWER(severity) "
+            "WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END DESC, "
+            "cvss DESC LIMIT ?"
+        )
+        params.append(int(limit))
+        cursor.execute(query, params)
+        return cursor.fetchall()
+    except Exception as e:
+        logger.error(f"Error reading vulnerabilities: {e}", exc_info=True)
+        return []
+    finally:
+        conn.close()
+
+
+def get_vulnerability_counts(db_path: Optional[str] = None) -> dict:
+    """
+    Return summary counts for the dashboard KPI row:
+    {'critical', 'high', 'medium', 'low', 'unknown', 'total', 'fixable'}.
+    """
+    db_path = db_path or config.DB_PATH
+    counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "unknown": 0, "total": 0, "fixable": 0}
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT LOWER(severity), COUNT(*) FROM vulnerabilities GROUP BY LOWER(severity)")
+        for sev, n in cursor.fetchall():
+            key = sev if sev in counts else "unknown"
+            counts[key] += n
+            counts["total"] += n
+        cursor.execute("SELECT COUNT(*) FROM vulnerabilities WHERE fixed_version IS NOT NULL AND fixed_version != ''")
+        counts["fixable"] = cursor.fetchone()[0]
+        return counts
+    except Exception as e:
+        logger.error(f"Error counting vulnerabilities: {e}", exc_info=True)
+        return counts
+    finally:
+        conn.close()
+
+
+def clear_vulnerabilities(db_path: Optional[str] = None) -> bool:
+    """Delete all vulnerability findings (table structure is preserved)."""
+    db_path = db_path or config.DB_PATH
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("DELETE FROM vulnerabilities")
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error clearing vulnerabilities: {e}", exc_info=True)
+        return False
     finally:
         conn.close()
 

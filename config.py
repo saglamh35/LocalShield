@@ -67,6 +67,21 @@ RESPONSE_DRY_RUN: bool = os.getenv("RESPONSE_DRY_RUN", "False").lower() in ("tru
 # With a value > 0, the watcher lifts each block after the duration elapses.
 BLOCK_DURATION_MINUTES: int = int(os.getenv("BLOCK_DURATION_MINUTES", "0"))
 
+# Vulnerability Scanning (Trivy-based, offline-first)
+# LocalShield stays offline-first: Trivy's vulnerability DB is downloaded ONCE
+# (e.g. `trivy image --download-db-only`) and then used air-gapped, exactly like
+# the local Ollama model. The scanner degrades gracefully if Trivy is absent.
+# Path to the Trivy binary (default: resolve 'trivy' on PATH).
+TRIVY_PATH: str = os.getenv("TRIVY_PATH", "trivy")
+# Directory holding the pre-downloaded Trivy DB (empty = Trivy's default cache).
+TRIVY_CACHE_DIR: str = os.getenv("TRIVY_CACHE_DIR", "")
+# Comma-separated container images to scan, e.g. "python:3.9-slim,nginx:1.18".
+VULN_SCAN_IMAGES: List[str] = [img.strip() for img in os.getenv("VULN_SCAN_IMAGES", "").split(",") if img.strip()]
+# Comma-separated filesystem paths to scan (host rootfs / project directories).
+VULN_SCAN_PATHS: List[str] = [p.strip() for p in os.getenv("VULN_SCAN_PATHS", "").split(",") if p.strip()]
+# Minimum CVE severity that triggers a per-scan notification: Low | Medium | High | Critical
+VULN_NOTIFY_MIN_SEVERITY: str = os.getenv("VULN_NOTIFY_MIN_SEVERITY", "High")
+
 # Firewall allowlist - critical IPs that must NEVER be auto-blocked.
 # Prevents the active-response engine from cutting off DNS/gateway and locking
 # you out. Extra IPs can be added via SAFE_IPS="a,b,c" (comma-separated).
