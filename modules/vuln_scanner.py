@@ -57,10 +57,12 @@ class VulnScanner:
         notify_min_severity: Optional[str] = None,
         db_path: Optional[str] = None,
     ):
-        self.trivy_path = trivy_path or getattr(config, "TRIVY_PATH", "trivy")
-        self.cache_dir = cache_dir if cache_dir is not None else getattr(config, "TRIVY_CACHE_DIR", "")
-        self.notify_min_severity = notify_min_severity or getattr(config, "VULN_NOTIFY_MIN_SEVERITY", "High")
-        self.db_path = db_path
+        # str() coercion keeps these concretely typed (getattr returns Any),
+        # so shutil.which() and subprocess.run() receive plain str arguments.
+        self.trivy_path: str = str(trivy_path or getattr(config, "TRIVY_PATH", "trivy"))
+        self.cache_dir: str = str(cache_dir if cache_dir is not None else getattr(config, "TRIVY_CACHE_DIR", ""))
+        self.notify_min_severity: str = str(notify_min_severity or getattr(config, "VULN_NOTIFY_MIN_SEVERITY", "High"))
+        self.db_path: Optional[str] = db_path
 
     # -- availability -------------------------------------------------------
 
