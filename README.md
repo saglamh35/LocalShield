@@ -90,6 +90,12 @@
 - **Vulnerabilities dashboard tab**: severity KPI row, "% with a fix" metric, and a filterable CVE table
 - **Ansible remediation (SOAR)**: generates an Ansible playbook that upgrades the affected packages across the affected hosts. **Dry-run by default** (honors `RESPONSE_DRY_RUN`) — the playbook is rendered and audited for review, never auto-executed; degrades gracefully when `ansible-playbook` is absent
 
+### 📈 Observability (Prometheus & Grafana)
+
+- **Prometheus exporter**: SIEM + vulnerability KPIs (logs, high-risk events, open incidents, blocked IPs, vulnerabilities by severity, fixable ratio) served at `/metrics` — stdlib `http.server` only, **no new dependencies**, localhost-bound by default
+- **Grafana dashboard**: a ready-to-import `grafana/localshield_dashboard.json` (stat panels, fixable-ratio gauge, severity time series)
+- Run with `python -m modules.metrics_exporter`; see [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) for the Prometheus scrape config and Grafana import steps
+
 ### 📊 Security Dashboard
 
 - **Log Analysis**: Risk-level visualization, timeline and risk-distribution charts
