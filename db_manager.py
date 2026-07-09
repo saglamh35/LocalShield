@@ -707,6 +707,65 @@ def record_vulnerability(
         conn.close()
 
 
+_VULN_UPSERT_SQL = """
+    INSERT INTO vulnerabilities
+        (cve_id, package, installed_version, fixed_version, severity,
+         target, target_type, cvss, title, scan_time)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(cve_id, package, target) DO UPDATE SET
+        installed_version = excluded.installed_version,
+        fixed_version = excluded.fixed_version,
+        severity = excluded.severity,
+        target_type = excluded.target_type,
+        cvss = excluded.cvss,
+        title = excluded.title,
+        scan_time = excluded.scan_time
+"""
+
+
+def record_vulnerabilities(
+    findings: List[dict],
+    scan_time: Optional[datetime] = None,
+    db_path: Optional[str] = None,
+) -> int:
+    """
+    Batch-upsert many findings in a SINGLE connection (one commit), instead of
+    one connect/commit/close per CVE. A real image scan returns hundreds of
+    CVEs, so this matters. Each finding is a dict with keys cve_id, package,
+    target (required) plus optional installed_version, fixed_version, severity,
+    target_type, cvss, title. Returns the number of rows written.
+    """
+    if not findings:
+        return 0
+    db_path = db_path or config.DB_PATH
+    ts = (scan_time or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+    rows = [
+        (
+            f["cve_id"],
+            f["package"],
+            f.get("installed_version"),
+            f.get("fixed_version"),
+            f.get("severity"),
+            f["target"],
+            f.get("target_type"),
+            f.get("cvss"),
+            f.get("title"),
+            ts,
+        )
+        for f in findings
+    ]
+    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
+    try:
+        conn.executemany(_VULN_UPSERT_SQL, rows)
+        conn.commit()
+        return len(rows)
+    except Exception as e:
+        logger.error(f"Error recording vulnerabilities (batch): {e}", exc_info=True)
+        return 0
+    finally:
+        conn.close()
+
+
 def get_vulnerabilities(
     severity: Optional[str] = None,
     target: Optional[str] = None,

@@ -73,6 +73,36 @@ class VulnScanner:
         except Exception:
             return False
 
+    def is_db_present(self) -> bool:
+        """
+        True if a Trivy vulnerability DB is available locally. This is what makes
+        offline scanning meaningful: without a pre-downloaded DB a scan errors out
+        and looks identical to a clean "no vulnerabilities" result. Callers use
+        this to tell "DB missing" apart from "target is clean". Never raises.
+        """
+        if not self.is_available():
+            return False
+        cmd = [self.trivy_path, "version", "--format", "json"]
+        if self.cache_dir:
+            cmd += ["--cache-dir", self.cache_dir]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)  # noqa: S603
+            if proc.returncode != 0:
+                return False
+            return self._db_present_from_version(proc.stdout)
+        except Exception:
+            return False
+
+    @staticmethod
+    def _db_present_from_version(version_json: str) -> bool:
+        """Parse `trivy version --format json`; True if it reports a vuln DB."""
+        try:
+            data = json.loads(version_json)
+        except (ValueError, TypeError):
+            return False
+        vdb = data.get("VulnerabilityDB")
+        return isinstance(vdb, dict) and vdb.get("UpdatedAt") is not None
+
     # -- public scanning API ------------------------------------------------
 
     def scan_image(self, image: str, store: bool = True, notify: bool = True) -> List[Dict[str, Any]]:
@@ -95,7 +125,16 @@ class VulnScanner:
                 "Install Trivy and pre-download its DB to enable this feature.",
                 self.trivy_path,
             )
-            return {"scanned": 0, "findings": 0, "counts": {}, "available": False}
+            return {"scanned": 0, "findings": 0, "counts": {}, "available": False, "db_present": False}
+
+        # A scan without a local DB errors out and would look like "no findings".
+        # Surface that distinctly instead of silently reporting a clean result.
+        if not self.is_db_present():
+            logger.warning(
+                "⚠️  Trivy is installed but no local vulnerability DB was found. "
+                "Run `trivy image --download-db-only` once, then scans run offline."
+            )
+            return {"scanned": 0, "findings": 0, "counts": {}, "available": True, "db_present": False}
 
         scan_time = datetime.now()
         all_findings: List[Dict[str, Any]] = []
@@ -111,7 +150,13 @@ class VulnScanner:
         counts = self._count_by_severity(all_findings)
         self._notify_summary(all_findings, counts)
         logger.info("Vulnerability scan complete: %d target(s), %d finding(s)", scanned, len(all_findings))
-        return {"scanned": scanned, "findings": len(all_findings), "counts": counts, "available": True}
+        return {
+            "scanned": scanned,
+            "findings": len(all_findings),
+            "counts": counts,
+            "available": True,
+            "db_present": True,
+        }
 
     # -- internals ----------------------------------------------------------
 
@@ -152,7 +197,16 @@ class VulnScanner:
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)  # noqa: S603
             if proc.returncode != 0:
-                logger.error("Trivy scan of %s failed (rc=%s): %s", target, proc.returncode, proc.stderr.strip())
+                stderr = proc.stderr.strip()
+                if "db" in stderr.lower() and ("download" in stderr.lower() or "need to be updated" in stderr.lower()):
+                    logger.error(
+                        "Trivy scan of %s failed: vulnerability DB unavailable. "
+                        "Run `trivy image --download-db-only` once for offline scans. (%s)",
+                        target,
+                        stderr,
+                    )
+                else:
+                    logger.error("Trivy scan of %s failed (rc=%s): %s", target, proc.returncode, stderr)
                 return None
             return proc.stdout
         except FileNotFoundError:
@@ -192,10 +246,20 @@ class VulnScanner:
                         "target": target,
                         "target_type": target_type,
                         "cvss": self._extract_cvss(vuln.get("CVSS")),
-                        "title": vuln.get("Title") or vuln.get("Description"),
+                        # Title, falling back to (often long) Description — truncate
+                        # so it can't bloat the dashboard table.
+                        "title": self._short_title(vuln.get("Title") or vuln.get("Description")),
                     }
                 )
         return findings
+
+    @staticmethod
+    def _short_title(title: Any, limit: int = 300) -> Optional[str]:
+        """Trim an over-long title/description so it can't bloat the UI table."""
+        if not title:
+            return None
+        text = str(title)
+        return text if len(text) <= limit else text[: limit - 1] + "…"
 
     @staticmethod
     def _extract_cvss(cvss: Any) -> Optional[float]:
@@ -214,20 +278,8 @@ class VulnScanner:
         return None
 
     def _store(self, findings: List[Dict[str, Any]], scan_time: datetime) -> None:
-        for f in findings:
-            db_manager.record_vulnerability(
-                cve_id=f["cve_id"],
-                package=f["package"],
-                target=f["target"],
-                installed_version=f.get("installed_version"),
-                fixed_version=f.get("fixed_version"),
-                severity=f.get("severity"),
-                target_type=f.get("target_type"),
-                cvss=f.get("cvss"),
-                title=f.get("title"),
-                scan_time=scan_time,
-                db_path=self.db_path,
-            )
+        # Single connection / one commit for the whole batch (see db_manager).
+        db_manager.record_vulnerabilities(findings, scan_time=scan_time, db_path=self.db_path)
 
     @staticmethod
     def _count_by_severity(findings: List[Dict[str, Any]]) -> Dict[str, int]:

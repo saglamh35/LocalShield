@@ -26,6 +26,7 @@ from db_manager import (
     get_vulnerabilities,
     get_vulnerability_counts,
 )
+from modules.ansible_remediation import playbook_for_db
 from modules.chat_manager import ask_assistant
 from modules.mitre import summarize as mitre_summarize
 from modules.network_scanner import get_port_summary, scan_open_ports
@@ -1277,6 +1278,30 @@ def main() -> None:
                 st.dataframe(vuln_df, use_container_width=True, hide_index=True)
             else:
                 st.info("No findings match the current filters.")
+
+            # --- Ansible remediation (SOAR, dry-run: generate & review only) ---
+            st.markdown("---")
+            st.subheader("🛠️ Ansible Remediation")
+            st.caption(
+                "Generate an Ansible playbook that upgrades the affected packages "
+                "across the affected hosts. This only renders the playbook for review — "
+                "it never runs `ansible-playbook`."
+            )
+            if counts["fixable"] == 0:
+                st.info("No findings currently have a fix available, so there is nothing to remediate.")
+            elif st.button("Generate remediation playbook", key="gen_playbook"):
+                playbook = playbook_for_db()
+                if playbook:
+                    st.code(playbook, language="yaml")
+                    st.download_button(
+                        "⬇️ Download playbook",
+                        data=playbook,
+                        file_name="localshield_remediation.yml",
+                        mime="text/yaml",
+                        key="dl_playbook",
+                    )
+                else:
+                    st.info("Nothing fixable to remediate.")
 
     # --- TAB 3: AI ASSISTANT (UPDATED UI) ---
     with tab_chat:
