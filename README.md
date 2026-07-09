@@ -22,7 +22,9 @@
 - **Live Network Packet Capture** (Wireshark-like functionality) using Scapy
 - **AI-Powered Threat Analysis** via local LLM (Ollama) - no cloud dependencies
 - **YAML-Based Detection Rules** with MITRE ATT&CK framework integration
-- **Automated Response (SOAR)** through Windows Firewall integration
+- **Automated Response (SOAR)** through Windows Firewall integration and Ansible remediation
+- **Vulnerability Management (CVE)** via offline Trivy scanning of container images and filesystems
+- **Observability** with a Prometheus exporter and a ready-to-import Grafana dashboard
 - **Professional Dashboard** built with Streamlit for real-time visualization
 
 
@@ -120,7 +122,7 @@
 
 ### ✅ Quality
 
-- **120+ unit tests** and **GitHub Actions CI** across Python 3.10 / 3.11 / 3.12
+- **260+ unit tests** and **GitHub Actions CI** across Python 3.10 / 3.11 / 3.12
 - **Cross-platform detection core**: import Linux SSH `auth.log` and run it through the same rules (see below)
 
 ---
@@ -138,6 +140,10 @@
 ### Active Response (SOAR) — blocked IPs &amp; audit trail
 
 ![LocalShield dashboard — Active Response tab showing blocked IPs and the response audit trail](docs/screenshots/active-response.png)
+
+### Vulnerability Management — CVE findings &amp; fix coverage
+
+![LocalShield dashboard — Vulnerabilities tab with a severity KPI row, "% with a fix" metric and a filterable CVE table](docs/screenshots/vulnerabilities.png)
 
 ---
 
@@ -310,7 +316,7 @@ way unless you place an authenticating reverse proxy in front.
 
 ### Tooling
 
-- **pytest**: 120+ unit & integration tests
+- **pytest**: 260+ unit & integration tests
 - **GitHub Actions**: CI matrix across Python 3.10 / 3.11 / 3.12
 
 ### Architecture Patterns
@@ -340,19 +346,26 @@ LocalShield/
 │
 ├── modules/
 │   ├── detection_engine.py   # YAML rule engine (per-source thresholds, MITRE)
+│   ├── rule_schema.py        # Detection-rule schema & validation
 │   ├── ai_engine.py          # Ollama LLM analysis (JSON mode + cache)
 │   ├── ai_models.py          # Pydantic model for AI output
 │   ├── mitre.py              # Offline MITRE ATT&CK technique/tactic lookup
+│   ├── iputils.py            # Family-neutral IPv4/IPv6 parsing & extraction
 │   ├── log_importer.py       # Cross-platform SSH auth.log importer
 │   ├── packet_capture.py     # Real-time network packet sniffer (Scapy)
 │   ├── network_scanner.py    # Open port vulnerability scanner
+│   ├── vuln_scanner.py       # Trivy-based CVE scanner (offline-first)
+│   ├── ansible_remediation.py# Ansible remediation playbook generator (SOAR)
+│   ├── metrics_exporter.py   # Prometheus /metrics exporter (stdlib only)
 │   ├── response_engine.py    # Windows Firewall automation + IP allowlist
 │   ├── threat_intel.py       # IP reputation (single IPs + CIDR ranges)
+│   ├── notifier.py           # De-spammed alert notifications
 │   ├── chat_manager.py       # AI assistant chat interface
 │   └── knowledge_base.py     # Event ID knowledge base (RAG)
 │
 ├── rules/                    # YAML detection rules (MITRE-mapped)
 │   ├── brute_force.yaml            #  T1110  (per-source)
+│   ├── brute_force_success.yaml    #  T1110  (success after burst)
 │   ├── powershell_encoded.yaml     #  T1059.001 / T1027
 │   ├── parent_child_suspicious.yaml#  T1059.001 / T1204.002
 │   ├── lolbin_download.yaml        #  T1105 / T1140 / T1197
@@ -364,7 +377,8 @@ LocalShield/
 │   └── hid_injection.yaml          #  T1200 / T1059.001  (BadUSB)
 │
 ├── payloads/duckyscript/     # Educational DuckyScript demos (O.MG cable / iPadOS)
-├── tests/                    # 120+ unit & integration tests
+├── grafana/                  # Ready-to-import Grafana dashboard (Prometheus)
+├── tests/                    # 260+ unit & integration tests
 ├── data/                     # Knowledge base and threat intel data
 ├── .streamlit/config.toml    # Binds the dashboard to localhost
 ├── .github/workflows/ci.yml  # GitHub Actions CI (pytest, Py 3.10–3.12)
@@ -521,6 +535,7 @@ Please use it with that in mind:
 
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — component map & data flow
 - **[docs/RULES.md](docs/RULES.md)** — detection-rule authoring guide
+- **[docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)** — Prometheus metrics table, scrape config & Grafana import
 - **[docs/DUCKYSCRIPT.md](docs/DUCKYSCRIPT.md)** — HID injection / BadUSB explained, DuckyScript reference & benign O.MG payloads (red → blue)
 - **[docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md)** — self-assessment: threat model & hardening
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — setup, tooling, adding a rule
