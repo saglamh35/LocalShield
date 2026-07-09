@@ -89,6 +89,12 @@
 - **De-spammed alerting**: one summary notification per scan (Critical/High counts) via the existing `Notifier`, not one alert per CVE
 - **Vulnerabilities dashboard tab**: severity KPI row, "% with a fix" metric, and a filterable CVE table
 
+### 📈 Observability (Prometheus & Grafana)
+
+- **Prometheus exporter**: SIEM + vulnerability KPIs (logs, high-risk events, open incidents, blocked IPs, vulnerabilities by severity, fixable ratio) served at `/metrics` — stdlib `http.server` only, **no new dependencies**, localhost-bound by default
+- **Grafana dashboard**: a ready-to-import `grafana/localshield_dashboard.json` (stat panels, fixable-ratio gauge, severity time series)
+- Run with `python -m modules.metrics_exporter`; see [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) for the Prometheus scrape config and Grafana import steps
+
 ### 📊 Security Dashboard
 
 - **Log Analysis**: Risk-level visualization, timeline and risk-distribution charts

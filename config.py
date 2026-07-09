@@ -82,6 +82,13 @@ VULN_SCAN_PATHS: List[str] = [p.strip() for p in os.getenv("VULN_SCAN_PATHS", ""
 # Minimum CVE severity that triggers a per-scan notification: Low | Medium | High | Critical
 VULN_NOTIFY_MIN_SEVERITY: str = os.getenv("VULN_NOTIFY_MIN_SEVERITY", "High")
 
+# Metrics Exporter (Prometheus text-exposition, offline-first)
+# Exposes LocalShield SIEM + vulnerability KPIs at http://METRICS_HOST:METRICS_PORT/metrics
+# for a Prometheus scrape + Grafana dashboard. Stdlib http.server only — no new deps.
+# Binds localhost by default; expose wider only behind a trusted network/proxy.
+METRICS_HOST: str = os.getenv("METRICS_HOST", "127.0.0.1")
+METRICS_PORT: int = int(os.getenv("METRICS_PORT", "9109"))
+
 # Firewall allowlist - critical IPs that must NEVER be auto-blocked.
 # Prevents the active-response engine from cutting off DNS/gateway and locking
 # you out. Extra IPs can be added via SAFE_IPS="a,b,c" (comma-separated).
