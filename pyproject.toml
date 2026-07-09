@@ -35,7 +35,7 @@ py-modules = ["log_watcher", "config", "db_manager"]
 
 [tool.pytest.ini_options]
 # Only collect the real unit tests under tests/.
-# The repo root contains ad-hoc helper scripts (beyin_test.py, test_firewall.py,
+# The repo root contains ad-hoc helper scripts (brain_test.py, test_firewall.py,
 # test_sniffer.py) that execute network/Ollama code at import time and must not
 # be treated as pytest test modules.
 testpaths = ["tests"]
@@ -48,7 +48,7 @@ addopts = "-ra"
 line-length = 120
 target-version = "py310"
 # Ad-hoc root scripts run code at import time; not part of the linted package.
-extend-exclude = ["beyin_test.py", "test_firewall.py", "test_sniffer.py", "simulate_attack.py"]
+extend-exclude = ["brain_test.py", "test_firewall.py", "test_sniffer.py", "simulate_attack.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]  # pycodestyle, pyflakes, isort
