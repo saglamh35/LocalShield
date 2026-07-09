@@ -1,0 +1,28 @@
+REM ============================================================
+REM  VM-target (Windows) - Detectable HID recon  (LAB ONLY)
+REM  Target : a Windows VM you own, with Sysmon installed
+REM  Goal   : Produce REAL, detectable SIEM telemetry so LocalShield's
+REM           hid_injection rule fires — the *detectable* half of the
+REM           purple-team loop. Unlike the iPad scripts (which a
+REM           keyboard-only iPad sandboxes to typing), this launches a
+REM           command interpreter, which is exactly what a SIEM sees.
+REM  Safety : The command is BENIGN (whoami). The only "tradecraft" is
+REM           the hidden window (-w hidden) — precisely the signal a
+REM           detection should catch. No download, no exfil, no C2, no
+REM           credential access. Run only on a VM you own.
+REM  MITRE  : T1200 (Hardware Additions) + T1059.001 (PowerShell)
+REM ============================================================
+
+DELAY 2000
+
+REM Open the Run dialog — its host is explorer.exe, so the process it
+REM spawns has ParentImage=explorer.exe (the ancestry the rule keys on).
+GUI r
+DELAY 500
+
+REM Launch a HIDDEN PowerShell that runs a harmless recon command.
+REM -w hidden : hide the window (the detectable tradecraft)
+REM -nop      : no profile (typical of typed one-liners)
+REM whoami    : benign — prints the current user, nothing else
+STRING powershell -w hidden -nop whoami
+ENTER

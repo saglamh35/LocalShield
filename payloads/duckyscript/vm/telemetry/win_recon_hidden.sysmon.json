@@ -1,0 +1,14 @@
+{
+  "_comment": "Sample Sysmon Event ID 1 (Process Create) that win_recon_hidden.txt produces on a Windows VM. This is the integration artifact LocalShield's detection engine consumes; simulate_hid_attack.py replays it and hid_injection_001 fires. Values are illustrative/lab-safe.",
+  "event_id": "1",
+  "provider": "Sysmon",
+  "message": "Process Create: ParentImage: C:\\Windows\\explorer.exe Image: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe CommandLine: powershell.exe -w hidden -nop whoami User: LAB\\analyst",
+  "sysmon": {
+    "ParentImage": "C:\\Windows\\explorer.exe",
+    "Image": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "CommandLine": "powershell.exe -w hidden -nop whoami",
+    "User": "LAB\\analyst",
+    "ProcessId": "6120",
+    "ParentProcessId": "4288"
+  }
+}
