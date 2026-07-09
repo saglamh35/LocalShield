@@ -88,6 +88,7 @@
 - **Dedup on `(cve_id, package, target)`**: repeated scans upsert findings instead of multiplying them
 - **De-spammed alerting**: one summary notification per scan (Critical/High counts) via the existing `Notifier`, not one alert per CVE
 - **Vulnerabilities dashboard tab**: severity KPI row, "% with a fix" metric, and a filterable CVE table
+- **Ansible remediation (SOAR)**: generates an Ansible playbook that upgrades the affected packages across the affected hosts. **Dry-run by default** (honors `RESPONSE_DRY_RUN`) — the playbook is rendered and audited for review, never auto-executed; degrades gracefully when `ansible-playbook` is absent
 
 ### 📈 Observability (Prometheus & Grafana)
 
@@ -416,6 +417,10 @@ TRIVY_CACHE_DIR=
 VULN_SCAN_IMAGES=python:3.9-slim,nginx:1.18
 VULN_SCAN_PATHS=/opt/app
 VULN_NOTIFY_MIN_SEVERITY=High
+
+# Ansible remediation (dry-run by default via RESPONSE_DRY_RUN)
+REMEDIATION_OUTPUT_DIR=.
+ANSIBLE_PLAYBOOK_PATH=ansible-playbook
 ```
 
 Run a scan (stores findings in the `vulnerabilities` table, surfaced in the
@@ -423,6 +428,13 @@ dashboard's **Vulnerabilities** tab):
 
 ```bash
 python -m modules.vuln_scanner
+```
+
+Generate an Ansible remediation playbook for the fixable findings (dry-run:
+renders and audits the playbook, never executes it):
+
+```bash
+python -m modules.ansible_remediation
 ```
 
 ### Detection Rules

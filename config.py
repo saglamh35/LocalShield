@@ -82,6 +82,15 @@ VULN_SCAN_PATHS: List[str] = [p.strip() for p in os.getenv("VULN_SCAN_PATHS", ""
 # Minimum CVE severity that triggers a per-scan notification: Low | Medium | High | Critical
 VULN_NOTIFY_MIN_SEVERITY: str = os.getenv("VULN_NOTIFY_MIN_SEVERITY", "High")
 
+# Vulnerability Remediation (Ansible-based SOAR, dry-run by default)
+# Generates an Ansible playbook that upgrades the affected packages across the
+# affected hosts. Honors RESPONSE_DRY_RUN: by default the playbook is rendered
+# and audited but NEVER executed — review-before-run, like the firewall SOAR.
+# Directory where generated remediation playbooks are written.
+REMEDIATION_OUTPUT_DIR: str = os.getenv("REMEDIATION_OUTPUT_DIR", ".")
+# Path to the ansible-playbook binary (default: resolve on PATH).
+ANSIBLE_PLAYBOOK_PATH: str = os.getenv("ANSIBLE_PLAYBOOK_PATH", "ansible-playbook")
+
 # Metrics Exporter (Prometheus text-exposition, offline-first)
 # Exposes LocalShield SIEM + vulnerability KPIs at http://METRICS_HOST:METRICS_PORT/metrics
 # for a Prometheus scrape + Grafana dashboard. Stdlib http.server only — no new deps.
