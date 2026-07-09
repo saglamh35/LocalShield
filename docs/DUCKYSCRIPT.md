@@ -151,7 +151,50 @@ Defensive takeaways that generalize beyond this one rule:
 
 ---
 
-## 5. See also
+## 5. VM-target purple-team walkthrough (attack → detect → respond)
+
+Section 3 explained why the *iPad* payloads can only type. To actually exercise the
+blue-team side you need a target that runs an interpreter — a **Windows VM you own**
+with Sysmon. That is the *detectable* half of the loop, and it ships in
+[`payloads/duckyscript/vm/`](../payloads/duckyscript/vm/).
+
+The payload `win_recon_hidden.txt` opens the Run dialog and types:
+
+```
+powershell -w hidden -nop whoami
+```
+
+This is deliberately **benign** — `whoami` prints a username and nothing else. The
+only tradecraft is `-w hidden` (a hidden window), which is *exactly* the signal a
+detection should catch. So there is no weaponization, yet the telemetry is real.
+
+**The loop:**
+
+1. **Attack** — flash the payload to your O.MG cable, attach it to your VM.
+2. **Telemetry** — Sysmon records a Process Create (Event ID 1) with
+   `ParentImage=explorer.exe`, `Image=powershell.exe`, and the hidden-window command
+   line. Its shape is captured in `payloads/duckyscript/vm/telemetry/win_recon_hidden.sysmon.json`.
+3. **Detect** — [`rules/hid_injection.yaml`](../rules/hid_injection.yaml) matches the
+   `explorer → hidden powershell` lineage → **T1200** (Hardware Additions) +
+   **T1059.001** (PowerShell).
+4. **Respond** — the detection surfaces in the dashboard and through the `Notifier`,
+   where the existing SOAR (firewall / Ansible remediation) can act.
+
+**No VM handy?** Replay it offline — the same detection path, no hardware:
+
+```bash
+python simulate_hid_attack.py
+```
+
+This runs the sample telemetry through the detection engine and stores the T1200
+detection in the DB (see `tests/test_purple_team_detection.py` for the asserted
+attack→detect proof).
+
+> The command stays benign on purpose. A *weaponized* payload (encoded download,
+> credential dump, C2) is out of scope for this project — the valuable, career-relevant
+> skill is the **detection**, which this loop demonstrates in full.
+
+## 6. See also
 
 - Example payloads: [`payloads/duckyscript/`](../payloads/duckyscript/)
 - Detection rule: [`rules/hid_injection.yaml`](../rules/hid_injection.yaml)
