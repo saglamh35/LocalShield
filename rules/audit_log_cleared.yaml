@@ -1,0 +1,17 @@
+id: "audit_log_cleared_001"
+name: "Security Audit Log Cleared"
+description: "Detects clearing of the Windows Security audit log (Event ID 1102). Attackers clear the log to cover their tracks after an intrusion — legitimate clears are rare and should always be verified."
+mitre:
+  - "T1070.001"  # Indicator Removal: Clear Windows Event Logs
+severity: "critical"
+tags:
+  - "defense_evasion"
+  - "anti_forensics"
+  - "log_tampering"
+enabled: true
+
+conditions:
+  provider: "Security"
+  event_id: "1102"
+
+match_message: "🔴 Audit Log Cleared: The Security event log was cleared (Event ID 1102). This is a classic anti-forensics move — identify who cleared it and treat any surrounding activity as suspect."
