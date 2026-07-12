@@ -61,7 +61,7 @@
 
 ### 🕵️‍♂️ Detection Engine
 
-- **Curated Rule Set**: Ships with rules for brute force, encoded PowerShell, suspicious parent-child chains, LOLBin downloads (certutil/bitsadmin), new services (7045), new accounts (4720), privileged-group changes (4732), account lockouts (4740) and WMIC process creation
+- **Curated Rule Set**: Ships with rules for brute force (incl. RDP, Logon Type 10), encoded PowerShell, suspicious parent-child chains, LOLBin downloads (certutil/bitsadmin), new services (7045), new accounts (4720), privileged-group changes (4732), account lockouts (4740), WMIC process creation, audit-log clearing (1102), audit-policy changes (4719) and scheduled-task creation (4698)
 - **Multi-Rule Matching**: One event can trip several rules; every match is reported (all MITRE techniques preserved), not just the first
 - **Per-Source Correlation**: Threshold rules (e.g. brute force) count **per attacker IP** — IPv4 or IPv6, with equivalent IPv6 spellings sharing one counter — so unrelated failures across hosts don't raise false alerts
 - **Flexible Conditions**: Event ID, provider, regex on message / command line / image / parent image, time-window thresholds, and per-source grouping
@@ -74,11 +74,13 @@
 - **Critical-IP Allowlist**: DNS/gateway and other critical IPs are never blocked
 - **Timed Blocks**: Optional auto-expiry (`BLOCK_DURATION_MINUTES`) lifts each block after a set duration
 - **Dry-Run Mode**: `RESPONSE_DRY_RUN=True` exercises every safety check and audit record without touching the firewall
+- **Manual Unblock**: Lift any block straight from the dashboard's Active Response tab — audited like every automated action
 - **Private-IP Filtering** and a **persisted audit trail** of every automated action
 
 ### 🌐 Threat Intelligence & Network Monitoring
 
 - **IP Reputation**: CSV-based feed supporting single IPs and **CIDR ranges**, in both IPv4 and IPv6
+- **Opt-In Feed Updater**: `python -m modules.threat_intel --update` merges a public blocklist (default: abuse.ch Feodo Tracker) into the local CSV — manual entries are preserved, and the runtime itself never fetches anything (offline-first stays intact)
 - **Live Packet Capture**: Wireshark-like capture using Scapy, with protocol analysis and PCAP export
 - **Traffic Statistics**: Top source/destination IPs, port analysis, and protocol breakdown
 - **Vulnerability Scanner**: Open-port detection with risk assessment
@@ -102,6 +104,8 @@
 
 - **Log Analysis**: Risk-level visualization, timeline and risk-distribution charts
 - **MITRE ATT&CK Coverage**: Techniques detected, grouped and coloured by tactic
+- **Honest Live Status**: The header badge is driven by a watcher heartbeat — Monitoring Active / Watcher Stale / Watcher Offline (a dashboard-only Docker deployment shows Offline by design)
+- **Incident Triage**: Close and reopen incidents directly from the Incidents tab
 - **Filtering & Pagination**: Risk / Event ID / full-text / date-range filters with paginated log cards
 - **Opt-In Live View**: Auto-refresh is a toggle (default off) so reading and the AI chat aren't interrupted
 - **AI Security Assistant**: Chat interface grounded in your current logs and open ports
@@ -122,7 +126,7 @@
 
 ### ✅ Quality
 
-- **260+ unit tests** and **GitHub Actions CI** across Python 3.10 / 3.11 / 3.12
+- **280+ unit tests** and **GitHub Actions CI** across Python 3.10 / 3.11 / 3.12
 - **Cross-platform detection core**: import Linux SSH `auth.log` and run it through the same rules (see below)
 
 ---
@@ -316,7 +320,7 @@ way unless you place an authenticating reverse proxy in front.
 
 ### Tooling
 
-- **pytest**: 270+ unit & integration tests
+- **pytest**: 280+ unit & integration tests
 - **GitHub Actions**: CI matrix across Python 3.10 / 3.11 / 3.12
 
 ### Architecture Patterns
@@ -379,11 +383,15 @@ LocalShield/
 │   ├── added_to_admin_group.yaml   #  T1098 / T1078.003
 │   ├── account_lockout.yaml        #  T1110
 │   ├── wmic_process_call.yaml      #  T1047
+│   ├── audit_log_cleared.yaml      #  T1070.001
+│   ├── audit_policy_change.yaml    #  T1562.002
+│   ├── scheduled_task_created.yaml #  T1053.005
+│   ├── rdp_brute_force.yaml        #  T1110 / T1021.001
 │   └── hid_injection.yaml          #  T1200 / T1059.001  (BadUSB)
 │
 ├── payloads/duckyscript/     # Educational DuckyScript demos (O.MG cable / iPadOS)
 ├── grafana/                  # Ready-to-import Grafana dashboard (Prometheus)
-├── tests/                    # 270+ unit & integration tests
+├── tests/                    # 280+ unit & integration tests
 ├── data/                     # Knowledge base and threat intel data
 ├── .streamlit/config.toml    # Binds the dashboard to localhost
 ├── .github/workflows/ci.yml  # GitHub Actions CI (pytest, Py 3.10–3.12)
