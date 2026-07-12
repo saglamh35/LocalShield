@@ -160,3 +160,147 @@ class ThreatIntel:
             int: Number of malicious entries
         """
         return len(self.threat_ips) + len(self.threat_networks)
+
+
+# --- Opt-in feed updater -----------------------------------------------------
+#
+# LocalShield is offline-first: nothing below runs automatically. Operators who
+# WANT an up-to-date blocklist run `python -m modules.threat_intel --update`,
+# which downloads a public feed and merges it into the local CSV. The runtime
+# lookup path above never touches the network.
+
+# abuse.ch Feodo Tracker: actively-used botnet C2 addresses, plain text format
+DEFAULT_FEED_URL = "https://feodotracker.abuse.ch/downloads/ipblocklist.txt"
+DEFAULT_FEED_CATEGORY = "Botnet C2"
+DEFAULT_FEED_CONFIDENCE = 90
+
+
+def _parse_feed_text(text: str) -> List[str]:
+    """
+    Extract valid IP addresses / CIDR ranges from a plain-text feed.
+    Lines starting with '#' are comments; anything that does not parse as an
+    address or network is skipped (a hostile feed line must never propagate).
+    """
+    entries: List[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "/" in line:
+            try:
+                entries.append(str(ipaddress.ip_network(line, strict=False)))
+            except ValueError:
+                logger.debug(f"Skipping invalid feed CIDR: {line!r}")
+            continue
+        normalized = iputils.normalize_ip(line)
+        if normalized:
+            entries.append(normalized)
+        else:
+            logger.debug(f"Skipping invalid feed line: {line!r}")
+    return entries
+
+
+def update_feed(
+    csv_path: str = "data/threat_intel.csv",
+    url: str = DEFAULT_FEED_URL,
+    category: str = DEFAULT_FEED_CATEGORY,
+    confidence: int = DEFAULT_FEED_CONFIDENCE,
+    timeout: int = 30,
+) -> int:
+    """
+    Download a plain-text IP blocklist and merge it into the local CSV feed.
+
+    Existing rows are preserved (manual entries are never lost); a downloaded
+    IP that already exists updates that row's category/confidence. The CSV is
+    written atomically and the previous version is kept as `<csv_path>.bak`.
+
+    Returns:
+        int: Number of feed entries merged in (new + refreshed)
+    """
+    import os
+    import tempfile
+    import urllib.request
+
+    if not url.lower().startswith("https://"):
+        raise ValueError(f"Feed URL must use https:// (got {url!r})")
+
+    logger.info(f"Downloading threat feed: {url}")
+    with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310 - https enforced above
+        text = response.read().decode("utf-8", errors="replace")
+
+    entries = _parse_feed_text(text)
+    if not entries:
+        logger.warning("Feed contained no valid entries — local CSV left untouched.")
+        return 0
+
+    # Load the existing CSV (manual + previous feed rows), keyed by IP
+    path = Path(csv_path)
+    rows: Dict[str, Dict[str, str]] = {}
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                ip = (row.get("ip") or "").strip()
+                if ip:
+                    rows[ip] = {
+                        "ip": ip,
+                        "category": (row.get("category") or "Unknown").strip(),
+                        "confidence": (row.get("confidence") or "0").strip(),
+                    }
+
+    for entry in entries:
+        rows[entry] = {"ip": entry, "category": category, "confidence": str(confidence)}
+
+    # Atomic write: tmp file in the same directory, then os.replace
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        with open(path, "rb") as src, open(f"{path}.bak", "wb") as dst:
+            dst.write(src.read())
+
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), suffix=".csv.tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=["ip", "category", "confidence"])
+            writer.writeheader()
+            writer.writerows(rows.values())
+        os.replace(tmp_name, path)
+    except BaseException:
+        if os.path.exists(tmp_name):
+            os.unlink(tmp_name)
+        raise
+
+    logger.info(f"✅ Threat feed merged: {len(entries)} feed entries, {len(rows)} total rows in {path}")
+    return len(entries)
+
+
+def _main() -> int:
+    """CLI entry point: python -m modules.threat_intel --update [--url ...] [--csv ...]"""
+    import argparse
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    parser = argparse.ArgumentParser(
+        description="LocalShield threat-intel feed tools (opt-in; the runtime never fetches on its own)."
+    )
+    parser.add_argument("--update", action="store_true", help="Download the feed and merge it into the local CSV")
+    parser.add_argument("--url", default=DEFAULT_FEED_URL, help=f"Feed URL (default: {DEFAULT_FEED_URL})")
+    parser.add_argument("--csv", default="data/threat_intel.csv", help="Local CSV path to merge into")
+    parser.add_argument("--category", default=DEFAULT_FEED_CATEGORY, help="Category label for feed entries")
+    parser.add_argument(
+        "--confidence", type=int, default=DEFAULT_FEED_CONFIDENCE, help="Confidence score for feed entries (1-100)"
+    )
+    args = parser.parse_args()
+
+    if not args.update:
+        parser.print_help()
+        return 1
+
+    try:
+        merged = update_feed(args.csv, url=args.url, category=args.category, confidence=args.confidence)
+    except Exception as e:
+        logger.error(f"Feed update failed: {e}")
+        return 1
+    print(f"Merged {merged} feed entries into {args.csv}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

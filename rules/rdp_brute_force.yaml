@@ -1,0 +1,22 @@
+id: "rdp_brute_force_001"
+name: "RDP Brute Force Detection"
+description: "Detects repeated failed RDP logons (Event ID 4625 with Logon Type 10 - RemoteInteractive) from the same source address. Exposed RDP is one of the most attacked entry points."
+mitre:
+  - "T1110"      # Brute Force
+  - "T1021.001"  # Remote Services: Remote Desktop Protocol
+severity: "high"
+tags:
+  - "brute_force"
+  - "rdp"
+  - "initial_access"
+enabled: true
+
+conditions:
+  event_id: "4625"
+  provider: "Security"
+  message_regex: 'Logon Type:\s*10'
+  time_window: 120  # seconds
+  threshold: 5      # 5+ failed RDP logons within the window
+  group_by: "source_ip"  # Count per attacker address
+
+match_message: "🔴 RDP Brute Force Detected: Multiple failed RemoteInteractive logons (Event ID 4625, Logon Type 10) from the same source within the time window. Block the source and check for a subsequent successful logon."

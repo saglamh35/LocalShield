@@ -1,0 +1,17 @@
+id: "scheduled_task_created_001"
+name: "Scheduled Task Created"
+description: "Detects creation of a scheduled task (Event ID 4698). Scheduled tasks are one of the most common persistence and lateral-movement mechanisms — verify the task action and author."
+mitre:
+  - "T1053.005"  # Scheduled Task/Job: Scheduled Task
+severity: "medium"
+tags:
+  - "persistence"
+  - "execution"
+  - "scheduled_task"
+enabled: true
+
+conditions:
+  provider: "Security"
+  event_id: "4698"
+
+match_message: "🟠 Scheduled Task Created: A new scheduled task was registered (Event ID 4698). Confirm the task command and creator are expected — rogue tasks are a common persistence mechanism."

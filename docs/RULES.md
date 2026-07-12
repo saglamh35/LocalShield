@@ -62,7 +62,10 @@ Use `event_id` as a list for OR, and `not_*` for exclusions.
 
 - **Brute force (per source):** `rules/brute_force.yaml` — 4625 × 5 in 60s, `group_by: source_ip`.
 - **Successful brute force (correlation):** `rules/brute_force_success.yaml` — 4624 after ≥5 prior 4625 from the same IP.
+- **RDP brute force (regex + threshold):** `rules/rdp_brute_force.yaml` — 4625 with `Logon Type: 10` × 5 in 120s, per source IP.
 - **LOLBin download:** `rules/lolbin_download.yaml` — Sysmon 1 + certutil/bitsadmin command line.
+- **Log tampering (single event):** `rules/audit_log_cleared.yaml` (1102, critical) and `rules/audit_policy_change.yaml` (4719).
+- **Persistence:** `rules/scheduled_task_created.yaml` (4698) and `rules/new_service_install.yaml` (7045).
 
 ## Testing a rule
 

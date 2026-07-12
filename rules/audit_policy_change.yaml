@@ -1,0 +1,17 @@
+id: "audit_policy_change_001"
+name: "System Audit Policy Changed"
+description: "Detects a change to the system audit policy (Event ID 4719). Attackers weaken auditing to blind the SIEM before acting — verify every policy change against an authorized change request."
+mitre:
+  - "T1562.002"  # Impair Defenses: Disable Windows Event Logging
+severity: "high"
+tags:
+  - "defense_evasion"
+  - "audit_policy"
+  - "log_tampering"
+enabled: true
+
+conditions:
+  provider: "Security"
+  event_id: "4719"
+
+match_message: "🔴 Audit Policy Changed: The system audit policy was modified (Event ID 4719). Unauthorized changes are used to disable logging before an attack — confirm the change was sanctioned."

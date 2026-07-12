@@ -18,6 +18,7 @@ from db_manager import (
     clear_all_logs,
     get_all_logs,
     get_blocked_ips,
+    get_heartbeat,
     get_high_risk_count,
     get_incidents,
     get_latest_detection,
@@ -26,12 +27,16 @@ from db_manager import (
     get_total_log_count,
     get_vulnerabilities,
     get_vulnerability_counts,
+    record_action,
+    remove_blocked_ip,
+    set_incident_status,
 )
 from modules.ansible_remediation import playbook_for_db
 from modules.chat_manager import ask_assistant
 from modules.mitre import summarize as mitre_summarize
 from modules.network_scanner import get_port_summary, scan_open_ports
 from modules.packet_capture import PacketSniffer
+from modules.response_engine import FirewallManager
 
 # Page configuration
 st.set_page_config(page_title="LocalShield Dashboard", page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
@@ -147,6 +152,11 @@ st.markdown(
         100% { box-shadow: 0 0 0 0 rgba(63,185,80,0); }
     }
     @media (prefers-reduced-motion: reduce) { .ls-dot { animation: none; } }
+    /* Watcher-status variants (heartbeat-driven: stale / offline) */
+    .ls-status.stale { color: var(--ls-med); background: rgba(227,160,8,.1); border-color: rgba(227,160,8,.3); }
+    .ls-status.stale .ls-dot { background: var(--ls-med); animation: none; box-shadow: none; }
+    .ls-status.offline { color: var(--ls-high); background: rgba(248,81,73,.1); border-color: rgba(248,81,73,.3); }
+    .ls-status.offline .ls-dot { background: var(--ls-high); animation: none; box-shadow: none; }
 
     .ls-kpi {
         background: var(--ls-surface); border: 1px solid var(--ls-line);
@@ -293,6 +303,25 @@ def get_risk_color_class(risk_level) -> str:
     elif "low" in risk_str or "düşük" in risk_str:
         return "risk-low"
     return ""
+
+
+def get_watcher_status() -> "tuple[str, str]":
+    """
+    Derive the log watcher's live status from its DB heartbeat.
+
+    Returns:
+        (css_class, label): "" / "stale" / "offline" and the badge text.
+        A dashboard-only deployment (e.g. Docker) has no watcher and
+        honestly shows "Watcher Offline".
+    """
+    last_seen = get_heartbeat("log_watcher", db_path=config.DB_PATH)
+    if last_seen is not None:
+        age = (datetime.now() - last_seen).total_seconds()
+        if age <= 30:
+            return "", "Monitoring Active"
+        if age <= 300:
+            return "stale", "Watcher Stale"
+    return "offline", "Watcher Offline"
 
 
 def translate_risk_level(risk_level) -> str:
@@ -599,16 +628,17 @@ def main() -> None:
     else:
         latest_str = "No events yet"
 
-    # --- Professional header with live status ---
+    # --- Professional header with live status (driven by the watcher heartbeat) ---
+    status_class, status_label = get_watcher_status()
     st.markdown(
-        """
+        f"""
         <div class="ls-header">
             <span class="ls-badge-shield">🛡️</span>
             <div>
                 <h1>LocalShield</h1>
                 <div class="sub">AI-Powered Offline SIEM · Windows Event &amp; Network Threat Detection</div>
             </div>
-            <div class="ls-status"><span class="ls-dot"></span> Monitoring Active</div>
+            <div class="ls-status {status_class}"><span class="ls-dot"></span> {status_label}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -878,19 +908,34 @@ def main() -> None:
                 chip = sev_chip.get(sev, "chip-med")
                 border = "var(--ls-high)" if sev in ("high", "critical") else "var(--ls-med)"
                 status_badge = "🟢 open" if status == "open" else "⚪ closed"
-                st.markdown(
-                    f"""
-                    <div class="ls-ip-card" style="border-left-color:{border}">
-                        <div>
-                            <div class="ip">#{inc_id} · {key}</div>
-                            <div class="meta">{(title or "Incident")[:90]}</div>
-                            <div class="meta">{count} event(s) · {first_seen} → {last_seen} · {status_badge}</div>
+                card_col, btn_col = st.columns([6, 1])
+                with card_col:
+                    st.markdown(
+                        f"""
+                        <div class="ls-ip-card" style="border-left-color:{border}">
+                            <div>
+                                <div class="ip">#{inc_id} · {key}</div>
+                                <div class="meta">{(title or "Incident")[:90]}</div>
+                                <div class="meta">{count} event(s) · {first_seen} → {last_seen} · {status_badge}</div>
+                            </div>
+                            <span class="ls-chip {chip}" style="margin-left:auto">{sev.upper()}</span>
                         </div>
-                        <span class="ls-chip {chip}" style="margin-left:auto">{sev.upper()}</span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                with btn_col:
+                    if status == "open":
+                        if st.button("✔ Close", key=f"inc_close_{inc_id}", use_container_width=True):
+                            if set_incident_status(inc_id, "closed", db_path=config.DB_PATH):
+                                st.rerun()
+                            else:
+                                st.error("Could not close incident.")
+                    else:
+                        if st.button("↻ Reopen", key=f"inc_reopen_{inc_id}", use_container_width=True):
+                            if set_incident_status(inc_id, "open", db_path=config.DB_PATH):
+                                st.rerun()
+                            else:
+                                st.error("Could not reopen incident.")
         else:
             st.info("✅ No incidents yet. High-risk detections will be grouped here as they occur.")
 
@@ -928,18 +973,35 @@ def main() -> None:
             if blocked_ips:
                 for ip, rule_name, blocked_at, reason in blocked_ips:
                     when = str(blocked_at or "")
-                    st.markdown(
-                        f"""
-                        <div class="ls-ip-card">
-                            <div>
-                                <div class="ip">{ip}</div>
-                                <div class="meta">{reason or "Blocked"} · {when}</div>
+                    ip_col, unblock_col = st.columns([4, 1])
+                    with ip_col:
+                        st.markdown(
+                            f"""
+                            <div class="ls-ip-card">
+                                <div>
+                                    <div class="ip">{ip}</div>
+                                    <div class="meta">{reason or "Blocked"} · {when}</div>
+                                </div>
+                                <span class="tag">{rule_name or "BLOCKED"}</span>
                             </div>
-                            <span class="tag">{rule_name or "BLOCKED"}</span>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    with unblock_col:
+                        # Mirrors the watcher's block-expiry path: lift the
+                        # firewall rule first, then clear the DB row and audit it.
+                        if st.button("Unblock", key=f"unblock_{ip}", use_container_width=True):
+                            if FirewallManager().unblock_ip(ip):
+                                remove_blocked_ip(ip, db_path=config.DB_PATH)
+                                record_action(
+                                    "unblock_ip",
+                                    target=ip,
+                                    details="manual unblock from dashboard",
+                                    db_path=config.DB_PATH,
+                                )
+                                st.rerun()
+                            else:
+                                st.error(f"Could not unblock {ip} (admin rights / Windows Firewall required).")
             else:
                 st.info("✅ No IPs are currently blocked. High-risk events with a hostile source IP will appear here.")
 
