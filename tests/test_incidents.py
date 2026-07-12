@@ -73,3 +73,27 @@ class TestIncidentGrouping:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestIncidentTriage:
+    def test_close_and_reopen(self, db):
+        inc_id = db_manager.upsert_incident(
+            key="203.0.113.9", title="Test", severity="High", timestamp=datetime.now(), db_path=db
+        )
+        assert db_manager.get_open_incident_count(db_path=db) == 1
+
+        assert db_manager.set_incident_status(inc_id, "closed", db_path=db)
+        assert db_manager.get_open_incident_count(db_path=db) == 0
+
+        assert db_manager.set_incident_status(inc_id, "open", db_path=db)
+        assert db_manager.get_open_incident_count(db_path=db) == 1
+
+    def test_invalid_status_rejected(self, db):
+        inc_id = db_manager.upsert_incident(
+            key="203.0.113.10", title="Test", severity="High", timestamp=datetime.now(), db_path=db
+        )
+        assert not db_manager.set_incident_status(inc_id, "resolved; DROP TABLE incidents", db_path=db)
+        assert db_manager.get_open_incident_count(db_path=db) == 1
+
+    def test_unknown_id_returns_false(self, db):
+        assert not db_manager.set_incident_status(999999, "closed", db_path=db)

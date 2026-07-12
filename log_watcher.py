@@ -28,6 +28,7 @@ from db_manager import (
     purge_old_logs,
     record_action,
     record_blocked_ip,
+    record_heartbeat,
     remove_blocked_ip,
     upsert_incident,
 )
@@ -696,10 +697,13 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
     def _maintenance_sync(self) -> None:
         """
         Periodic housekeeping, run once per watch cycle in the thread pool:
+        - record a heartbeat so the dashboard can show live watcher status
         - lift timed firewall blocks whose duration has expired
         - once per 24h, purge rows older than the retention window
         Best-effort: a maintenance failure must never disrupt event processing.
         """
+        record_heartbeat("log_watcher")
+
         # Expire timed blocks (cheap query; permanent blocks are never returned)
         try:
             for ip in get_expired_blocked_ips():

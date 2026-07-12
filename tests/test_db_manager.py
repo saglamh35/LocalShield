@@ -149,3 +149,23 @@ class TestTimedBlocks:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestHeartbeat:
+    def test_no_heartbeat_returns_none(self, db):
+        assert db_manager.get_heartbeat("log_watcher", db_path=db) is None
+
+    def test_record_and_read_roundtrip(self, db):
+        ts = datetime(2026, 7, 12, 10, 30, 0)
+        db_manager.record_heartbeat("log_watcher", timestamp=ts, db_path=db)
+        assert db_manager.get_heartbeat("log_watcher", db_path=db) == ts
+
+    def test_upsert_keeps_latest(self, db):
+        db_manager.record_heartbeat("log_watcher", timestamp=datetime(2026, 7, 12, 10, 0, 0), db_path=db)
+        later = datetime(2026, 7, 12, 10, 5, 0)
+        db_manager.record_heartbeat("log_watcher", timestamp=later, db_path=db)
+        assert db_manager.get_heartbeat("log_watcher", db_path=db) == later
+
+    def test_components_are_independent(self, db):
+        db_manager.record_heartbeat("log_watcher", timestamp=datetime(2026, 7, 12, 10, 0, 0), db_path=db)
+        assert db_manager.get_heartbeat("metrics_exporter", db_path=db) is None

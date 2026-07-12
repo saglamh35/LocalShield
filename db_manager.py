@@ -129,6 +129,16 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_vulns_severity ON vulnerabilities(severity)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_vulns_target ON vulnerabilities(target)")
 
+        # Component heartbeats: the log watcher records its last-seen time each
+        # watch cycle so the dashboard can show an honest Active/Stale/Offline
+        # status instead of a hard-coded badge.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS component_status (
+                component TEXT PRIMARY KEY,
+                last_seen DATETIME NOT NULL
+            )
+        """)
+
         conn.commit()
         logger.info(f"Database '{db_path}' successfully created/connected")
         logger.debug("'security_logs' table ready")
@@ -658,6 +668,77 @@ def get_open_incident_count(db_path: Optional[str] = None) -> int:
     except Exception as e:
         logger.error(f"Error counting incidents: {e}", exc_info=True)
         return 0
+    finally:
+        conn.close()
+
+
+def set_incident_status(incident_id: int, status: str, db_path: Optional[str] = None) -> bool:
+    """
+    Set an incident's triage status ('open' or 'closed').
+
+    Returns:
+        bool: True if a row was updated
+    """
+    if status not in ("open", "closed"):
+        logger.error(f"Invalid incident status: {status!r}")
+        return False
+
+    db_path = db_path or config.DB_PATH
+    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE incidents SET status = ? WHERE id = ?", (status, int(incident_id)))
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        logger.error(f"Error updating incident {incident_id} status: {e}", exc_info=True)
+        return False
+    finally:
+        conn.close()
+
+
+def record_heartbeat(
+    component: str = "log_watcher",
+    timestamp: Optional[datetime] = None,
+    db_path: Optional[str] = None,
+) -> None:
+    """
+    Record a component heartbeat (upsert). Called once per watch cycle by the
+    log watcher; best-effort — a failure must never disrupt event processing.
+    """
+    db_path = db_path or config.DB_PATH
+    ts = (timestamp or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
+    try:
+        conn.execute(
+            "INSERT INTO component_status (component, last_seen) VALUES (?, ?) "
+            "ON CONFLICT(component) DO UPDATE SET last_seen = excluded.last_seen",
+            (component, ts),
+        )
+        conn.commit()
+    except Exception as e:
+        logger.debug(f"Heartbeat write failed (ignored): {e}")
+    finally:
+        conn.close()
+
+
+def get_heartbeat(component: str = "log_watcher", db_path: Optional[str] = None) -> Optional[datetime]:
+    """
+    Return a component's last heartbeat time, or None if it never reported
+    (e.g. a dashboard-only deployment where the watcher isn't running).
+    """
+    db_path = db_path or config.DB_PATH
+    conn = sqlite3.connect(db_path, timeout=10.0)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT last_seen FROM component_status WHERE component = ?", (component,))
+        row = cursor.fetchone()
+        if not row or not row[0]:
+            return None
+        return datetime.strptime(str(row[0]), "%Y-%m-%d %H:%M:%S")
+    except Exception as e:
+        logger.debug(f"Heartbeat read failed (ignored): {e}")
+        return None
     finally:
         conn.close()
 
