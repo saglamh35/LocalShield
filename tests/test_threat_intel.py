@@ -163,5 +163,71 @@ class TestIPv6Feed:
         assert ipv6_feed.check_ip("5.6.7.8") is None
 
 
+class TestFeedUpdater:
+    """update_feed is opt-in (CLI only) — these tests never touch the network."""
+
+    FEED_TEXT = "# abuse.ch Feodo Tracker - sample\n203.0.113.10\nnot-an-ip\n198.51.100.0/24\n\n2001:db8::7\n"
+
+    def _mock_urlopen(self, monkeypatch, payload):
+        import contextlib
+        import io
+        import urllib.request
+
+        @contextlib.contextmanager
+        def fake_urlopen(url, timeout=0):
+            yield io.BytesIO(payload.encode("utf-8"))
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    def test_rejects_non_https_url(self, tmp_path):
+        from modules.threat_intel import update_feed
+
+        with pytest.raises(ValueError):
+            update_feed(str(tmp_path / "x.csv"), url="http://feodotracker.abuse.ch/list.txt")
+
+    def test_merges_and_preserves_manual_rows(self, tmp_path, monkeypatch):
+        from modules.threat_intel import update_feed
+
+        csv_file = tmp_path / "threat_intel.csv"
+        csv_file.write_text("ip,category,confidence\n1.2.3.4,Manual Entry,75\n", encoding="utf-8")
+        self._mock_urlopen(monkeypatch, self.FEED_TEXT)
+
+        merged = update_feed(str(csv_file), url="https://example.invalid/feed.txt")
+        # 203.0.113.10 + 198.51.100.0/24 + 2001:db8::7 (bad line skipped)
+        assert merged == 3
+
+        ti = ThreatIntel(csv_path=str(csv_file))
+        assert ti.check_ip("1.2.3.4")["category"] == "Manual Entry"  # manual row preserved
+        assert ti.check_ip("203.0.113.10")["category"] == "Botnet C2"
+        assert ti.check_ip("198.51.100.77") is not None  # CIDR range loaded
+        assert ti.check_ip("2001:db8::7") is not None
+
+        # A backup of the pre-update CSV is kept
+        assert (tmp_path / "threat_intel.csv.bak").read_text(encoding="utf-8").startswith("ip,category,confidence")
+
+    def test_empty_feed_leaves_csv_untouched(self, tmp_path, monkeypatch):
+        from modules.threat_intel import update_feed
+
+        csv_file = tmp_path / "threat_intel.csv"
+        original = "ip,category,confidence\n1.2.3.4,Manual Entry,75\n"
+        csv_file.write_text(original, encoding="utf-8")
+        self._mock_urlopen(monkeypatch, "# only comments\n\n")
+
+        assert update_feed(str(csv_file), url="https://example.invalid/feed.txt") == 0
+        assert csv_file.read_text(encoding="utf-8") == original
+
+    def test_refetch_updates_existing_feed_row(self, tmp_path, monkeypatch):
+        from modules.threat_intel import update_feed
+
+        csv_file = tmp_path / "threat_intel.csv"
+        self._mock_urlopen(monkeypatch, "203.0.113.10\n")
+        update_feed(str(csv_file), url="https://example.invalid/feed.txt")
+        update_feed(str(csv_file), url="https://example.invalid/feed.txt", confidence=95)
+
+        ti = ThreatIntel(csv_path=str(csv_file))
+        assert ti.check_ip("203.0.113.10")["confidence"] == 95
+        assert ti.get_threat_count() == 1  # no duplicate rows
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
