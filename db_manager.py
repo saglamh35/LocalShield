@@ -222,7 +222,7 @@ def get_all_logs(
     # ORDER BY direction must be an exact keyword; LIMIT must be a positive int.
     direction = "DESC" if str(order_by).strip().upper() != "ASC" else "ASC"
 
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
 
     try:
         cursor = conn.cursor()
@@ -264,14 +264,16 @@ def get_high_risk_count(db_path: Optional[str] = None) -> int:
         int: Count of high-risk events
     """
     db_path = db_path or config.DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
 
     try:
         cursor = conn.cursor()
 
+        # 'Critical' counts as high risk too; 'Yüksek' covers databases
+        # written before the Turkish->English migration.
         cursor.execute("""
             SELECT COUNT(*) FROM security_logs
-            WHERE risk_score = 'Yüksek' OR risk_score = 'High'
+            WHERE risk_score IN ('Critical', 'High', 'Yüksek')
         """)
         count: int = cursor.fetchone()[0]
         return count
@@ -294,7 +296,7 @@ def get_total_log_count(db_path: Optional[str] = None) -> int:
         int: Total log count
     """
     db_path = db_path or config.DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
 
     try:
         cursor = conn.cursor()
@@ -320,7 +322,7 @@ def get_latest_detection(db_path: Optional[str] = None) -> Optional[str]:
         str: Latest detection time (if exists), otherwise None
     """
     db_path = db_path or config.DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
 
     try:
         cursor = conn.cursor()
@@ -351,7 +353,7 @@ def clear_all_logs(db_path: Optional[str] = None) -> bool:
         bool: True if successful, False if error occurred
     """
     db_path = db_path or config.DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
 
     try:
         cursor = conn.cursor()
@@ -487,7 +489,7 @@ def get_expired_blocked_ips(now: Optional[datetime] = None, db_path: Optional[st
     """
     db_path = db_path or config.DB_PATH
     ts = (now or datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
     try:
         cursor = conn.cursor()
         cursor.execute(
@@ -519,7 +521,7 @@ def remove_blocked_ip(ip: str, db_path: Optional[str] = None) -> None:
 def get_blocked_ips(db_path: Optional[str] = None) -> List[Tuple[str, Optional[str], str, Optional[str]]]:
     """Return all persisted blocked IPs as (ip, rule_name, blocked_at, reason)."""
     db_path = db_path or config.DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT ip, rule_name, blocked_at, reason FROM blocked_ips ORDER BY blocked_at DESC")
@@ -537,7 +539,7 @@ def get_recent_actions(
 ) -> List[Tuple[int, str, str, Optional[str], Optional[str]]]:
     """Return recent audit actions as (id, timestamp, action_type, target, details)."""
     db_path = db_path or config.DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
     try:
         cursor = conn.cursor()
         cursor.execute(
@@ -626,7 +628,7 @@ def get_incidents(
     max_severity, status), newest activity first. Optionally filter by status.
     """
     db_path = db_path or config.DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
     try:
         cursor = conn.cursor()
         query = "SELECT id, key, title, first_seen, last_seen, event_count, max_severity, status FROM incidents"
@@ -648,7 +650,7 @@ def get_incidents(
 def get_open_incident_count(db_path: Optional[str] = None) -> int:
     """Return the number of currently-open incidents."""
     db_path = db_path or config.DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM incidents WHERE status = 'open'")
@@ -794,7 +796,7 @@ def get_vulnerabilities(
      target_type, cvss, title, scan_time).
     """
     db_path = db_path or config.DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
     try:
         cursor = conn.cursor()
         query = (
@@ -836,7 +838,7 @@ def get_vulnerability_counts(db_path: Optional[str] = None) -> dict:
     """
     db_path = db_path or config.DB_PATH
     counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "unknown": 0, "total": 0, "fixable": 0}
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT LOWER(severity), COUNT(*) FROM vulnerabilities GROUP BY LOWER(severity)")
@@ -857,7 +859,7 @@ def get_vulnerability_counts(db_path: Optional[str] = None) -> dict:
 def clear_vulnerabilities(db_path: Optional[str] = None) -> bool:
     """Delete all vulnerability findings (table structure is preserved)."""
     db_path = db_path or config.DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10.0)
     try:
         conn.execute("DELETE FROM vulnerabilities")
         conn.commit()

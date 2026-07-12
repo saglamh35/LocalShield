@@ -5,6 +5,7 @@ Production-Ready: YAML-based rule system and MITRE ATT&CK integration
 
 import logging
 import re
+import threading
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -116,6 +117,10 @@ class DetectionRule:
         # Track event history for threshold-based rules
         # Format: key -> [(timestamp, context_dict), ...]
         self.event_history: Dict[str, List[Tuple[datetime, Dict[str, Any]]]] = defaultdict(list)
+        # matches()/_matches_correlation() run on a thread pool (see
+        # log_watcher), so all event_history read-modify-write sequences must
+        # hold this lock or threshold counts can lose increments.
+        self._history_lock = threading.Lock()
 
     def matches(
         self,
@@ -234,22 +239,23 @@ class DetectionRule:
 
             cutoff_time = timestamp - timedelta(seconds=self.time_window)
 
-            # Prune expired entries across ALL keys and drop keys that become
-            # empty. Pruning only the current key would let stale keys (e.g. a
-            # parent->child combo that never reappears) accumulate forever,
-            # leaking memory over a long-running session.
-            for key in list(self.event_history.keys()):
-                self.event_history[key] = [(ts, ctx) for ts, ctx in self.event_history[key] if ts > cutoff_time]
-                if not self.event_history[key]:
-                    del self.event_history[key]
+            with self._history_lock:
+                # Prune expired entries across ALL keys and drop keys that become
+                # empty. Pruning only the current key would let stale keys (e.g. a
+                # parent->child combo that never reappears) accumulate forever,
+                # leaking memory over a long-running session.
+                for key in list(self.event_history.keys()):
+                    self.event_history[key] = [(ts, ctx) for ts, ctx in self.event_history[key] if ts > cutoff_time]
+                    if not self.event_history[key]:
+                        del self.event_history[key]
 
-            # Add new event with context
-            context = {"message": message, "sysmon_data": sysmon_data or {}}
-            self.event_history[event_key].append((timestamp, context))
+                # Add new event with context
+                context = {"message": message, "sysmon_data": sysmon_data or {}}
+                self.event_history[event_key].append((timestamp, context))
 
-            # Threshold check
-            if len(self.event_history[event_key]) >= self.threshold:
-                return True
+                # Threshold check
+                if len(self.event_history[event_key]) >= self.threshold:
+                    return True
 
             # If threshold not met, return False
             return False
@@ -277,19 +283,26 @@ class DetectionRule:
 
         # Prune expired prior events across all sources (keeps memory bounded)
         cutoff = timestamp - timedelta(seconds=self.corr_within)
-        for key in list(self.event_history.keys()):
-            self.event_history[key] = [(ts, ctx) for ts, ctx in self.event_history[key] if ts > cutoff]
-            if not self.event_history[key]:
-                del self.event_history[key]
+        with self._history_lock:
+            for key in list(self.event_history.keys()):
+                self.event_history[key] = [(ts, ctx) for ts, ctx in self.event_history[key] if ts > cutoff]
+                if not self.event_history[key]:
+                    del self.event_history[key]
 
-        # A prior event (e.g. a failed logon): record it, don't fire yet.
-        if str(event_id) == self.corr_prior_event_id:
-            self.event_history[source].append((timestamp, {}))
-            return False
+            # A prior event (e.g. a failed logon): record it, don't fire yet.
+            if str(event_id) == self.corr_prior_event_id:
+                self.event_history[source].append((timestamp, {}))
+                return False
 
-        # The trigger event (e.g. a successful logon): fire if enough priors.
-        if self.event_ids and str(event_id) in self.event_ids:
-            return len(self.event_history.get(source, [])) >= self.corr_count
+            # The trigger event (e.g. a successful logon): fire if enough priors.
+            if self.event_ids and str(event_id) in self.event_ids:
+                if len(self.event_history.get(source, [])) >= self.corr_count:
+                    # Consume the priors so one attack fires one alert; without
+                    # this, every later trigger from the same source re-fires
+                    # until the window expires.
+                    del self.event_history[source]
+                    return True
+                return False
 
         return False
 

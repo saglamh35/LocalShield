@@ -55,6 +55,27 @@ class TestSuccessfulBruteForce:
         if result is not None:
             assert result["rule_id"] != "brute_force_success_001"
 
+    def test_priors_consumed_after_firing(self, engine):
+        """One attack fires one alert: the priors are consumed when the rule
+        fires, so a second success from the same source does not re-fire."""
+        base = datetime.now()
+        ip = "203.0.113.60"
+        for i in range(5):
+            engine.check_event("4625", base + timedelta(seconds=i), _fail(ip), "Security")
+        result = engine.check_event("4624", base + timedelta(seconds=6), _success(ip), "Security")
+        assert result is not None and result["rule_id"] == "brute_force_success_001"
+
+        # Immediately after, another success from the same IP must NOT re-fire
+        result = engine.check_event("4624", base + timedelta(seconds=7), _success(ip), "Security")
+        if result is not None:
+            assert result["rule_id"] != "brute_force_success_001"
+
+        # A fresh round of failures re-arms the rule for the same source
+        for i in range(5):
+            engine.check_event("4625", base + timedelta(seconds=10 + i), _fail(ip), "Security")
+        result = engine.check_event("4624", base + timedelta(seconds=16), _success(ip), "Security")
+        assert result is not None and result["rule_id"] == "brute_force_success_001"
+
     def test_failures_outside_window_do_not_correlate(self, engine):
         base = datetime.now()
         ip = "203.0.113.77"
