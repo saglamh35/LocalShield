@@ -316,7 +316,7 @@ way unless you place an authenticating reverse proxy in front.
 
 ### Tooling
 
-- **pytest**: 260+ unit & integration tests
+- **pytest**: 270+ unit & integration tests
 - **GitHub Actions**: CI matrix across Python 3.10 / 3.11 / 3.12
 
 ### Architecture Patterns
@@ -337,6 +337,11 @@ LocalShield/
 ├── db_manager.py             # Database, indexes, audit & blocked-IP tables
 ├── config.py                 # Configuration and environment variables
 ├── generate_demo_data.py     # Demo data generator for testing
+├── simulate_attack.py        # Brute-force demo injector (Event ID 4625)
+├── simulate_hid_attack.py    # BadUSB/HID purple-team telemetry replay
+├── test_firewall.py          # Manual Windows Firewall block test script
+├── test_sniffer.py           # Manual Scapy/Npcap verification script
+├── brain_test.py             # Manual Ollama connectivity smoke test
 ├── run_localshield.bat       # Windows launcher script
 ├── run_localshield.sh        # Linux/macOS launcher script
 ├── Dockerfile                # Container image (dashboard + detection core)
@@ -378,7 +383,7 @@ LocalShield/
 │
 ├── payloads/duckyscript/     # Educational DuckyScript demos (O.MG cable / iPadOS)
 ├── grafana/                  # Ready-to-import Grafana dashboard (Prometheus)
-├── tests/                    # 260+ unit & integration tests
+├── tests/                    # 270+ unit & integration tests
 ├── data/                     # Knowledge base and threat intel data
 ├── .streamlit/config.toml    # Binds the dashboard to localhost
 ├── .github/workflows/ci.yml  # GitHub Actions CI (pytest, Py 3.10–3.12)
