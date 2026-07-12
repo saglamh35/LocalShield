@@ -127,7 +127,7 @@ class LogWatcher:
                     logger.warning(f"Error closing {log_name} log: {e}")
         self.log_handles.clear()
 
-    def get_event_message(self, event: Any, log_name: str = None) -> str:
+    def get_event_message(self, event: Any, log_name: Optional[str] = None) -> str:
         """
         Gets readable message text from event
 
@@ -316,8 +316,9 @@ Sysmon Process Terminated Details:
                 if inserts_str:
                     additional_info = f"\nAdditional Details (StringInserts): {inserts_str}"
 
-                # Combine event in rich format
-                log_text = f"""Log Source: {log_source}
+            # Combine event in rich format. Built unconditionally: events without
+            # StringInserts must still be analyzed and stored.
+            log_text = f"""Log Source: {log_source}
 Event ID: {event_id}
 Time: {event_time}
 Message: {message}{sysmon_details}{additional_info}

@@ -64,7 +64,12 @@ class ThreatIntel:
                 for row in reader:
                     ip = row.get("ip", "").strip()
                     category = row.get("category", "Unknown").strip()
-                    confidence = int(row.get("confidence", 0))
+                    # One malformed row must not abort the rest of the feed.
+                    try:
+                        confidence = int(row.get("confidence", 0) or 0)
+                    except (TypeError, ValueError):
+                        logger.warning(f"⚠️  Skipping threat feed row with invalid confidence: {row}")
+                        continue
 
                     # Skip benign IPs (confidence 0 or category "Benign")
                     if category.lower() == "benign" or confidence == 0:

@@ -11,6 +11,7 @@ from typing import Any
 import altair as alt
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as st_components
 
 import config
 from db_manager import (
@@ -261,7 +262,11 @@ def render_kpi(column, icon, label, value, foot="", accent="var(--ls-accent)") -
 
 
 def get_risk_icon(risk_level) -> str:
-    """Returns icon based on risk level"""
+    """Returns icon based on risk level.
+
+    Turkish literals (yüksek/orta/düşük) are kept on purpose: databases
+    created before the English migration still contain those risk values.
+    """
     if pd.isna(risk_level):
         return "❓"
 
@@ -610,7 +615,11 @@ def main() -> None:
     )
 
     # --- KPI row (all core capabilities at a glance) ---
-    df_techniques = mitre_summarize(load_data()["MITRE Technique"].tolist()) if total_logs else []
+    # load_data() can return a column-less empty DataFrame (empty DB or load
+    # error) even when the uncached total_logs count is non-zero, so guard the
+    # column access instead of trusting total_logs.
+    df_kpi = load_data()
+    df_techniques = mitre_summarize(df_kpi["MITRE Technique"].tolist()) if "MITRE Technique" in df_kpi.columns else []
     k1, k2, k3, k4, k5, k6 = st.columns(6)
     render_kpi(k1, "📊", "Total Events", f"{total_logs:,}", "ingested & analyzed", "var(--ls-info)")
     render_kpi(
@@ -1038,9 +1047,12 @@ def main() -> None:
                                         mime="application/vnd.tcpdump.pcap",
                                         use_container_width=True,
                                     )
-                                    os.unlink(filepath)  # Clean up
                             finally:
                                 loop.close()
+                                # The temp file must go away even when the
+                                # capture or download setup fails.
+                                if os.path.exists(temp_file.name):
+                                    os.unlink(temp_file.name)
                     except Exception as e:
                         st.error(f"Error capturing PCAP: {e}")
 
@@ -1180,14 +1192,14 @@ def main() -> None:
                 # Highlight high risk ports
                 def highlight_high_risk(row):
                     styles = [""] * len(row)
-                    if row["Risk"] == "High" or row["Risk"] == "Yüksek":
+                    if row["Risk"] == "High":
                         return ["background-color: #ff4444; color: white; font-weight: bold;"] * len(row)
                     return styles
 
                 # Add icon to Risk column
                 df_ports_display = df_ports.copy()
                 df_ports_display["Risk"] = df_ports_display["Risk"].apply(
-                    lambda x: f"🚨 {x}" if x == "High" or x == "Yüksek" else f"✅ {x}"
+                    lambda x: f"🚨 {x}" if x == "High" else f"✅ {x}"
                 )
 
                 styled_df = df_ports_display.style.apply(highlight_high_risk, axis=1)
@@ -1195,7 +1207,7 @@ def main() -> None:
                 st.dataframe(styled_df, use_container_width=True, hide_index=True, height=500)
 
                 # Warning for high risk ports
-                high_risk_ports = [p for p in ports if p["Risk"] == "High" or p["Risk"] == "Yüksek"]
+                high_risk_ports = [p for p in ports if p["Risk"] == "High"]
                 if high_risk_ports:
                     st.warning(
                         f"⚠️ **{len(high_risk_ports)} high risk port(s) detected!** "
@@ -1206,10 +1218,10 @@ def main() -> None:
                     with st.expander("🚨 High Risk Port Details", expanded=True):
                         for port_info in high_risk_ports:
                             st.markdown(f"""
-                            **Port {port_info["Port"]}** - {port_info.get("Service", port_info.get("Servis", "N/A"))}
+                            **Port {port_info["Port"]}** - {port_info.get("Service", "N/A")}
                             - **PID:** {port_info["PID"]}
-                            - **Application:** {port_info.get("Application", port_info.get("Uygulama", "N/A"))}
-                            - **Description:** {port_info.get("Description", port_info.get("Açıklama", "N/A"))}
+                            - **Application:** {port_info.get("Application", "N/A")}
+                            - **Description:** {port_info.get("Description", "N/A")}
                             """)
                             st.markdown("---")
             else:
@@ -1373,18 +1385,22 @@ def main() -> None:
 
     # Auto-refresh is opt-in (sidebar toggle). When enabled, reload after 5s,
     # but never while the user is typing in the AI chat input.
+    # NOTE: st.markdown never executes <script> tags, so this must go through
+    # components.html, whose iframe does run scripts. The iframe is same-origin
+    # (srcdoc), so window.parent reaches the actual dashboard page.
     if auto_refresh:
         auto_refresh_script = """
         <script>
             setTimeout(function(){
-                var chatInput = document.querySelector('[data-testid="stChatInput"] textarea');
-                if (!chatInput || document.activeElement !== chatInput) {
-                    location.reload();
+                var doc = window.parent.document;
+                var chatInput = doc.querySelector('[data-testid="stChatInput"] textarea');
+                if (!chatInput || doc.activeElement !== chatInput) {
+                    window.parent.location.reload();
                 }
             }, 5000);
         </script>
         """
-        st.markdown(auto_refresh_script, unsafe_allow_html=True)
+        st_components.html(auto_refresh_script, height=0)
 
 
 if __name__ == "__main__":

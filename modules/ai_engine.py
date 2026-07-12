@@ -127,6 +127,9 @@ RULES:
         Returns:
             tuple[str, str]: (markdown_analysis, risk_score) - Markdown and risk level for Dashboard
         """
+        # Bound before the try: the outer except's fallback references it, and
+        # an early failure would otherwise raise UnboundLocalError there.
+        event_id: Optional[str] = None
         try:
             # Return a cached analysis for an identical event, if present
             cache_key = self._cache_key(log_text)
@@ -136,7 +139,7 @@ RULES:
                 return cached
 
             # Try to extract Event ID from log text
-            event_id: Optional[str] = self.extract_event_id(log_text)
+            event_id = self.extract_event_id(log_text)
 
             # Retrieve information from knowledge base (RAG)
             kb_info: Optional[Dict[str, Any]] = None

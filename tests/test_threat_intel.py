@@ -58,6 +58,25 @@ class TestThreatIntel:
         assert ti.get_threat_count() == 0
         assert ti.check_ip("1.2.3.4") is None
 
+    def test_malformed_row_does_not_abort_feed(self, tmp_path):
+        """A row with a non-numeric confidence is skipped; the rest still load."""
+        csv_file = tmp_path / "threat_intel.csv"
+        csv_file.write_text(
+            "ip,category,confidence\n"
+            "1.2.3.4,Botnet,100\n"
+            "5.6.7.8,BruteForce,not_a_number\n"
+            "9.9.9.10,Scanner,\n"
+            "10.20.30.40,Malware,80\n",
+            encoding="utf-8",
+        )
+        ti = ThreatIntel(csv_path=str(csv_file))
+        # Bad row (5.6.7.8) is skipped, empty confidence (9.9.9.10) counts as 0
+        # and is filtered as benign; the rows around them still load.
+        assert ti.check_ip("1.2.3.4") is not None
+        assert ti.check_ip("10.20.30.40") is not None
+        assert ti.check_ip("5.6.7.8") is None
+        assert ti.get_threat_count() == 2
+
     def test_reload(self, feed, tmp_path):
         # Overwrite the feed with a single new malicious IP and reload
         (tmp_path / "threat_intel.csv").write_text("ip,category,confidence\n10.20.30.40,Malware,80\n", encoding="utf-8")
