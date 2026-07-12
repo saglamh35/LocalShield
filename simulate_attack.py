@@ -8,7 +8,7 @@ import io
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Windows terminal encoding sorunu için UTF-8 ayarı
+# UTF-8 setup for the Windows terminal encoding issue
 if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')

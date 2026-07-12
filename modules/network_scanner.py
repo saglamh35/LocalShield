@@ -2,12 +2,15 @@
 Network Scanner Module - Module for Scanning Open Ports
 """
 
+import logging
 import socket
 from typing import Any, Dict, List, Optional
 
 import psutil
 
 import config
+
+logger = logging.getLogger(__name__)
 
 # High-risk ports (critical from security perspective)
 HIGH_RISK_PORTS = {
@@ -195,14 +198,14 @@ def scan_open_ports(mock: bool = False) -> List[Dict[str, Any]]:
                 continue
             except Exception as e:
                 # Unexpected error, log but continue
-                print(f"⚠️  Port scan error: {e}")
+                logger.warning(f"⚠️  Port scan error: {e}")
                 continue
 
     except psutil.AccessDenied:
-        print("❌ Administrator privileges required. Run as administrator for port scanning.")
+        logger.error("❌ Administrator privileges required. Run as administrator for port scanning.")
         return []
     except Exception as e:
-        print(f"❌ Critical error during port scan: {e}")
+        logger.error(f"❌ Critical error during port scan: {e}", exc_info=True)
         return []
 
     # Sort by port number
@@ -224,7 +227,7 @@ def get_port_summary(ports: List[Dict[str, Any]]) -> Dict[str, int]:
     summary = {"Total": len(ports), "High Risk": 0, "Low Risk": 0}
 
     for port_info in ports:
-        if port_info.get("Risk") == "High" or port_info.get("Risk") == "Yüksek":
+        if port_info.get("Risk") == "High":
             summary["High Risk"] += 1
         else:
             summary["Low Risk"] += 1

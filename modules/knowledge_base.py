@@ -4,8 +4,11 @@ Provides reference information about Windows Event IDs.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 # File paths
 BASE_DIR = Path(__file__).parent.parent
@@ -37,12 +40,12 @@ class KnowledgeBase:
                     if isinstance(data, dict):
                         self.local_knowledge = data
                     else:
-                        print("⚠️ Local knowledge is not in the expected format (must be a dict).")
-                print(f"✅ Local knowledge loaded: {len(self.local_knowledge)} Event IDs")
+                        logger.warning("⚠️ Local knowledge is not in the expected format (must be a dict).")
+                logger.info(f"✅ Local knowledge loaded: {len(self.local_knowledge)} Event IDs")
             else:
                 self.local_knowledge = {}
         except Exception as e:
-            print(f"❌ Error loading local knowledge: {e}")
+            logger.error(f"❌ Error loading local knowledge: {e}")
             self.local_knowledge = {}
 
         # --- 2. LOAD EXTERNAL KNOWLEDGE ---
@@ -61,19 +64,21 @@ class KnowledgeBase:
                         if eid:
                             self.external_knowledge[eid] = item
 
-                    print(f"✅ External knowledge loaded: {len(self.external_knowledge)} Event IDs (list -> dict)")
+                    logger.info(
+                        f"✅ External knowledge loaded: {len(self.external_knowledge)} Event IDs (list -> dict)"
+                    )
 
                 # If the file is already in dict form (legacy format)
                 elif isinstance(external_data, dict):
                     self.external_knowledge = external_data
-                    print(f"✅ External knowledge loaded: {len(self.external_knowledge)} Event IDs")
+                    logger.info(f"✅ External knowledge loaded: {len(self.external_knowledge)} Event IDs")
 
             else:
-                print(f"⚠️ External knowledge file not found: {EXTERNAL_KNOWLEDGE_PATH}")
+                logger.warning(f"⚠️ External knowledge file not found: {EXTERNAL_KNOWLEDGE_PATH}")
                 self.external_knowledge = {}
 
         except Exception as e:
-            print(f"❌ Error loading external knowledge: {e}")
+            logger.error(f"❌ Error loading external knowledge: {e}")
             self.external_knowledge = {}
 
     def get_event_info(self, event_id: str) -> Optional[Dict[str, str]]:

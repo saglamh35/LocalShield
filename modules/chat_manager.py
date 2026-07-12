@@ -37,6 +37,7 @@ def get_system_summary() -> str:
         for log in all_logs:
             if len(log) >= 6:
                 risk_level = str(log[5]).strip().lower()
+                # "yüksek" covers databases written before the English migration
                 if risk_level == "yüksek" or risk_level == "high":
                     high_risk_logs.append(log)
             if len(high_risk_logs) >= 10:  # Maximum 10 entries
@@ -73,17 +74,17 @@ def get_system_summary() -> str:
     try:
         # Perform port scan
         ports = scan_open_ports()
-        high_risk_ports = [p for p in ports if p.get("Risk") == "Yüksek" or p.get("Risk") == "High"]
+        high_risk_ports = [p for p in ports if p.get("Risk") == "High"]
 
         # Port summary
         if high_risk_ports:
             summary_parts.append("=== HIGH RISK OPEN PORTS ===\n")
             for port_info in high_risk_ports[:10]:  # Maximum 10 entries
                 summary_parts.append(
-                    f"- Port {port_info['Port']} ({port_info.get('Service', port_info.get('Servis', 'N/A'))})\n"
+                    f"- Port {port_info['Port']} ({port_info.get('Service', 'N/A')})\n"
                     f"  PID: {port_info.get('PID', 'N/A')}\n"
-                    f"  Application: {port_info.get('Application', port_info.get('Uygulama', 'Unknown'))}\n"
-                    f"  Description: {port_info.get('Description', port_info.get('Açıklama', 'No description'))}\n"
+                    f"  Application: {port_info.get('Application', 'Unknown')}\n"
+                    f"  Description: {port_info.get('Description', 'No description')}\n"
                 )
         else:
             summary_parts.append("=== OPEN PORTS ===\nNo high-risk open ports found.\n")

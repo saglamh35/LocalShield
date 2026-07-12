@@ -76,7 +76,7 @@ def generate_remediation_playbook(findings: List[Dict[str, Any]]) -> Optional[st
             cves = ", ".join(sorted(info["cves"]))
             tasks.append(
                 {
-                    "name": f"Patch {package} ({cves} -> fixed in {info['fixed_version']})",
+                    "name": f"Upgrade {package} to latest ({cves} fixed in {info['fixed_version']}+)",
                     "ansible.builtin.package": {"name": package, "state": "latest"},
                 }
             )

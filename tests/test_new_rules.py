@@ -47,9 +47,9 @@ class TestNewRules:
 
     def test_scenario_1_brute_force(self, detection_engine):
         """
-        Senaryo 1 (Brute Force):
-        Event ID 4625 ile 1 dakika içinde 5 adet başarısız giriş logu gönder.
-        Kuralın tetiklendiğini ve severity="high", mitre=["T1110", "T1110.001"] döndürdüğünü doğrula.
+        Scenario 1 (Brute Force):
+        Send 5 failed logon events (Event ID 4625) within 1 minute.
+        Verify the rule fires and returns severity="high", mitre=["T1110", "T1110.001"].
         """
         # Find the brute force rule
         brute_force_rule = None
@@ -104,10 +104,10 @@ Network Information:
 
             if i < 4:
                 # First 4 should not trigger (threshold is 5)
-                assert result is None, f"{i + 1}. başarısız girişte tetiklenmemeli (threshold 5)"
+                assert result is None, f"Must not trigger on failed login #{i + 1} (threshold 5)"
             else:
                 # 5th should trigger
-                assert result is not None, "5. başarısız girişte tetiklenmeli"
+                assert result is not None, "Must trigger on the 5th failed login"
                 detection_triggered = True
 
         assert detection_triggered, "Brute force detection should be triggered"
@@ -141,9 +141,9 @@ Network Information:
 
     def test_scenario_2_powershell_encoded(self, detection_engine):
         """
-        Senaryo 2 (PowerShell Encoded):
-        Sysmon Event ID 1 formatında, CommandLine parametresi -EncodedCommand içeren bir log gönder.
-        "Suspicious PowerShell" kuralının tetiklendiğini doğrula.
+        Scenario 2 (PowerShell Encoded):
+        Send a Sysmon Event ID 1 log whose CommandLine contains -EncodedCommand.
+        Verify the "Suspicious PowerShell" rule fires.
         """
         # Find the PowerShell encoded rule
         powershell_rule = None
@@ -222,9 +222,9 @@ ParentCommandLine: cmd.exe"""
 
     def test_scenario_3_parent_child_suspicious(self, detection_engine):
         """
-        Senaryo 3 (Parent-Child):
-        Sysmon Event ID 1 formatında, ParentImage="winword.exe" ve Image="cmd.exe" olan bir log gönder.
-        "Suspicious Parent-Child" kuralının tetiklendiğini doğrula.
+        Scenario 3 (Parent-Child):
+        Send a Sysmon Event ID 1 log with ParentImage="winword.exe" and Image="cmd.exe".
+        Verify the "Suspicious Parent-Child" rule fires.
         """
         # Find the parent-child rule
         parent_child_rule = None

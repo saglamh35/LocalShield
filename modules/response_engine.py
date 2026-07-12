@@ -192,7 +192,8 @@ class FirewallManager:
                 # Inspect the error output
                 error_output = result.stderr.lower()
 
-                # If the rule already exists, that is not an error
+                # If the rule already exists, that is not an error.
+                # "zaten var" is netsh's message on Turkish-locale Windows.
                 if "already exists" in error_output or "zaten var" in error_output:
                     self.blocked_ips.add(ip_address)
                     logger.info(f"ℹ️  Firewall rule already exists: {rule_name}")
