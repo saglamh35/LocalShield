@@ -144,7 +144,7 @@ class Notifier:
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            urllib.request.urlopen(req, timeout=3)  # noqa: S310  # nosec B310
+            urllib.request.urlopen(req, timeout=3)  # noqa: S310 - opt-in webhook URL from operator config, not log data  # nosec B310
         except Exception as e:
             logger.debug(f"webhook notification failed (ignored, offline-safe): {e}")
 

@@ -22,7 +22,7 @@ async def test():
     try:
         # Check if scapy is available
         try:
-            from scapy.all import get_if_list  # noqa: F401
+            from scapy.all import get_if_list  # noqa: F401 - probe import: only checks scapy is importable
 
             print("✅ Scapy library is installed")
         except ImportError:

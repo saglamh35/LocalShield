@@ -254,7 +254,7 @@ def get_all_logs(
             SELECT id, timestamp, event_id, message, ai_analysis, risk_score, mitre_technique
             FROM security_logs
             ORDER BY timestamp {direction}
-        """  # nosec B608
+        """  # direction is validated to the literal ASC/DESC above  # nosec B608
 
         params: Tuple = ()
         if limit is not None:
