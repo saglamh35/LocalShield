@@ -38,7 +38,12 @@ DASHBOARD_TITLE: str = os.getenv("DASHBOARD_TITLE", "🛡️ LocalShield - AI-Po
 CHECK_INTERVAL: int = int(os.getenv("CHECK_INTERVAL", "5"))  # seconds
 
 # Logging Settings
-LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+# Validated here: callers resolve this with getattr(logging, LOG_LEVEL),
+# which would happily return any attribute of the logging module (e.g. a
+# class) for a typo'd value instead of a level.
+LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
+if LOG_LEVEL not in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
+    LOG_LEVEL = "INFO"
 LOG_FILE: str = os.getenv("LOG_FILE", "localshield.log")
 
 # Notification Settings (offline-first)

@@ -190,15 +190,84 @@ distinct events.
 
 ---
 
+## LS-04 — Event loss under burst load
+
+| | |
+|---|---|
+| **Severity** | Medium (availability of detection) |
+| **Class** | Detection gap / silent data loss |
+| **Component** | `log_watcher.py` |
+| **Status** | Fixed ✅ · Regression test: `TestChannelDrain` |
+
+### Description
+
+Each watch cycle issued a **single** `ReadEventLog` call, which returns at most
+~1000 of the newest events. During a burst — say, a brute-force flood producing
+thousands of 4625s in one interval — everything beyond that first batch was
+never read. Because the LS-03 high-water mark then advanced to the newest
+RecordNumber, the skipped middle was never re-read either: the events were lost
+permanently, and precisely when detection mattered most.
+
+### Fix
+
+`_read_channel_events` drains the channel newest-to-oldest, batch by batch,
+until it reaches the previous high-water mark (or a hard cap of
+`_MAX_READ_BATCHES` batches per cycle, so a flooding channel cannot pin the
+watcher). No gap can open between the last processed record and the newest.
+
+### Regression tests
+
+- `test_burst_larger_than_one_batch_is_fully_drained` — 3000-event burst, zero loss
+- `test_drain_stops_at_high_water_mark` — no re-reading of processed records
+- `test_drain_is_bounded` — flood cannot cause unbounded work
+
+---
+
+## LS-05 — Post-log-clear blindness (anti-forensics window)
+
+| | |
+|---|---|
+| **Severity** | Medium (availability of detection) |
+| **Class** | Detection gap / state desynchronization |
+| **Component** | `log_watcher.py` |
+| **Status** | Fixed ✅ · Regression test: `TestRecordNumberReset` |
+
+### Description
+
+Clearing the event log is a classic attacker anti-forensics move (Event 1102).
+Windows then restarts RecordNumbers from 1 — but the LS-03 dedup still held the
+old high-water mark, so **every** post-clear event was treated as
+"already processed" until the counter climbed back past the old maximum. The
+attacker's clear didn't just erase history; it blinded future detection too.
+A related edge: the startup time filter also applied in steady state, dropping
+events delivered late (queued > 5 s) despite their fresh RecordNumbers.
+
+### Fix
+
+`_select_new_events` detects the reset (newest RecordNumber below the stored
+mark), logs a warning and re-baselines the channel. The time filter now applies
+only to the baseline read, so in steady state the RecordNumber alone — which
+proves whether a record was seen — decides.
+
+### Regression tests
+
+- `test_log_clear_rebaselines` — post-clear events are processed again
+- `test_late_delivered_event_survives_time_threshold` — no steady-state time drops
+- `test_baseline_read_still_skips_history` — startup backlog still skipped
+
+---
+
 ## Takeaways
 
-Three findings, one common thread: **trusting the shape of data over its
+Five findings, one common thread: **trusting the shape of data over its
 provenance.** An IP is an IP, a failure is a failure, an event is an event —
 until you ask *where it came from* and *whether you've acted on it already.*
 
 - **LS-01** — sanitize the *source* of a privileged action, not just its format.
 - **LS-02** — a detector's job is to model the *actor*, not tally raw events.
 - **LS-03** — any at-least-once pipeline needs an idempotency key.
+- **LS-04** — a reader that can fall behind must know how to catch up.
+- **LS-05** — persistent state needs a story for when its anchor resets.
 
 Each fix ships with regression tests that fail on the old behaviour, so the
 audit is not a one-time cleanup but a permanent guardrail. That is the point of
