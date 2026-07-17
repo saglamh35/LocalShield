@@ -56,6 +56,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Upper bound on ReadEventLog batches drained per channel per cycle
+# (10 x 1000 events). Caps CPU/memory if a channel floods faster than
+# the watcher can ever catch up.
+_MAX_READ_BATCHES = 10
+
 
 class LogWatcher:
     """
@@ -70,7 +75,10 @@ class LogWatcher:
         self.firewall_manager = FirewallManager()  # Active response engine
         self.threat_intel = ThreatIntel()  # Threat intelligence engine
         self.notifier = Notifier()  # Offline-first alerting
-        self.db_conn = init_db(config.DB_PATH)
+        # Create the schema up front; every write later opens its own
+        # short-lived connection, so keeping this one open would just hold
+        # an idle handle for the process lifetime.
+        init_db(config.DB_PATH).close()
         # Reload persisted blocked IPs so a restart knows what is already blocked
         try:
             persisted = [row[0] for row in get_blocked_ips(config.DB_PATH)]
@@ -177,7 +185,9 @@ class LogWatcher:
         try:
             import xml.etree.ElementTree as ET
 
-            root = ET.fromstring(xml)
+            # The XML comes from the local Windows event subsystem
+            # (well-formed, no DTDs), not from a network peer
+            root = ET.fromstring(xml)  # nosec B314
 
             # Windows event XML carries a default namespace, so match by local
             # tag name (ignoring the {namespace} prefix) rather than a plain path.
@@ -593,6 +603,15 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
         so we remember the highest one seen per channel and skip anything at or
         below it. Events without a RecordNumber fall back to the time filter.
 
+        The time filter only applies to the baseline read (last_record == 0):
+        in steady state an event queued or delivered late would otherwise be
+        dropped even though its RecordNumber proves it was never processed.
+
+        If the channel's newest RecordNumber is below our high-water mark, the
+        log was cleared (e.g. attacker anti-forensics, Event 1102) and Windows
+        restarted numbering — re-baseline instead of skipping everything until
+        the counter climbs back past the old maximum.
+
         Args:
             log_name: Log channel name (dedup state is kept per channel)
             events: Raw events from ReadEventLog
@@ -602,15 +621,28 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             list: New (not previously processed) events
         """
         last_record = self._last_record.get(log_name, 0)
+
+        record_numbers = [rn for e in events if (rn := getattr(e, "RecordNumber", None)) is not None]
+        newest_record = max(record_numbers, default=0)
+        if last_record and newest_record and newest_record < last_record:
+            logger.warning(
+                f"{log_name}: RecordNumber reset detected "
+                f"(newest {newest_record} < last seen {last_record}) — log cleared? Re-baselining."
+            )
+            last_record = 0
+            self._last_record[log_name] = 0
+
         max_record = last_record
         selected = []
 
         for event in events:
-            if event.TimeGenerated <= time_threshold:
-                continue
-
             record_number = getattr(event, "RecordNumber", None)
-            if record_number is not None:
+            if record_number is None:
+                if event.TimeGenerated <= time_threshold:
+                    continue  # No dedup key: the time filter is all we have
+            else:
+                if last_record == 0 and event.TimeGenerated <= time_threshold:
+                    continue  # Baseline read: skip the historical backlog
                 if record_number <= last_record:
                     continue  # Already processed on a previous read
                 max_record = max(max_record, record_number)
@@ -621,6 +653,43 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
             self._last_record[log_name] = max_record
 
         return selected
+
+    def _read_channel_events(self, log_name: str, log_handle: Any) -> List[Any]:
+        """
+        Reads a channel until drained (newest to oldest, bounded).
+
+        A single ReadEventLog call returns at most ~1000 of the newest events;
+        during a burst (e.g. a brute-force flood) anything beyond that would be
+        skipped forever, because _last_record advances to the newest
+        RecordNumber. Reading backwards batch by batch until we reach the
+        previous high-water mark guarantees no gap, while _MAX_READ_BATCHES
+        caps the work per cycle.
+
+        Args:
+            log_name: Log channel name (for the per-channel high-water mark)
+            log_handle: Open handle from OpenEventLog
+
+        Returns:
+            list: Raw events, newest first (deduplication happens later)
+        """
+        flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
+        last_record = self._last_record.get(log_name, 0)
+        collected: List[Any] = []
+
+        for _ in range(_MAX_READ_BATCHES):
+            batch = win32evtlog.ReadEventLog(log_handle, flags, 0, 1000)
+            if not batch:
+                break
+            collected.extend(batch)
+
+            # Stop once this batch reaches back past events we already
+            # processed; on the baseline read (last_record == 0) only the
+            # empty-batch/cap conditions apply.
+            batch_records = [rn for e in batch if (rn := getattr(e, "RecordNumber", None)) is not None]
+            if batch_records and min(batch_records) <= last_record:
+                break
+
+        return collected
 
     def _read_events_sync(self) -> List[tuple]:
         """
@@ -648,15 +717,7 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                     else:
                         log_source = "Security"
 
-                    # Read events after last check time
-                    flags = win32evtlog.EVENTLOG_BACKWARDS_READ | win32evtlog.EVENTLOG_SEQUENTIAL_READ
-
-                    events = win32evtlog.ReadEventLog(
-                        log_handle,
-                        flags,
-                        0,
-                        1000,  # Read maximum 1000 events per channel
-                    )
+                    events = self._read_channel_events(log_name, log_handle)
 
                     if events:
                         # Filter events by timestamp with 5 second buffer to catch events that might have been missed
@@ -759,8 +820,6 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
         finally:
             # Cleanup
             self.close_event_log()
-            if self.db_conn:
-                self.db_conn.close()
             self.executor.shutdown(wait=True)
             logger.info("\n🛡️  LocalShield Log Watcher stopped.")
 
