@@ -277,5 +277,49 @@ class TestDryRun:
         assert FirewallManager(allowlist=[]).dry_run is False
 
 
+class TestThreadSafety:
+    def test_concurrent_block_ip_invokes_netsh_once(self, monkeypatch):
+        # block_ip runs in the watcher's thread pool; the check-and-reserve
+        # must guarantee a single netsh invocation per IP.
+        import threading
+
+        calls = []
+        call_lock = threading.Lock()
+
+        def fake_run(cmd, **kwargs):
+            with call_lock:
+                calls.append(cmd)
+            return FakeResult(returncode=0)
+
+        monkeypatch.setattr(response_engine.subprocess, "run", fake_run)
+        fw = FirewallManager(allowlist=[], dry_run=False)
+
+        results = []
+        threads = [threading.Thread(target=lambda: results.append(fw.block_ip("93.184.216.34"))) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(calls) == 1, "concurrent blocks of the same IP must run netsh exactly once"
+        assert all(results)
+        assert fw.blocked_ips == {"93.184.216.34"}
+
+    def test_failed_block_rolls_back_reservation(self, monkeypatch):
+        monkeypatch.setattr(
+            response_engine.subprocess,
+            "run",
+            lambda *a, **k: FakeResult(returncode=1, stderr="unexpected error"),
+        )
+        fw = FirewallManager(allowlist=[], dry_run=False)
+
+        assert fw.block_ip("93.184.216.34") is False
+        assert "93.184.216.34" not in fw.blocked_ips, "a failed block must not stay reserved"
+        # A retry after the failure must attempt netsh again (not short-circuit)
+        monkeypatch.setattr(response_engine.subprocess, "run", lambda *a, **k: FakeResult(returncode=0))
+        assert fw.block_ip("93.184.216.34") is True
+        assert "93.184.216.34" in fw.blocked_ips
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

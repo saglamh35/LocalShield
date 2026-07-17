@@ -78,6 +78,32 @@ class TestBrain:
         assert risk == "Medium"
         assert md  # a non-empty fallback explanation is returned
 
+    def test_cache_eviction_thread_safe(self, counting_chat):
+        # analyze() runs in the watcher's thread pool; unsynchronized FIFO
+        # eviction (pop(next(iter(...)))) racing an insert raises
+        # "dictionary changed size during iteration".
+        import threading
+
+        brain = Brain()
+        brain._cache_max = 4
+        errors = []
+
+        def work(i):
+            try:
+                for j in range(20):
+                    brain.analyze(f"Event ID: 4625\nMessage: unique {i}-{j}")
+            except Exception as e:  # pragma: no cover - only on regression
+                errors.append(e)
+
+        threads = [threading.Thread(target=work, args=(i,)) for i in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert errors == []
+        assert len(brain._cache) <= brain._cache_max
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
