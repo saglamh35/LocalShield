@@ -5,6 +5,7 @@ Production-Ready: Updated with type hints and logging
 
 import logging
 import sqlite3
+import threading
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
@@ -241,12 +242,18 @@ def get_all_logs(
             SELECT id, timestamp, event_id, message, ai_analysis, risk_score, mitre_technique
             FROM security_logs
             ORDER BY timestamp {direction}
-        """
+        """  # nosec B608
 
         params: Tuple = ()
         if limit is not None:
+            limit = int(limit)
+            if limit <= 0:
+                # SQLite treats a negative LIMIT as "no limit" — the opposite
+                # of what a caller passing e.g. -1 by mistake would expect.
+                logger.warning(f"get_all_logs: ignoring non-positive limit {limit}, returning no rows")
+                return []
             query += " LIMIT ?"
-            params = (int(limit),)
+            params = (limit,)
 
         cursor.execute(query, params)
         results: List[Tuple[int, str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]] = (
@@ -566,6 +573,12 @@ def get_recent_actions(
 
 _SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3, "critical": 4}
 
+# upsert_incident is SELECT-then-INSERT/UPDATE; events are processed
+# concurrently by the watcher's thread pool, so without serialization two
+# events with the same key could both open an incident (duplicates) or
+# both read the same event_count (lost increment).
+_incident_lock = threading.Lock()
+
 
 def upsert_incident(
     key: str,
@@ -583,49 +596,57 @@ def upsert_incident(
     db_path = db_path or config.DB_PATH
     ts = timestamp or datetime.now()
     ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
-    conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False)
-    try:
-        cursor = conn.cursor()
-        # Most recent open incident for this key
-        cursor.execute(
-            "SELECT id, last_seen, event_count, max_severity FROM incidents "
-            "WHERE key = ? AND status = 'open' ORDER BY last_seen DESC LIMIT 1",
-            (key,),
-        )
-        row = cursor.fetchone()
-
-        fresh = False
-        if row:
-            inc_id, last_seen, count, max_sev = row
-            try:
-                last_dt = datetime.strptime(str(last_seen), "%Y-%m-%d %H:%M:%S")
-                fresh = (ts - last_dt).total_seconds() <= window_seconds
-            except Exception:
-                fresh = False
-
-        if row and fresh:
-            new_sev = max_sev
-            if _SEVERITY_RANK.get(str(severity).lower(), 0) > _SEVERITY_RANK.get(str(max_sev).lower(), 0):
-                new_sev = severity
+    with _incident_lock:
+        # isolation_level=None: explicit transaction control; BEGIN IMMEDIATE
+        # additionally serializes against writers in other processes.
+        conn = sqlite3.connect(db_path, timeout=10.0, check_same_thread=False, isolation_level=None)
+        try:
+            cursor = conn.cursor()
+            cursor.execute("BEGIN IMMEDIATE")
+            # Most recent open incident for this key
             cursor.execute(
-                "UPDATE incidents SET last_seen = ?, event_count = event_count + 1, max_severity = ? WHERE id = ?",
-                (ts_str, new_sev, inc_id),
+                "SELECT id, last_seen, event_count, max_severity FROM incidents "
+                "WHERE key = ? AND status = 'open' ORDER BY last_seen DESC LIMIT 1",
+                (key,),
+            )
+            row = cursor.fetchone()
+
+            fresh = False
+            if row:
+                inc_id, last_seen, count, max_sev = row
+                try:
+                    last_dt = datetime.strptime(str(last_seen), "%Y-%m-%d %H:%M:%S")
+                    fresh = (ts - last_dt).total_seconds() <= window_seconds
+                except Exception:
+                    fresh = False
+
+            if row and fresh:
+                new_sev = max_sev
+                if _SEVERITY_RANK.get(str(severity).lower(), 0) > _SEVERITY_RANK.get(str(max_sev).lower(), 0):
+                    new_sev = severity
+                cursor.execute(
+                    "UPDATE incidents SET last_seen = ?, event_count = event_count + 1, max_severity = ? WHERE id = ?",
+                    (ts_str, new_sev, inc_id),
+                )
+                conn.commit()
+                return inc_id
+
+            cursor.execute(
+                "INSERT INTO incidents (key, title, first_seen, last_seen, event_count, "
+                "max_severity, status) VALUES (?, ?, ?, ?, 1, ?, 'open')",
+                (key, title, ts_str, ts_str, severity),
             )
             conn.commit()
-            return inc_id
-
-        cursor.execute(
-            "INSERT INTO incidents (key, title, first_seen, last_seen, event_count, "
-            "max_severity, status) VALUES (?, ?, ?, ?, 1, ?, 'open')",
-            (key, title, ts_str, ts_str, severity),
-        )
-        conn.commit()
-        return cursor.lastrowid or -1
-    except Exception as e:
-        logger.error(f"Error upserting incident: {e}", exc_info=True)
-        return -1
-    finally:
-        conn.close()
+            return cursor.lastrowid or -1
+        except Exception as e:
+            logger.error(f"Error upserting incident: {e}", exc_info=True)
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            return -1
+        finally:
+            conn.close()
 
 
 def get_incidents(
