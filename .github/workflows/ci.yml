@@ -79,6 +79,6 @@ jobs:
       - name: Install scanners
         run: pip install bandit pip-audit
       - name: Bandit (SAST, fails on medium+ severity)
-        run: bandit -r modules/ db_manager.py log_watcher.py config.py dashboard.py --severity-level medium
+        run: bandit -r modules/ ui/ db_manager.py log_watcher.py config.py dashboard.py --severity-level medium
       - name: pip-audit (dependency CVEs)
         run: pip-audit -r requirements.txt

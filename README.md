@@ -336,7 +336,8 @@ way unless you place an authenticating reverse proxy in front.
 
 ```
 LocalShield/
-├── dashboard.py              # Streamlit dashboard application
+├── dashboard.py              # Streamlit entry point (UI lives in ui/)
+├── ui/                       # Dashboard package: theme, data, charts, views/
 ├── log_watcher.py            # Main log monitoring service (AsyncIO)
 ├── db_manager.py             # Database, indexes, audit & blocked-IP tables
 ├── config.py                 # Configuration and environment variables
