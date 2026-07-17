@@ -43,6 +43,20 @@ keep them green and add tests for new behavior.
   structured-source-only block targeting.
 - **Match the surrounding style** (English comments/docstrings, type hints).
 
+## Suppressing linter/scanner findings
+
+Every `# noqa` / `# nosec` must carry a one-line justification on the same
+line. For ruff, append it after the code; for bandit, the reason goes *before*
+the marker (bandit parses everything after `# nosec` as test IDs):
+
+```python
+proc = subprocess.run(cmd, ...)  # noqa: S603 - fixed argv, no shell; trivy path from operator config
+root = ET.fromstring(xml)  # XML from the local event subsystem, not a network peer  # nosec B314
+```
+
+A suppression without a reason is a review blocker — if the reason is hard to
+write, the finding probably deserves a fix instead.
+
 ## Project layout
 
 See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the component map and

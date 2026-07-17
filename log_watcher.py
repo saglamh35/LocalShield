@@ -190,9 +190,7 @@ class LogWatcher:
         try:
             import xml.etree.ElementTree as ET
 
-            # The XML comes from the local Windows event subsystem
-            # (well-formed, no DTDs), not from a network peer
-            root = ET.fromstring(xml)  # nosec B314
+            root = ET.fromstring(xml)  # XML from the local Windows event subsystem, not a network peer  # nosec B314
 
             # Windows event XML carries a default namespace, so match by local
             # tag name (ignoring the {namespace} prefix) rather than a plain path.

@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 for name in ("win32evtlog", "win32evtlogutil", "win32con"):
     sys.modules.setdefault(name, types.ModuleType(name))
 
-import log_watcher  # noqa: E402
+import log_watcher
 
 
 def _fake_event(record, ts=None):

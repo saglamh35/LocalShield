@@ -86,7 +86,7 @@ class VulnScanner:
         if self.cache_dir:
             cmd += ["--cache-dir", self.cache_dir]
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)  # noqa: S603
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)  # noqa: S603 - fixed argv, no shell; trivy path from operator config
             if proc.returncode != 0:
                 return False
             return self._db_present_from_version(proc.stdout)
@@ -195,7 +195,7 @@ class VulnScanner:
         cmd.append(target)
 
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)  # noqa: S603
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)  # noqa: S603 - fixed argv, no shell; trivy path from operator config
             if proc.returncode != 0:
                 stderr = proc.stderr.strip()
                 if "db" in stderr.lower() and ("download" in stderr.lower() or "need to be updated" in stderr.lower()):
