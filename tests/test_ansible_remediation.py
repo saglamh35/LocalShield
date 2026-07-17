@@ -119,5 +119,56 @@ class TestRemediateDryRun:
         assert Path(result["playbook_path"]).exists()
 
 
+class _FakeProc:
+    def __init__(self, returncode):
+        self.returncode = returncode
+        self.stderr = "boom" if returncode else ""
+
+
+class TestRunPlaybookPreflight:
+    """The execute path must run ansible's own dry run (--check) first and
+    abort the real run when the pre-flight fails."""
+
+    @pytest.fixture
+    def recorded(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(ar.shutil, "which", lambda _: "/usr/bin/ansible-playbook")
+
+        def fake_run(argv, **kwargs):
+            calls.append(argv)
+            rc = self._rc_for(argv, calls)
+            return _FakeProc(rc)
+
+        monkeypatch.setattr(ar.subprocess, "run", fake_run)
+        return calls
+
+    # Overridden per-test via closure state
+    _rc_map = {}
+
+    def _rc_for(self, argv, calls):
+        return self._rc_map.get("check" if "--check" in argv else "run", 0)
+
+    def test_check_then_real_run_in_order(self, db, recorded):
+        self._rc_map = {"check": 0, "run": 0}
+        assert ar._run_playbook("pb.yml", db_path=db) is True
+        assert len(recorded) == 2
+        assert "--check" in recorded[0]
+        assert "--check" not in recorded[1]
+
+    def test_failing_check_aborts_and_audits(self, db, recorded):
+        self._rc_map = {"check": 1}
+        assert ar._run_playbook("pb.yml", db_path=db) is False
+        # Only the pre-flight ran; the hosts were never touched.
+        assert len(recorded) == 1
+        assert "--check" in recorded[0]
+        actions = db_manager.get_recent_actions(db_path=db)
+        assert any(a[2] == "remediation_preflight_failed" for a in actions)
+
+    def test_failing_real_run_returns_false(self, db, recorded):
+        self._rc_map = {"check": 0, "run": 2}
+        assert ar._run_playbook("pb.yml", db_path=db) is False
+        assert len(recorded) == 2
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

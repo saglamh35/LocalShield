@@ -112,14 +112,38 @@ def playbook_for_db(db_path: Optional[str] = None) -> Optional[str]:
     return generate_remediation_playbook([_row_to_finding(r) for r in rows])
 
 
-def _run_playbook(path: str) -> bool:
-    """Execute a playbook with ansible-playbook. Never raises; False on any issue."""
+def _run_playbook(path: str, db_path: Optional[str] = None) -> bool:
+    """
+    Execute a playbook with ansible-playbook. Never raises; False on any issue.
+
+    Read-only before changes: Ansible's own dry run (``--check``) must succeed
+    before the playbook is allowed to touch hosts. A failing pre-flight aborts
+    the real run and is recorded in the audit trail.
+    """
     exe = getattr(config, "ANSIBLE_PLAYBOOK_PATH", "ansible-playbook")
     if shutil.which(exe) is None:
         logger.warning("⚠️  '%s' not found — playbook generated but NOT executed.", exe)
         return False
     try:
-        proc = subprocess.run([exe, path], capture_output=True, text=True, timeout=1800)  # noqa: S603
+        check = subprocess.run(  # noqa: S603 - fixed argv, no shell; exe comes from operator config
+            [exe, "--check", path], capture_output=True, text=True, timeout=1800
+        )
+        if check.returncode != 0:
+            logger.error(
+                "ansible-playbook --check pre-flight failed (rc=%s) — real run aborted: %s",
+                check.returncode,
+                check.stderr.strip(),
+            )
+            db_manager.record_action(
+                "remediation_preflight_failed",
+                target=path,
+                details=f"ansible-playbook --check rc={check.returncode}",
+                db_path=db_path,
+            )
+            return False
+        proc = subprocess.run(  # noqa: S603 - fixed argv, no shell; exe comes from operator config
+            [exe, path], capture_output=True, text=True, timeout=1800
+        )
         if proc.returncode == 0:
             logger.info("Ansible remediation applied via %s", path)
             return True
@@ -176,7 +200,7 @@ def remediate(
     if dry_run:
         logger.warning("🧪 [DRY-RUN] Remediation playbook written to %s — NOT executed.", path)
     else:
-        executed = _run_playbook(path)
+        executed = _run_playbook(path, db_path=db_path)
 
     return {"playbook_path": path, "plays": plays, "executed": executed, "dry_run": dry_run}
 
