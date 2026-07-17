@@ -63,3 +63,41 @@ Windows Event Log (Security + Sysmon)          Linux auth.log (cross-platform)
 - **Cross-platform core:** detection/correlation/notify/incidents are exercised
   on Linux via the `auth.log` importer and the test-suite, even though live
   Windows capture is Windows-only.
+
+## SQLite concurrency & scaling limits
+
+The store is a single SQLite file (`config.DB_PATH`) opened with WAL mode,
+`timeout=10.0` and short-lived connections. That is the right choice for the
+single-host, learning-scale use case — but it has a ceiling worth knowing.
+
+**Who writes today.** The log watcher is the main writer (security_logs,
+actions, blocked_ips, incidents, component_status, correlation_state). The
+dashboard writes only on rare, human-triggered clicks (clear DB, close
+incident, unblock IP), and the vuln scanner / Ansible remediation write when
+manually run. The Prometheus metrics exporter is read-only.
+
+**Failure mode under load.** WAL allows many readers but only one writer at a
+time: concurrent writers serialize on the write lock, and a writer that cannot
+acquire it within the 10s busy timeout surfaces as `SQLITE_BUSY` (logged and,
+for best-effort paths, dropped). A long-lived reader — e.g. the dashboard on
+auto-refresh — can also pin the WAL checkpoint and grow the `-wal` file. At
+learning-scale event rates none of this bites; at sustained bursts
+(~50+ events/s) or with multiple hosts feeding one DB it will.
+
+**Design rule: single writer.** Keep the watcher the sole steady-state writer.
+Any new component must either hand its writes to the watcher process or stay
+read-only; do not add a second continuous writer to the same file.
+
+**PostgreSQL migration path.** All SQL lives behind `db_manager.py` (plain SQL,
+no ORM), so a migration is localized:
+
+1. Swap `sqlite3.connect(...)` for a `psycopg` connection pool behind the same
+   function signatures.
+2. Replace SQLite-isms: `INTEGER PRIMARY KEY AUTOINCREMENT` → `SERIAL`/
+   `IDENTITY`, `INSERT OR REPLACE` → `INSERT ... ON CONFLICT ... DO UPDATE`,
+   `PRAGMA journal_mode=WAL` → not needed.
+3. Move `DB_PATH` to a `DATABASE_URL`-style setting; keep SQLite as the
+   default so the offline single-host experience is unchanged.
+
+The trigger point for that migration is multi-host ingestion or sustained
+write contention — not something a single monitored machine will reach.
