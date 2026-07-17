@@ -50,7 +50,7 @@ Windows Event Log (Security + Sysmon)          Linux auth.log (cross-platform)
 | `modules/notifier.py` | Offline-first alerting (alert-log always on; desktop toast / webhook opt-in). |
 | `modules/network_scanner.py`, `modules/packet_capture.py` | Open-port scan and live packet capture (Scapy). |
 | `db_manager.py` | SQLite schema, indexes, and helpers for logs, audit actions, blocked IPs, and incidents. |
-| `dashboard.py` | Streamlit SOC console (localhost-bound, no auth by design). |
+| `dashboard.py` | Thin Streamlit entry point; the SOC console UI lives in the `ui/` package (theme, data loaders, components, charts, one view per tab). Localhost-bound, no auth by design. |
 
 ## Design principles
 

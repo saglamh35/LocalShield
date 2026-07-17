@@ -30,8 +30,8 @@ localshield-watch = "log_watcher:main"
 # data dirs. Declare the importable code explicitly instead. This is what the
 # `localshield-watch` entry point (log_watcher:main) needs at runtime:
 # log_watcher imports config, db_manager and the modules package.
-packages = ["modules"]
-py-modules = ["log_watcher", "config", "db_manager"]
+packages = ["modules", "ui", "ui.views"]
+py-modules = ["log_watcher", "config", "db_manager", "dashboard"]
 
 [tool.pytest.ini_options]
 # Only collect the real unit tests under tests/.
