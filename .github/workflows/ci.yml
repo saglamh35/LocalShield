@@ -61,4 +61,24 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run tests
-        run: pytest --cov=modules --cov=db_manager --cov-report=term-missing
+        # Coverage includes the core watcher and config — the largest,
+        # most security-relevant files must not be invisible to the report.
+        # The floor stops coverage from silently regressing (currently ~62%).
+        run: >
+          pytest --cov=modules --cov=db_manager --cov=log_watcher --cov=config
+          --cov-report=term-missing --cov-fail-under=55
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install scanners
+        run: pip install bandit pip-audit
+      - name: Bandit (SAST, fails on medium+ severity)
+        run: bandit -r modules/ db_manager.py log_watcher.py config.py dashboard.py --severity-level medium
+      - name: pip-audit (dependency CVEs)
+        run: pip-audit -r requirements.txt

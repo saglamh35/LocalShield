@@ -41,6 +41,30 @@ class Notifier:
         self.alert_log_file: str = str(alert_log_file or getattr(config, "ALERT_LOG_FILE", "alerts.log"))
         self.desktop = getattr(config, "NOTIFY_DESKTOP", False) if desktop is None else desktop
         self.webhook_url = (webhook_url if webhook_url is not None else getattr(config, "NOTIFY_WEBHOOK_URL", "")) or ""
+        # Scheme policy: https anywhere, plain http only to the local machine
+        # (a local ntfy/Gotify fits the offline-first design). Anything else
+        # (file://, ftp://, http to an external host) would hand alert
+        # contents straight to urlopen — disable the webhook instead.
+        if self.webhook_url and not self._is_allowed_webhook_url(self.webhook_url):
+            logger.warning(
+                f"Webhook disabled: only https:// (or http:// to localhost) URLs are allowed "
+                f"(got: {self.webhook_url[:40]!r})"
+            )
+            self.webhook_url = ""
+
+    @staticmethod
+    def _is_allowed_webhook_url(url: str) -> bool:
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(url)
+        except ValueError:
+            return False
+        if parsed.scheme == "https":
+            return True
+        if parsed.scheme == "http":
+            return parsed.hostname in ("localhost", "127.0.0.1", "::1")
+        return False
 
     def should_notify(self, severity: str) -> bool:
         return _rank(severity) >= self.min_rank
@@ -120,7 +144,7 @@ class Notifier:
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            urllib.request.urlopen(req, timeout=3)  # noqa: S310 - user-configured URL
+            urllib.request.urlopen(req, timeout=3)  # noqa: S310  # nosec B310
         except Exception as e:
             logger.debug(f"webhook notification failed (ignored, offline-safe): {e}")
 

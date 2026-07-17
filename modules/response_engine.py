@@ -7,6 +7,7 @@ Production-Ready: with error handling and logging.
 import ipaddress
 import logging
 import subprocess
+import threading
 from typing import Iterable, List, Optional
 
 from modules import iputils
@@ -41,6 +42,10 @@ class FirewallManager:
                      config.RESPONSE_DRY_RUN)
         """
         self.blocked_ips: set[str] = set()  # Track blocked IPs
+        # block_ip/unblock_ip run in the watcher's thread pool; guard the
+        # shared set so two events for the same IP can't both pass the
+        # "already blocked" check and race the mutation.
+        self._lock = threading.Lock()
         # Critical IPs that must never be blocked (e.g. DNS, gateway).
         # Normalized so '2001:DB8::1' in config matches '2001:db8::1' in a log.
         source = allowlist if allowlist is not None else _DEFAULT_ALLOWLIST
@@ -141,10 +146,14 @@ class FirewallManager:
             logger.warning(f"⚠️  Allowlisted IP not blocked (safety): {ip_address}")
             return False
 
-        # Check whether it is already blocked
-        if ip_address in self.blocked_ips:
-            logger.info(f"ℹ️  IP address already blocked: {ip_address}")
-            return True
+        # Check-and-reserve atomically: without the lock, two threads handling
+        # events for the same IP could both pass this check and both invoke
+        # netsh. The reservation is rolled back if the command fails.
+        with self._lock:
+            if ip_address in self.blocked_ips:
+                logger.info(f"ℹ️  IP address already blocked: {ip_address}")
+                return True
+            self.blocked_ips.add(ip_address)
 
         # Build the Windows Firewall rule
         rule_name = self._rule_name(ip_address)
@@ -152,7 +161,6 @@ class FirewallManager:
         # Dry-run: every safety check above still applies, but no firewall
         # command is executed — the would-be action is only logged/audited.
         if self.dry_run:
-            self.blocked_ips.add(ip_address)
             logger.warning(f"🧪 [DRY-RUN] Would block IP address: {ip_address} (rule: {rule_name})")
             return True
 
@@ -185,7 +193,6 @@ class FirewallManager:
 
             # Success check
             if result.returncode == 0:
-                self.blocked_ips.add(ip_address)
                 logger.warning(f"🛡️  IP address blocked successfully: {ip_address} (rule: {rule_name})")
                 return True
             else:
@@ -195,17 +202,22 @@ class FirewallManager:
                 # If the rule already exists, that is not an error.
                 # "zaten var" is netsh's message on Turkish-locale Windows.
                 if "already exists" in error_output or "zaten var" in error_output:
-                    self.blocked_ips.add(ip_address)
                     logger.info(f"ℹ️  Firewall rule already exists: {rule_name}")
                     return True
                 else:
+                    with self._lock:
+                        self.blocked_ips.discard(ip_address)
                     logger.error(f"❌ IP block error ({ip_address}): {result.stderr}")
                     return False
 
         except subprocess.TimeoutExpired:
+            with self._lock:
+                self.blocked_ips.discard(ip_address)
             logger.error(f"❌ IP block timed out: {ip_address}")
             return False
         except Exception as e:
+            with self._lock:
+                self.blocked_ips.discard(ip_address)
             logger.error(f"❌ Unexpected IP block error ({ip_address}): {e}", exc_info=True)
             return False
 
@@ -224,7 +236,8 @@ class FirewallManager:
 
         # Dry-run: mirror block_ip — no firewall command is executed.
         if self.dry_run:
-            self.blocked_ips.discard(ip_address)
+            with self._lock:
+                self.blocked_ips.discard(ip_address)
             logger.info(f"🧪 [DRY-RUN] Would unblock IP address: {ip_address}")
             return True
 
@@ -234,7 +247,8 @@ class FirewallManager:
             result = subprocess.run(command, capture_output=True, text=True, timeout=10, check=False)
 
             if result.returncode == 0:
-                self.blocked_ips.discard(ip_address)
+                with self._lock:
+                    self.blocked_ips.discard(ip_address)
                 logger.info(f"✅ IP address unblocked: {ip_address}")
                 return True
             else:

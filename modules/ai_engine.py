@@ -6,6 +6,7 @@ Production-Ready: Updated with JSON output format and type hints
 import json
 import logging
 import re
+import threading
 from typing import Any, Dict, Optional, Tuple
 
 import ollama
@@ -46,8 +47,11 @@ class Brain:
 
         # Small in-memory cache so identical events are not re-sent to the LLM.
         # Keyed on the event content with volatile timestamps stripped out.
+        # analyze() runs in the watcher's thread pool, so eviction+insert must
+        # be atomic (iterating while another thread mutates raises RuntimeError).
         self._cache: Dict[str, Tuple[str, str]] = {}
         self._cache_max: int = 256
+        self._cache_lock = threading.Lock()
 
         # System prompt for JSON output format
         self.system_prompt: str = """You are a Senior SOC (Security Operations Center) Analyst.
@@ -133,7 +137,8 @@ RULES:
         try:
             # Return a cached analysis for an identical event, if present
             cache_key = self._cache_key(log_text)
-            cached = self._cache.get(cache_key)
+            with self._cache_lock:
+                cached = self._cache.get(cache_key)
             if cached is not None:
                 logger.debug("AI analysis served from cache")
                 return cached
@@ -210,9 +215,10 @@ Also write this in the "risk_score" field: "{kb_info.get("risk_level", "Medium")
                 result = (markdown_analysis, analysis_response.risk_score)
 
                 # Cache only successful analyses (bounded, FIFO eviction)
-                if len(self._cache) >= self._cache_max:
-                    self._cache.pop(next(iter(self._cache)))
-                self._cache[cache_key] = result
+                with self._cache_lock:
+                    if len(self._cache) >= self._cache_max:
+                        self._cache.pop(next(iter(self._cache)), None)
+                    self._cache[cache_key] = result
 
                 return result
 

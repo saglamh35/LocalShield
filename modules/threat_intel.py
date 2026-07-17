@@ -225,7 +225,7 @@ def update_feed(
         raise ValueError(f"Feed URL must use https:// (got {url!r})")
 
     logger.info(f"Downloading threat feed: {url}")
-    with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310 - https enforced above
+    with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310  # nosec B310
         text = response.read().decode("utf-8", errors="replace")
 
     entries = _parse_feed_text(text)

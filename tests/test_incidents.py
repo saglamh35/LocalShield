@@ -97,3 +97,32 @@ class TestIncidentTriage:
 
     def test_unknown_id_returns_false(self, db):
         assert not db_manager.set_incident_status(999999, "closed", db_path=db)
+
+
+class TestIncidentConcurrency:
+    def test_concurrent_upserts_do_not_duplicate_or_lose_counts(self, db):
+        # The watcher processes events in parallel; without serialization two
+        # same-key events could both SELECT "no open incident" and both INSERT
+        # (duplicates), or both read the same count (lost increment).
+        from concurrent.futures import ThreadPoolExecutor
+
+        now = datetime.now()
+
+        def upsert(_):
+            return db_manager.upsert_incident(
+                key="203.0.113.9",
+                title="Brute force",
+                severity="High",
+                timestamp=now,
+                window_seconds=1800,
+                db_path=db,
+            )
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            ids = list(pool.map(upsert, range(20)))
+
+        assert all(i > 0 for i in ids), "no upsert may fail"
+        assert len(set(ids)) == 1, "all events must fold into a single incident"
+        incidents = db_manager.get_incidents(db_path=db)
+        assert len(incidents) == 1
+        assert incidents[0][5] == 20, "every increment must be counted"

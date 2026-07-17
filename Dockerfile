@@ -23,10 +23,20 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Persist the SQLite database (and anything else under /data) via a volume.
-RUN mkdir -p /data
+# Run as a dedicated non-root user: a compromised dashboard process should
+# not have root inside the container.
+RUN useradd --create-home --uid 1000 localshield \
+    && mkdir -p /data \
+    && chown -R localshield:localshield /app /data
 VOLUME ["/data"]
+USER localshield
 
 EXPOSE 8501
+
+# Streamlit's built-in health endpoint; python stands in for curl (not
+# installed in the slim base image).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)"
 
 # Bind to 0.0.0.0 *inside* the container. The host must publish this to
 # 127.0.0.1 only (see docker-compose.yml) to keep the localhost-only posture,

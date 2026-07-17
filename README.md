@@ -126,7 +126,7 @@
 
 ### ✅ Quality
 
-- **280+ unit tests** and **GitHub Actions CI** across Python 3.10 / 3.11 / 3.12
+- **320+ unit tests** and **GitHub Actions CI** across Python 3.10 / 3.11 / 3.12
 - **Cross-platform detection core**: import Linux SSH `auth.log` and run it through the same rules (see below)
 
 ---
@@ -320,7 +320,7 @@ way unless you place an authenticating reverse proxy in front.
 
 ### Tooling
 
-- **pytest**: 280+ unit & integration tests
+- **pytest**: 320+ unit & integration tests
 - **GitHub Actions**: CI matrix across Python 3.10 / 3.11 / 3.12
 
 ### Architecture Patterns
@@ -391,7 +391,7 @@ LocalShield/
 │
 ├── payloads/duckyscript/     # Educational DuckyScript demos (O.MG cable / iPadOS)
 ├── grafana/                  # Ready-to-import Grafana dashboard (Prometheus)
-├── tests/                    # 280+ unit & integration tests
+├── tests/                    # 320+ unit & integration tests
 ├── data/                     # Knowledge base and threat intel data
 ├── .streamlit/config.toml    # Binds the dashboard to localhost
 ├── .github/workflows/ci.yml  # GitHub Actions CI (pytest, Py 3.10–3.12)

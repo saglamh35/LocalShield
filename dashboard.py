@@ -3,6 +3,7 @@ Streamlit Dashboard - LocalShield Professional SIEM Interface
 """
 
 import asyncio
+import html
 import time
 from datetime import datetime
 from pathlib import Path
@@ -255,16 +256,20 @@ def get_threat_feed_count() -> int:
 
 
 def render_kpi(column, icon, label, value, foot="", accent="var(--ls-accent)") -> None:
-    """Renders a single professional KPI card into the given column."""
+    """Renders a single professional KPI card into the given column.
+
+    Values are escaped: the threat model treats log-derived content as
+    attacker-influenced, and these cards render with unsafe_allow_html.
+    """
     column.markdown(
         f"""
         <div class="ls-kpi" style="--kpi-accent:{accent}">
             <div class="k-top">
-                <span class="k-label">{label}</span>
+                <span class="k-label">{html.escape(str(label))}</span>
                 <span class="k-ico">{icon}</span>
             </div>
-            <div class="k-val">{value}</div>
-            <div class="k-foot">{foot}</div>
+            <div class="k-val">{html.escape(str(value))}</div>
+            <div class="k-foot">{html.escape(str(foot))}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -355,6 +360,25 @@ def translate_risk_level(risk_level) -> str:
         return risk_str.capitalize()
 
     return risk_str  # Return as-is if unknown
+
+
+def map_severity(risk_level) -> str:
+    """
+    Maps a stored risk level (English or legacy Turkish) to the severity
+    tier shown in the logs table. "critical" must be checked before "high":
+    checking "high" first would swallow every value into one tier and make
+    the High tier unreachable.
+    """
+    risk = str(risk_level).lower()
+    if "critical" in risk or "kritik" in risk:
+        return "Critical"
+    if "high" in risk or "yüksek" in risk:
+        return "High"
+    if "medium" in risk or "orta" in risk:
+        return "Medium"
+    if "low" in risk or "düşük" in risk:
+        return "Low"
+    return "Unspecified"
 
 
 def filter_data(df, risk_filters, event_id_filter, text_search=None, date_range=None) -> "pd.DataFrame":
@@ -576,7 +600,7 @@ def render_log_card(row) -> None:
             st.write(f"**ID:** `{row.get('ID', 'N/A')}`")
             st.write(f"**Event ID:** `{event_id}`")
             st.write(f"**Time:** `{time_str}`")
-            risk_display = f"<span class='{risk_class}'>**{risk_level_en}** {risk_icon}</span>"
+            risk_display = f"<span class='{risk_class}'>**{html.escape(str(risk_level_en))}** {risk_icon}</span>"
             st.markdown(f"**Risk Level:** {risk_display}", unsafe_allow_html=True)
 
             # Show MITRE Technique
@@ -795,19 +819,7 @@ def main() -> None:
 
             # Add Severity column (map from Risk Level)
             if not filtered_df.empty and "Risk Level" in filtered_df.columns:
-                filtered_df["Severity"] = filtered_df["Risk Level"].apply(
-                    lambda x: (
-                        "Critical"
-                        if "high" in str(x).lower() or "yüksek" in str(x).lower()
-                        else "High"
-                        if "high" in str(x).lower()
-                        else "Medium"
-                        if "medium" in str(x).lower() or "orta" in str(x).lower()
-                        else "Low"
-                        if "low" in str(x).lower() or "düşük" in str(x).lower()
-                        else "Unspecified"
-                    )
-                )
+                filtered_df["Severity"] = filtered_df["Risk Level"].apply(map_severity)
 
             # CSV Download Button and Log Header
             col_header1, col_header2 = st.columns([3, 1])
@@ -914,11 +926,11 @@ def main() -> None:
                         f"""
                         <div class="ls-ip-card" style="border-left-color:{border}">
                             <div>
-                                <div class="ip">#{inc_id} · {key}</div>
-                                <div class="meta">{(title or "Incident")[:90]}</div>
-                                <div class="meta">{count} event(s) · {first_seen} → {last_seen} · {status_badge}</div>
+                                <div class="ip">#{inc_id} · {html.escape(str(key))}</div>
+                                <div class="meta">{html.escape((title or "Incident")[:90])}</div>
+                                <div class="meta">{count} event(s) · {html.escape(str(first_seen))} → {html.escape(str(last_seen))} · {status_badge}</div>
                             </div>
-                            <span class="ls-chip {chip}" style="margin-left:auto">{sev.upper()}</span>
+                            <span class="ls-chip {chip}" style="margin-left:auto">{html.escape(sev.upper())}</span>
                         </div>
                         """,
                         unsafe_allow_html=True,
@@ -979,10 +991,10 @@ def main() -> None:
                             f"""
                             <div class="ls-ip-card">
                                 <div>
-                                    <div class="ip">{ip}</div>
-                                    <div class="meta">{reason or "Blocked"} · {when}</div>
+                                    <div class="ip">{html.escape(str(ip))}</div>
+                                    <div class="meta">{html.escape(str(reason or "Blocked"))} · {html.escape(when)}</div>
                                 </div>
-                                <span class="tag">{rule_name or "BLOCKED"}</span>
+                                <span class="tag">{html.escape(str(rule_name or "BLOCKED"))}</span>
                             </div>
                             """,
                             unsafe_allow_html=True,

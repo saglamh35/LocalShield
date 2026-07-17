@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.5", "mypy>=1.8", "pytest>=7.4.0", "pytest-cov>=4.0"]
+dev = ["ruff>=0.5", "mypy>=1.8", "pytest>=7.4.0", "pytest-cov>=4.0", "bandit>=1.7", "pip-audit>=2.7"]
 
 [project.scripts]
 localshield-watch = "log_watcher:main"
@@ -48,7 +48,7 @@ addopts = "-ra"
 line-length = 120
 target-version = "py310"
 # Ad-hoc root scripts run code at import time; not part of the linted package.
-extend-exclude = ["brain_test.py", "test_firewall.py", "test_sniffer.py", "simulate_attack.py"]
+extend-exclude = ["brain_test.py", "test_firewall.py", "test_sniffer.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]  # pycodestyle, pyflakes, isort
