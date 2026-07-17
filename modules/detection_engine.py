@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import yaml
 
 from modules import iputils
+from modules.correlation_store import CorrelationStore
 from modules.rule_schema import validate_rule
 
 # Logging configuration
@@ -23,14 +24,18 @@ logger = logging.getLogger(__name__)
 class DetectionRule:
     """Class representing a single detection rule"""
 
-    def __init__(self, rule_data: Dict[str, Any], rule_file: str):
+    def __init__(self, rule_data: Dict[str, Any], rule_file: str, store: Optional[CorrelationStore] = None):
         """
         Creates DetectionRule.
 
         Args:
             rule_data: Rule data parsed from YAML file
             rule_file: Rule file name
+            store: Optional persistence for correlation priors. With the
+                default None, correlation state lives in memory only (exactly
+                the pre-persistence behavior).
         """
+        self._store = store
         # Required fields
         self.id: str = rule_data.get("id", f"rule_{rule_file}")
         self.name: str = rule_data.get("name", "Unknown Rule")
@@ -292,6 +297,8 @@ class DetectionRule:
             # A prior event (e.g. a failed logon): record it, don't fire yet.
             if str(event_id) == self.corr_prior_event_id:
                 self.event_history[source].append((timestamp, {}))
+                if self._store is not None:
+                    self._store.record_prior(self.id, source, timestamp)
                 return False
 
             # The trigger event (e.g. a successful logon): fire if enough priors.
@@ -301,6 +308,8 @@ class DetectionRule:
                     # this, every later trigger from the same source re-fires
                     # until the window expires.
                     del self.event_history[source]
+                    if self._store is not None:
+                        self._store.clear_key(self.id, source)
                     return True
                 return False
 
@@ -408,14 +417,18 @@ class DetectionEngine:
     Engine that loads YAML-based detection rules and checks logs.
     """
 
-    def __init__(self, rules_dir: str = "rules"):
+    def __init__(self, rules_dir: str = "rules", store: Optional[CorrelationStore] = None):
         """
         Initializes DetectionEngine.
 
         Args:
             rules_dir: Directory where rule files are located
+            store: Optional correlation-state persistence. When given, prior
+                events survive restarts: rules record them as they happen and
+                load_rules() re-seeds each correlation rule from the store.
         """
         self.rules_dir = Path(rules_dir)
+        self.store = store
         self.rules: List[DetectionRule] = []
         self.load_rules()
 
@@ -450,7 +463,8 @@ class DetectionEngine:
                             except Exception as ve:
                                 logger.error(f"Skipping invalid rule in {yaml_file.name}: {ve}")
                                 continue
-                            rule = DetectionRule(rule_item, yaml_file.name)
+                            rule = DetectionRule(rule_item, yaml_file.name, store=self.store)
+                            self._restore_correlation_state(rule)
                             self.rules.append(rule)
                             logger.info(f"Rule loaded: {rule.name} (ID: {rule.id}) from {yaml_file.name}")
 
@@ -521,6 +535,24 @@ class DetectionEngine:
                 results.append(rule.get_result())
 
         return results
+
+    def _restore_correlation_state(self, rule: DetectionRule) -> None:
+        """
+        Re-seeds a correlation rule's in-memory history from the store so an
+        attack sequence in progress before a restart is not forgotten.
+        """
+        if not rule.correlation or self.store is None:
+            return
+        try:
+            cutoff = datetime.now() - timedelta(seconds=rule.corr_within)
+            priors = self.store.load_priors(rule.id, cutoff)
+            for key, timestamps in priors.items():
+                rule.event_history[key] = [(ts, {}) for ts in timestamps]
+            if priors:
+                total = sum(len(v) for v in priors.values())
+                logger.info(f"Restored {total} correlation prior(s) for rule {rule.id} ({len(priors)} source(s))")
+        except Exception as e:
+            logger.debug(f"correlation-state restore failed for {rule.id} (ignored): {e}")
 
     def reload_rules(self) -> None:
         """Reloads rules (hot reload)"""

@@ -140,6 +140,18 @@ def init_db(db_path: Optional[str] = None) -> sqlite3.Connection:
             )
         """)
 
+        # Correlation-rule prior events (one row per prior, e.g. one failed
+        # logon). Persisted so an in-progress attack sequence survives a
+        # watcher restart; see modules/correlation_store.py.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS correlation_state (
+                rule_id TEXT NOT NULL,
+                event_key TEXT NOT NULL,
+                ts DATETIME NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_corr_rule_key ON correlation_state(rule_id, event_key)")
+
         conn.commit()
         logger.info(f"Database '{db_path}' successfully created/connected")
         logger.debug("'security_logs' table ready")
