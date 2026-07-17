@@ -184,9 +184,9 @@ class PacketSniffer:
                                 desc = iface_info.get("description", iface_info.get("win_name", ""))
 
                                 # Skip loopback and invalid IPs
-                                if (
-                                    ip and ip != "0.0.0.0" and ip != "127.0.0.1"
-                                ):  # address comparison, not a socket bind  # nosec B104
+                                # (nosec must sit on the "0.0.0.0" line: bandit
+                                # anchors B104 to the literal, so keep this one line)
+                                if ip and ip != "0.0.0.0" and ip != "127.0.0.1":  # compare, not a bind  # nosec B104
                                     # Prefer non-loopback interfaces
                                     if "Loopback" not in str(desc) and "lo" not in str(desc).lower():
                                         # Prefer Ethernet/Wi-Fi over other interfaces
@@ -232,9 +232,8 @@ class PacketSniffer:
                 for iface in if_list:
                     try:
                         addr = get_if_addr(iface)
-                        if (
-                            addr and addr != "0.0.0.0" and addr != "127.0.0.1"
-                        ):  # address comparison, not a socket bind  # nosec B104
+                        # (single line on purpose: bandit anchors B104 to the "0.0.0.0" literal)
+                        if addr and addr != "0.0.0.0" and addr != "127.0.0.1":  # compare, not a bind  # nosec B104
                             if "Loopback" not in str(iface) and "lo" not in str(iface).lower():
                                 print(f"✅ Found active interface: {iface} (IP: {addr})")
                                 logger.info(f"Selected interface (get_if_list fallback): {iface} - IP: {addr}")
