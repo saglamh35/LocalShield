@@ -33,6 +33,7 @@ from db_manager import (
     upsert_incident,
 )
 from modules.ai_engine import Brain
+from modules.correlation_store import CorrelationStore
 from modules.detection_engine import DetectionEngine
 from modules.notifier import Notifier
 from modules.response_engine import FirewallManager
@@ -71,14 +72,18 @@ class LogWatcher:
     def __init__(self) -> None:
         """Initializes LogWatcher"""
         self.brain = Brain()
-        self.detection_engine = DetectionEngine()  # Rule engine
+        # Create the schema up front; every write later opens its own
+        # short-lived connection, so keeping this one open would just hold
+        # an idle handle for the process lifetime. Must run before the
+        # detection engine below reads correlation state from the DB.
+        init_db(config.DB_PATH).close()
+        # Rule engine, with correlation priors persisted so an in-progress
+        # attack sequence (e.g. brute-force failures) survives a restart.
+        self._correlation_store = CorrelationStore(config.DB_PATH)
+        self.detection_engine = DetectionEngine(store=self._correlation_store)
         self.firewall_manager = FirewallManager()  # Active response engine
         self.threat_intel = ThreatIntel()  # Threat intelligence engine
         self.notifier = Notifier()  # Offline-first alerting
-        # Create the schema up front; every write later opens its own
-        # short-lived connection, so keeping this one open would just hold
-        # an idle handle for the process lifetime.
-        init_db(config.DB_PATH).close()
         # Reload persisted blocked IPs so a restart knows what is already blocked
         try:
             persisted = [row[0] for row in get_blocked_ips(config.DB_PATH)]
@@ -774,6 +779,13 @@ Note: Pay special attention to fields like 'Account Name', 'Workstation Name', '
                     logger.info(f"⏲️  Timed block expired and lifted: {ip}")
         except Exception as e:
             logger.debug(f"block-expiry maintenance failed (ignored): {e}")
+
+        # Drop stale correlation priors. Rule windows are minutes, so anything
+        # older than an hour can never contribute to a future match.
+        try:
+            self._correlation_store.prune(datetime.now() - timedelta(hours=1))
+        except Exception as e:
+            logger.debug(f"correlation-state prune failed (ignored): {e}")
 
         # Daily retention purge (no-op when LOG_RETENTION_DAYS is 0)
         if config.LOG_RETENTION_DAYS > 0:
