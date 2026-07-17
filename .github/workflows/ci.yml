@@ -63,10 +63,12 @@ jobs:
       - name: Run tests
         # Coverage includes the core watcher and config — the largest,
         # most security-relevant files must not be invisible to the report.
-        # The floor stops coverage from silently regressing (currently ~62%).
+        # The floor stops coverage from silently regressing (currently ~63%);
+        # ratchet it up as coverage grows rather than leaving headroom for
+        # large untested modules to slip in.
         run: >
           pytest --cov=modules --cov=db_manager --cov=log_watcher --cov=config
-          --cov-report=term-missing --cov-fail-under=55
+          --cov-report=term-missing --cov-fail-under=60
 
   security:
     runs-on: ubuntu-latest
